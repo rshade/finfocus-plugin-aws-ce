@@ -1,0 +1,27 @@
+metadata:
+    name: aws-ce
+    version: 0.1.0
+    description: PulumiCost plugin for aws-ce
+    author: rshade
+    homepage: ""
+    repository: ""
+    license: Apache-2.0
+    keywords:
+        - pulumicost
+        - cost
+        - plugin
+        - aws
+    createdat: null
+    updatedat: null
+specification:
+    specversion: "1.0"
+    supportedproviders:
+        - aws
+    supportedresources: {}
+    capabilities:
+        - actual_cost
+    servicedefinition: null
+    observabilitysupport: null
+security: null
+installation: null
+configuration: null
