@@ -1,0 +1,25 @@
+{
+  "metadata":  {
+    "name":  "aws-ce",
+    "version":  "0.1.0",
+    "description":  "PulumiCost plugin for aws-ce",
+    "author":  "rshade",
+    "license":  "Apache-2.0",
+    "keywords":  [
+      "pulumicost",
+      "cost",
+      "plugin",
+      "aws"
+    ]
+  },
+  "specification":  {
+    "specVersion":  "1.0",
+    "supportedProviders":  [
+      "aws"
+    ],
+    "capabilities":  [
+      "projected_cost",
+      "actual_cost"
+    ]
+  }
+}
