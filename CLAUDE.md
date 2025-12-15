@@ -65,3 +65,37 @@ testPlugin.TestActualCost(resourceID, from, to, expectError)
 - Plugin supports `aws` provider only (configured in `NewCalculator()`)
 - Cost Explorer is a global AWS service; region doesn't affect data access
 - Client initialization is lazy (on first API call)
+
+## Plugin SDK Reference (v0.4.6)
+
+The `pluginsdk` package (`github.com/rshade/pulumicost-spec/sdk/go/pluginsdk`) provides standardized helpers that **MUST** be used.
+
+### 1. Environment Variables (`env.go`)
+- **Usage**: Replace manual `os.Getenv` calls.
+- `GetPort()`: `PULUMICOST_PLUGIN_PORT`
+- `GetLogLevel()`: `PULUMICOST_LOG_LEVEL`
+- `GetLogFile()`: `PULUMICOST_LOG_FILE` (Absolute path)
+- `IsTestMode()`: `PULUMICOST_TEST_MODE == "true"`
+
+### 2. Validation (`validation.go`)
+- **Usage**: Call at the start of RPC handlers.
+- `ValidateProjectedCostRequest(req)`
+- `ValidateActualCostRequest(req)`
+- Returns pre-defined errors (e.g., `ErrActualCostTimeRangeInvalid`).
+
+### 3. FOCUS 1.2 Builder (`focus_builder.go`)
+- **Usage**: Constructing `FocusCostRecord`s for `GetActualCost`.
+- `NewFocusRecordBuilder().WithIdentity(...).WithFinancials(...).Build()`
+- Ensures compliance with FinOps FOCUS 1.2 schema.
+
+### 4. Logging (`logging.go`)
+- **Usage**: Structured Zerolog setup.
+- `NewLogWriter()`: Returns writer for `PULUMICOST_LOG_FILE`.
+- `NewPluginLogger(name, version, level, writer)`: Creates standard logger.
+- `LogOperation(logger, "OperationName")`: returns a done function to defer for timing.
+
+### 5. Server & Flags (`sdk.go`)
+- **Usage**: Main entry point.
+- `ParsePortFlag()`: Parses `--port` (call `flag.Parse()` first).
+- `Serve(ctx, config)`: Starts gRPC server.
+- **Interfaces**: Implement `BudgetsProvider` and `RecommendationsProvider` for new features.
