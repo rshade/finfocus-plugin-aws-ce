@@ -99,3 +99,10 @@ The `pluginsdk` package (`github.com/rshade/pulumicost-spec/sdk/go/pluginsdk`) p
 - `ParsePortFlag()`: Parses `--port` (call `flag.Parse()` first).
 - `Serve(ctx, config)`: Starts gRPC server.
 - **Interfaces**: Implement `BudgetsProvider` and `RecommendationsProvider` for new features.
+
+## Active Technologies
+- Go 1.25.5 + pulumicost-spec v0.4.7+ (requires upstream change), aws-sdk-go-v2 (002-add-arn-spec)
+- N/A (stateless plugin, optional cache) (002-add-arn-spec)
+
+## Recent Changes
+- 002-add-arn-spec: Added Go 1.25.5 + pulumicost-spec v0.4.7+ (requires upstream change), aws-sdk-go-v2
