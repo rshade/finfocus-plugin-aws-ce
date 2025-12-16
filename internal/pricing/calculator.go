@@ -4,6 +4,7 @@ package pricing
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
@@ -89,10 +90,14 @@ func (c *Calculator) GetProjectedCost(_ context.Context, req *pbc.GetProjectedCo
 // GetActualCost retrieves actual historical costs from AWS Cost Explorer.
 func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRequest) (*pbc.GetActualCostResponse, error) {
 	resourceID := req.GetResourceId()
-	
-	c.logger.Debug().
-		Str("resource_id", resourceID).
-		Msg("GetActualCost request received")
+	arn := req.GetArn()
+
+	// Contextual logger
+	logEvent := c.logger.Debug().Str("resource_id", resourceID)
+	if arn != "" {
+		logEvent.Str("arn", arn)
+	}
+	logEvent.Msg("GetActualCost request received")
 
 	// Validate input
 	if resourceID == "" {
@@ -117,7 +122,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 			Msg("Invalid time range")
 		return nil, fmt.Errorf("invalid time range: end time (%v) is before start time (%v)", endTime, startTime)
 	}
-	
+
 	// Validate 14 month lookback limit
 	lookbackLimit := time.Now().AddDate(0, -14, 0)
 	if startTime.Before(lookbackLimit) {
@@ -128,8 +133,11 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 		return nil, fmt.Errorf("invalid time range: start time (%v) exceeds 14 months lookback limit", startTime)
 	}
 
+	// Resolve identifier to use for lookup (ARN takes precedence if present)
+	lookupID := c.resolveIdentifier(req)
+
 	// Generate cache key
-	cacheKey := fmt.Sprintf("cost:%s:%d:%d", resourceID, req.GetStart().GetSeconds(), req.GetEnd().GetSeconds())
+	cacheKey := fmt.Sprintf("cost:%s:%d:%d", lookupID, req.GetStart().GetSeconds(), req.GetEnd().GetSeconds())
 
 	// Check cache
 	if c.cache != nil {
@@ -143,14 +151,37 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 	granularity := "DAILY"
 	dimensions := []string{"SERVICE"}
 
-	// Create filter for resource ID
+	// Create filter
 	var filter *types.Expression
-	if resourceID != "" {
-		filter = &types.Expression{
+
+	// Extract context from ARN if available
+	var accountID string
+	if arn != "" {
+		if parsed, err := ParseARN(arn); err == nil {
+			accountID = parsed.AccountID
+		}
+	}
+
+	if lookupID != "" {
+		resourceFilter := types.Expression{
 			Dimensions: &types.DimensionValues{
 				Key:    types.DimensionResourceId,
-				Values: []string{resourceID},
+				Values: []string{lookupID},
 			},
+		}
+
+		if accountID != "" {
+			accountFilter := types.Expression{
+				Dimensions: &types.DimensionValues{
+					Key:    types.DimensionLinkedAccount,
+					Values: []string{accountID},
+				},
+			}
+			filter = &types.Expression{
+				And: []types.Expression{resourceFilter, accountFilter},
+			}
+		} else {
+			filter = &resourceFilter
 		}
 	}
 
@@ -158,12 +189,12 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 	start := time.Now()
 	clientCosts, err := c.ceClient.GetCost(ctx, filter, dimensions, startTime, endTime, granularity)
 	duration := time.Since(start)
-	
+
 	if err != nil {
 		c.logger.Error().Err(err).Msg("Failed to retrieve costs from AWS")
 		return nil, fmt.Errorf("retrieving costs: %w", err)
 	}
-	
+
 	c.logger.Info().
 		Int("results_count", len(clientCosts)).
 		Dur("duration", duration).
@@ -172,7 +203,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 	// If no costs found, return response with NoData hint
 	if len(clientCosts) == 0 {
 		return &pbc.GetActualCostResponse{
-			Results: []*pbc.ActualCostResult{},
+			Results:      []*pbc.ActualCostResult{},
 			FallbackHint: pbc.FallbackHint_FALLBACK_HINT_RECOMMENDED,
 		}, nil
 	}
@@ -202,6 +233,38 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 	}
 
 	return c.buildResponse(costs), nil
+}
+
+// resolveIdentifier determines which identifier to use for cost lookup.
+// Returns ARN if available, otherwise ResourceId.
+func (c *Calculator) resolveIdentifier(req *pbc.GetActualCostRequest) string {
+	arn := req.GetArn()
+	if arn == "" {
+		return req.GetResourceId()
+	}
+
+	parsed, err := ParseARN(arn)
+	if err != nil {
+		c.logger.Warn().Err(err).Str("arn", arn).Msg("Malformed ARN provided; falling back to ResourceId")
+		return req.GetResourceId()
+	}
+
+	// Verify identity: Check if ResourceId matches the parsed resource
+	// parsed.Resource might be "instance/i-12345" or "function:name"
+	// req.ResourceId might be "i-12345"
+	resourceID := req.GetResourceId()
+	
+	// Check if the parsed resource ends with the request ResourceId
+	// This handles "instance/i-123" vs "i-123"
+	if !strings.HasSuffix(parsed.Resource, resourceID) {
+		// Strict check failed, try contains for safety or just log
+		c.logger.Warn().
+			Str("resource_id", resourceID).
+			Str("arn_resource", parsed.Resource).
+			Msg("Identifier mismatch: ResourceId does not match ARN resource component. Using ARN as source of truth.")
+	}
+
+	return arn
 }
 
 func (c *Calculator) buildResponse(costs []CostEntry) *pbc.GetActualCostResponse {

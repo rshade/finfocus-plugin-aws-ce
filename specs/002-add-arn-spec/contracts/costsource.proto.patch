@@ -1,0 +1,25 @@
+// Proto change for pulumicost-spec repository
+// Target file: proto/pulumicost/v1/costsource.proto
+// This is a PATCH specification, not the full file
+
+// Add the following field to GetActualCostRequest message:
+
+message GetActualCostRequest {
+  string resource_id = 1;
+  google.protobuf.Timestamp start = 2;
+  google.protobuf.Timestamp end = 3;
+  string resource_type = 4;
+
+  // NEW FIELD - Add after resource_type
+  // Cloud canonical identifier (ARN for AWS, Resource ID for Azure/GCP).
+  // When provided, takes precedence over resource_id for cost lookups.
+  // Plugins should:
+  //   1. Parse the ARN to extract account/region context
+  //   2. Compare resource_id with ARN resource portion
+  //   3. Log warning on mismatch, use ARN as source of truth
+  // Format for AWS: arn:partition:service:region:account-id:resource
+  string arn = 5;
+}
+
+// No changes required to GetActualCostResponse
+// No changes required to other messages
