@@ -44,6 +44,47 @@ The plugin embeds `pluginsdk.BasePlugin` and uses:
 - `pluginsdk.Calculator()` - Response builders
 - `pluginsdk.NotSupportedError()`, `pluginsdk.NoDataError()` - Standard errors
 
+### SDK Compliance (v0.4.7+)
+
+The plugin uses standardized SDK helpers for configuration and logging:
+
+**Entry Point (`cmd/plugin/main.go`):**
+
+```go
+// Initialize logger using SDK helpers
+logWriter := pluginsdk.NewLogWriter()
+level := parseLogLevel(pluginsdk.GetLogLevel())
+logger := pluginsdk.NewPluginLogger("aws-ce", "1.0.0", level, logWriter)
+
+// Determine port: CLI flag takes precedence over environment variable
+port := pluginsdk.ParsePortFlag()
+if port == 0 {
+    port = pluginsdk.GetPort()
+}
+```
+
+**RPC Handlers (`internal/pricing/calculator.go`):**
+
+```go
+func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRequest) (*pbc.GetActualCostResponse, error) {
+    // Log operation timing using SDK helper
+    done := pluginsdk.LogOperation(c.logger, "GetActualCost")
+    defer done()
+
+    // Validate request using SDK validation helper
+    if err := pluginsdk.ValidateActualCostRequest(req); err != nil {
+        return nil, status.Error(codes.InvalidArgument, err.Error())
+    }
+    // ... implementation
+}
+```
+
+**Key Patterns:**
+
+- No `log.Fatal` or `os.Exit` calls - use `logger.Error()` + return
+- SDK validation before business logic - returns standardized error messages
+- LogOperation for all RPC methods - provides timing and structured logging
+
 ### Testing Pattern
 
 Uses `pluginsdk.NewTestPlugin(t, plugin)` for integration tests:
@@ -103,6 +144,8 @@ The `pluginsdk` package (`github.com/rshade/pulumicost-spec/sdk/go/pluginsdk`) p
 ## Active Technologies
 - Go 1.25.5 + pulumicost-spec v0.4.7+ (requires upstream change), aws-sdk-go-v2 (002-add-arn-spec)
 - N/A (stateless plugin, optional cache) (002-add-arn-spec)
+- Go 1.25.5 + pulumicost-spec v0.4.7, aws-sdk-go-v2, zerolog (003-sdk-compliance-refactor)
+- N/A (stateless plugin with optional cache) (003-sdk-compliance-refactor)
 
 ## Recent Changes
 - 002-add-arn-spec: Added Go 1.25.5 + pulumicost-spec v0.4.7+ (requires upstream change), aws-sdk-go-v2

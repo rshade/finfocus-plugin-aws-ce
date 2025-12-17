@@ -10,6 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"github.com/rshade/pulumicost-plugin-aws-ce/internal/client"
 	pbc "github.com/rshade/pulumicost-spec/sdk/go/proto/pulumicost/v1"
@@ -89,6 +91,15 @@ func (c *Calculator) GetProjectedCost(_ context.Context, req *pbc.GetProjectedCo
 
 // GetActualCost retrieves actual historical costs from AWS Cost Explorer.
 func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRequest) (*pbc.GetActualCostResponse, error) {
+	// Log operation timing using SDK helper
+	done := pluginsdk.LogOperation(c.logger, "GetActualCost")
+	defer done()
+
+	// Validate request using SDK validation helper
+	if err := pluginsdk.ValidateActualCostRequest(req); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	resourceID := req.GetResourceId()
 	arn := req.GetArn()
 
@@ -99,31 +110,16 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 	}
 	logEvent.Msg("GetActualCost request received")
 
-	// Validate input
-	if resourceID == "" {
-		return nil, fmt.Errorf("invalid request: ResourceId is required")
-	}
-
 	// Initialize client if needed
 	if err := c.initClient(ctx); err != nil {
 		return nil, fmt.Errorf("client initialization failed: %w", err)
 	}
 
 	// Parse time range from protobuf Timestamp
-	// Using AsTime() would require extra import or checks, doing manual conversion for safety/simplicity
 	startTime := time.Unix(req.GetStart().GetSeconds(), int64(req.GetStart().GetNanos()))
 	endTime := time.Unix(req.GetEnd().GetSeconds(), int64(req.GetEnd().GetNanos()))
 
-	// Validate time range
-	if endTime.Before(startTime) {
-		c.logger.Error().
-			Time("start", startTime).
-			Time("end", endTime).
-			Msg("Invalid time range")
-		return nil, fmt.Errorf("invalid time range: end time (%v) is before start time (%v)", endTime, startTime)
-	}
-
-	// Validate 14 month lookback limit
+	// Validate 14 month lookback limit (AWS-specific, not in SDK validation)
 	lookbackLimit := time.Now().AddDate(0, -14, 0)
 	if startTime.Before(lookbackLimit) {
 		c.logger.Error().
@@ -186,10 +182,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 	}
 
 	// Get costs from Cost Explorer
-	start := time.Now()
 	clientCosts, err := c.ceClient.GetCost(ctx, filter, dimensions, startTime, endTime, granularity)
-	duration := time.Since(start)
-
 	if err != nil {
 		c.logger.Error().Err(err).Msg("Failed to retrieve costs from AWS")
 		return nil, fmt.Errorf("retrieving costs: %w", err)
@@ -197,7 +190,6 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 
 	c.logger.Info().
 		Int("results_count", len(clientCosts)).
-		Dur("duration", duration).
 		Msg("Retrieved costs from AWS")
 
 	// If no costs found, return response with NoData hint
@@ -291,6 +283,10 @@ func (c *Calculator) buildResponse(costs []CostEntry) *pbc.GetActualCostResponse
 
 // GetServiceActualCost retrieves actual costs for a specific AWS service.
 func (c *Calculator) GetServiceActualCost(ctx context.Context, serviceName string, startTime, endTime time.Time) (float64, string, error) {
+	// Log operation timing using SDK helper
+	done := pluginsdk.LogOperation(c.logger, "GetServiceActualCost")
+	defer done()
+
 	if err := c.initClient(ctx); err != nil {
 		return 0, "", fmt.Errorf("client initialization failed: %w", err)
 	}
@@ -322,6 +318,10 @@ func (c *Calculator) GetServiceActualCost(ctx context.Context, serviceName strin
 
 // GetAccountActualCost retrieves total actual costs for the AWS account.
 func (c *Calculator) GetAccountActualCost(ctx context.Context, startTime, endTime time.Time) (float64, string, error) {
+	// Log operation timing using SDK helper
+	done := pluginsdk.LogOperation(c.logger, "GetAccountActualCost")
+	defer done()
+
 	if err := c.initClient(ctx); err != nil {
 		return 0, "", fmt.Errorf("client initialization failed: %w", err)
 	}
