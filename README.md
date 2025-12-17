@@ -135,11 +135,63 @@ func TestPluginName(t *testing.T) {
 
 ### Configuration
 
-The plugin supports the following configuration options:
+#### Environment Variables
 
-- Environment variables for cloud provider credentials
-- Pricing data files for offline pricing calculations
-- Regional pricing variations
+Configure the plugin using standard PulumiCost environment variables:
+
+```bash
+# Required: AWS credentials (standard AWS SDK chain)
+export AWS_REGION=us-east-1
+export AWS_ACCESS_KEY_ID=your-key
+export AWS_SECRET_ACCESS_KEY=your-secret
+
+# Optional: Plugin configuration
+export PULUMICOST_PLUGIN_PORT=50051        # Specific port (default: auto-assign)
+export PULUMICOST_LOG_FILE=/var/log/pulumicost-aws-ce.log  # Log to file (default: stderr)
+export PULUMICOST_LOG_LEVEL=debug          # Verbosity: debug|info|warn|error (default: info)
+```
+
+#### CLI Flags
+
+The `--port` flag overrides the environment variable:
+
+```bash
+# Use environment variable port
+./pulumicost-plugin-aws-ce
+
+# Override with CLI flag (takes precedence)
+./pulumicost-plugin-aws-ce --port 50052
+```
+
+#### Log Output
+
+Logs use structured JSON format with standard fields:
+
+```json
+{
+  "level": "info",
+  "component": "pulumicost-plugin-aws-ce",
+  "plugin_name": "aws-ce",
+  "plugin_version": "1.0.0",
+  "operation": "GetActualCost",
+  "duration_ms": 1234,
+  "message": "Operation completed"
+}
+```
+
+#### Graceful Shutdown
+
+The plugin responds cleanly to shutdown signals (SIGINT, SIGTERM):
+
+```bash
+# Start plugin in background
+./bin/pulumicost-plugin-aws-ce &
+PID=$!
+
+# Send SIGTERM for graceful shutdown
+kill -TERM $PID
+# Plugin completes in-flight requests before exiting
+```
 
 ## Contributing
 
