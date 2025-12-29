@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2025-12-10
 
 ## Active Technologies
+- Go 1.25.5 + goreleaser (for cross-platform binary builds), golangci-lint v2.6.2 (for code quality), release-please (for automated versioning), GitHub Actions (for CI/CD workflows) (001-cicd-infrastructure)
+- N/A (configuration and documentation files only) (001-cicd-infrastructure)
 
 - Go 1.25.5 + github.com/rshade/pulumicost-spec (PulumiCost plugin SDK), github.com/aws/aws-sdk-go-v2 (AWS SDK for Cost Explorer API) (001-aws-ce-plugin)
 
@@ -15,13 +17,18 @@ tests/
 
 ## Commands
 
-# Add commands for Go 1.25.5
+- `make test`: Run all tests
+- `make lint`: Run linters
+- `make build`: Build the plugin binary
+- `make ensure`: Update dependencies
+- `make install`: Install plugin to local registry
 
 ## Code Style
 
 Go 1.25.5: Follow standard conventions
 
 ## Recent Changes
+- 001-cicd-infrastructure: Added Go 1.25.5 + goreleaser (for cross-platform binary builds), golangci-lint v2.6.2 (for code quality), release-please (for automated versioning), GitHub Actions (for CI/CD workflows)
 
 - 001-aws-ce-plugin: Added Go 1.25.5 + github.com/rshade/pulumicost-spec (PulumiCost plugin SDK), github.com/aws/aws-sdk-go-v2 (AWS SDK for Cost Explorer API)
 

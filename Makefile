@@ -78,6 +78,9 @@ deps:
 	@go mod download
 	@echo "✅ Dependencies updated"
 
+# Ensure dependencies (alias for deps)
+ensure: deps
+
 # Check for security vulnerabilities
 security:
 	@echo "Checking for security vulnerabilities..."
