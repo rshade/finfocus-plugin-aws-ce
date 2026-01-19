@@ -96,7 +96,7 @@ As a developer integrating with PulumiCost, I want the plugin to handle AWS API 
 - **FR-012**: System MUST implement hybrid caching: in-memory cache while running, persist to disk on shutdown, load from disk on startup
 - **FR-013**: System MUST use filesystem timestamps to determine cache freshness
 - **FR-014**: System MUST validate date range requests do not exceed 14 months lookback and return helpful error if exceeded
-- **FR-015**: System MUST include `FallbackHint` enum value in gRPC response (RECOMMENDED when returning empty results, NONE when returning data) to signal core whether to try fallback plugins (blocked by: [pulumicost-spec#124](https://github.com/rshade/pulumicost-spec/issues/124))
+- **FR-015**: System MUST include `FallbackHint` enum value in gRPC response (RECOMMENDED when returning empty results, NONE when returning data) to signal core whether to try fallback plugins (blocked by: [finfocus-spec#124](https://github.com/rshade/finfocus-spec/issues/124))
 
 ### Security Requirements
 
@@ -152,4 +152,4 @@ As a developer integrating with PulumiCost, I want the plugin to handle AWS API 
 - The plugin operates as a read-only integration with no ability to modify AWS resources or billing
 - AWS Cost Explorer data may have up to 24-hour delay for recent costs (standard AWS behavior)
 - The plugin will be distributed as a single binary compatible with the PulumiCost plugin system
-- The pulumicost-spec SDK requires `FallbackHint` enum addition ([pulumicost-spec#124](https://github.com/rshade/pulumicost-spec/issues/124)) - FR-015 is blocked until this is merged
+- The finfocus-spec SDK requires `FallbackHint` enum addition ([finfocus-spec#124](https://github.com/rshade/finfocus-spec/issues/124)) - FR-015 is blocked until this is merged

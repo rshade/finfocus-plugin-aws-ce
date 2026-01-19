@@ -2,7 +2,7 @@
 
 **Plugin**: aws-ce
 **Protocol**: gRPC
-**Base**: pulumicost-spec CostSourceService
+**Base**: finfocus-spec CostSourceService
 
 ## Service Definition
 

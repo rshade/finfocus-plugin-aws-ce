@@ -6,17 +6,17 @@
 ## Prerequisites
 
 - Go 1.25.5+
-- Access to `rshade/pulumicost-spec` repository (for upstream PR)
+- Access to `rshade/finfocus-spec` repository (for upstream PR)
 - AWS credentials configured (for integration testing)
 
 ## Implementation Sequence
 
-### Step 1: Upstream Spec Change (pulumicost-spec repo)
+### Step 1: Upstream Spec Change (finfocus-spec repo)
 
 ```bash
 # Clone spec repo
-git clone https://github.com/rshade/pulumicost-spec.git
-cd pulumicost-spec
+git clone https://github.com/rshade/finfocus-spec.git
+cd finfocus-spec
 git checkout -b feat/add-arn-field
 
 # Edit proto file
@@ -38,7 +38,7 @@ git push origin feat/add-arn-field
 
 ```bash
 # In pulumicost-plugin-aws-ce repo
-go get github.com/rshade/pulumicost-spec@v0.4.8  # or new version
+go get github.com/rshade/finfocus-spec@v0.5.2  # or new version
 go mod tidy
 ```
 

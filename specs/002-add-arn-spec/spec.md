@@ -103,7 +103,7 @@ As a plugin developer querying AWS Cost Explorer, I need to extract region and a
 ## Dependencies
 
 - **Blocks**: Issue #11 (GetActualCost implementation) - robust implementation requires ARN field
-- **Upstream**: Requires PR to `rshade/pulumicost-spec` repository
+- **Upstream**: Requires PR to `rshade/finfocus-spec` repository
 - **Release sequence**: Spec release → Plugin update → Integration testing
 
 ## Out of Scope

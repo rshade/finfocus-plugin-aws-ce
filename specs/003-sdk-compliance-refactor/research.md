@@ -7,7 +7,7 @@
 
 This document captures research findings for the SDK compliance refactoring. Since this is a refactoring task (not new feature development), the research focuses on SDK helper API signatures and migration patterns.
 
-## SDK Helper Functions (Verified in pluginsdk v0.4.7)
+## SDK Helper Functions (Verified in pluginsdk v0.5.2)
 
 ### Environment Variable Helpers
 

@@ -39,5 +39,5 @@ to planning
 - 4 prioritized user stories with clear acceptance scenarios
 - 6 measurable success criteria defined
 - Assumptions documented for AWS prerequisites and SDK dependency
-- **External blocker**: FR-015 blocked by [pulumicost-spec#124](https://github.com/rshade/pulumicost-spec/issues/124)
+- **External blocker**: FR-015 blocked by [finfocus-spec#124](https://github.com/rshade/finfocus-spec/issues/124)
 - Ready for `/speckit.plan`

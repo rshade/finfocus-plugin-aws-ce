@@ -5,7 +5,7 @@
 
 ## Summary
 
-Add an optional `arn` field to `GetActualCostRequest` in the upstream `pulumicost-spec`
+Add an optional `arn` field to `GetActualCostRequest` in the upstream `finfocus-spec`
 protobuf definitions, then update the AWS CE plugin to consume this field for robust
 resource identification and identity verification. The ARN serves as the canonical
 cloud identifier, enabling precise cost lookups and mismatch detection.
@@ -13,7 +13,7 @@ cloud identifier, enabling precise cost lookups and mismatch detection.
 ## Technical Context
 
 **Language/Version**: Go 1.25.5
-**Primary Dependencies**: pulumicost-spec v0.4.7+ (requires upstream change), aws-sdk-go-v2
+**Primary Dependencies**: finfocus-spec v0.5.2+ (requires upstream change), aws-sdk-go-v2
 **Storage**: N/A (stateless plugin, optional cache)
 **Testing**: go test, pluginsdk.NewTestPlugin pattern
 **Target Platform**: Linux/macOS/Windows (gRPC plugin)
@@ -55,7 +55,7 @@ specs/002-add-arn-spec/
 ### Source Code (repository root)
 
 ```text
-# Upstream: rshade/pulumicost-spec (changes required first)
+# Upstream: rshade/finfocus-spec (changes required first)
 proto/pulumicost/v1/
 └── costsource.proto     # Add arn field to GetActualCostRequest
 

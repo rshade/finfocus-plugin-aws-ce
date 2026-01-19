@@ -18,7 +18,7 @@ Refactor the AWS Cost Explorer plugin to use standardized `pluginsdk` helpers fo
 ## Technical Context
 
 **Language/Version**: Go 1.25.5
-**Primary Dependencies**: pulumicost-spec v0.4.7, aws-sdk-go-v2, zerolog
+**Primary Dependencies**: finfocus-spec v0.5.2, aws-sdk-go-v2, zerolog
 **Storage**: N/A (stateless plugin with optional cache)
 **Testing**: `go test` via `make test`, using `pluginsdk.NewTestPlugin(t, plugin)` pattern
 **Target Platform**: Linux/macOS/Windows (gRPC server binary)

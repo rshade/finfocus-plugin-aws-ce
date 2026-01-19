@@ -8,7 +8,7 @@
 As a platform engineer, I want to compare On-Demand costs with real-time Spot Market rates and understand the associated volatility/risk, so I can make informed decisions about using Spot instances for my workloads.
 
 ## Technical Thesis
-Implement the "Spot Market Advisor" capabilities by integrating with EC2 Spot APIs and aligned with upcoming `pulumicost-spec` Spot features.
+Implement the "Spot Market Advisor" capabilities by integrating with EC2 Spot APIs and aligned with upcoming `finfocus-spec` Spot features.
 
 ### Scope
 1.  **Real-Time Arbitrage:**
@@ -26,4 +26,4 @@ Implement the "Spot Market Advisor" capabilities by integrating with EC2 Spot AP
 ## Research Tasks
 - [ ] Prototype `DescribeSpotPriceHistory` call with filters for Product Description (Linux/UNIX) and AZ.
 - [ ] Investigate the stability and schema of the Spot Advisor JSON feed for "Interruption Frequency" data.
-- [ ] Define how to map AWS "Frequency of Interruption" buckets (e.g., "<5%", "5-10%") to the `pulumicost-spec` `SpotRisk` enum/field.
+- [ ] Define how to map AWS "Frequency of Interruption" buckets (e.g., "<5%", "5-10%") to the `finfocus-spec` `SpotRisk` enum/field.

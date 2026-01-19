@@ -8,7 +8,7 @@
 As an engineering manager, I want to view the status of my AWS Budgets alongside my actual costs, so that I can see if my current spending is tracking against my defined limits.
 
 ## Technical Thesis
-Implement the `getbudgets` RPC (defined in `pulumicost-spec` v0.5.0) by proxying the AWS Budgets API.
+Implement the `getbudgets` RPC (defined in `finfocus-spec` v0.5.0) by proxying the AWS Budgets API.
 
 ### API Mapping
 *   **RPC:** `GetBudgets(GetBudgetsRequest)`

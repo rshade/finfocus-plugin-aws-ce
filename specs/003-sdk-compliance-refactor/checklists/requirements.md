@@ -32,7 +32,7 @@
 ## Notes
 
 - Spec references `pluginsdk` helper function names (FR-006 to FR-010) which are specific to the Go SDK. These references are acceptable as they describe WHAT functionality to use, not HOW to implement it. The actual implementation choice remains with the developer.
-- The project already uses `pulumicost-spec v0.4.7` (newer than v0.4.6 mentioned in the original issue), so no dependency downgrade is needed.
+- The project already uses `finfocus-spec v0.5.2` (newer than v0.5.2 mentioned in the original issue), so no dependency downgrade is needed.
 - Current codebase already has proper signal handling; the main refactor need is replacing `log.Fatalf` with error returns.
 
 ## Validation Results

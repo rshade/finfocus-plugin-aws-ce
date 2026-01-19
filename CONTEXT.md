@@ -23,6 +23,50 @@ To prevent scope creep and architectural drift, this project adheres to the foll
 **Responsibility:** AWS is responsible for the accuracy of the billing data. We are responsible for the accuracy of the **translation** to the FOCUS 1.2 standard.
 
 ## Interaction Model
-*   **Inbound:** gRPC Server (listening on localhost, port assigned by Core).
-*   **Outbound:** AWS SDK for Go v2 (authenticated via standard AWS chains).
-*   **Data Format:** Returns data complying strictly with the `pulumicost-spec` (FOCUS 1.2 derived) Protocol Buffers.
+
+- **Inbound:** gRPC Server (listening on localhost, port assigned by Core).
+- **Outbound:** AWS SDK for Go v2 (authenticated via standard AWS chains).
+- **Data Format:** Returns data complying strictly with the `finfocus-spec` (FOCUS 1.2 derived) Protocol Buffers.
+
+## Implementation Status
+
+### Currently Implemented
+
+| RPC | Status | AWS API |
+|-----|--------|---------|
+| `GetActualCost` | ✅ Full | `GetCostAndUsage` |
+| `GetProjectedCost` | ❌ Blocked | Intentionally returns error (directs to aws-public plugin) |
+
+### SDK Compliance (v0.5.2)
+
+The plugin uses standardized SDK helpers:
+
+- `pluginsdk.NewLogWriter()` / `NewPluginLogger()` - Structured logging
+- `pluginsdk.LogOperation()` - Operation timing
+- `pluginsdk.ValidateActualCostRequest()` - Input validation
+- `pluginsdk.ParsePortFlag()` / `GetPort()` - Configuration
+- `pluginsdk.Serve()` - gRPC server startup
+
+### Extension Points Available
+
+1. **New AWS Cost APIs** - CostExplorerAPI interface supports additional methods
+2. **Additional Cost Dimensions** - SERVICE, USAGE_TYPE, TAG-based grouping
+3. **Filter Expressions** - Cost Explorer query filters
+4. **Cache Configuration** - TTL and storage location customization
+
+### Features Requiring Upstream Spec Work
+
+- `BudgetsProvider` interface (for AWS Budgets RPC)
+- `RecommendationsProvider` interface (for Rightsizing/RI/SP recommendations)
+- `AnomalyRecord` structure mapping (for Cost Explorer anomalies)
+- FOCUS 1.3 commitment columns (CommitmentDiscountId, etc.)
+
+## Verification Checklist
+
+When adding new features, verify:
+
+1. ✅ Does it only read data from AWS? (No writes allowed)
+2. ✅ Does it avoid local calculations? (Pass-through only)
+3. ✅ Does it use SDK helpers for logging/validation?
+4. ✅ Does it map to an existing AWS API? (No invented data)
+5. ✅ Does it comply with FOCUS schema requirements?

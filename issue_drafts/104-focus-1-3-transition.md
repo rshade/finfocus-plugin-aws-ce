@@ -8,7 +8,7 @@
 As a FinOps practitioner, I want my data to include "Commitment" details (FOCUS 1.3) so I can analyze my Reserved Instance and Savings Plan effective rates.
 
 ## Technical Thesis
-Audit the `pulumicost-spec` FOCUS 1.3 columns against AWS Cost Explorer data availability.
+Audit the `finfocus-spec` FOCUS 1.3 columns against AWS Cost Explorer data availability.
 
 ### Scope
 *   **New Columns:** `CommitmentDiscountCategory`, `CommitmentDiscountId`, `CommitmentDiscountName`, `CommitmentDiscountType`.

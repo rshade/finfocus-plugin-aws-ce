@@ -62,7 +62,7 @@ type CacheEntry struct {
 // FallbackHint enum values.
 // Note: This should ideally come from the SDK. Defining locally if not available.
 // Using pbc.FallbackHint if available, otherwise just mapping logic.
-// Checking imports, pbc is "github.com/rshade/pulumicost-spec/sdk/go/proto/pulumicost/v1".
+// Checking imports, pbc is "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1".
 // If the SDK doesn't have it yet, we'll need to handle it or wait.
 // For now, assuming it's NOT in SDK based on analysis, but we need it for logic.
 // We will use pbc.FallbackHint if we can, or just comments for now.
