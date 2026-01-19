@@ -69,6 +69,12 @@ make test
 
 # Run linters
 make lint
+
+# Update dependencies
+make ensure
+
+# Install to local registry
+make install
 ```
 
 ### Project Structure

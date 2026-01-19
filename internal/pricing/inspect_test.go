@@ -19,6 +19,9 @@ func TestInspectProto(t *testing.T) {
 
 	t.Logf("--- GetProjectedCostRequest ---")
 	printFields(t, &pbc.GetProjectedCostRequest{})
+	
+	t.Logf("--- GetProjectedCostResponse ---")
+	printFields(t, &pbc.GetProjectedCostResponse{})
 }
 
 func printFields(t *testing.T, v interface{}) {

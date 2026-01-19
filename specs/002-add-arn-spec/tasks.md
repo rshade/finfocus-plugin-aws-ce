@@ -28,10 +28,10 @@ This is a Go plugin project with structure:
 **Purpose**: Upstream spec change must be completed and released before plugin work.
 **NOTE**: These tasks are to be executed in the `rshade/pulumicost-spec` repository. They cannot be directly executed within this project context.
 
-- [ ] T001 Create PR in rshade/pulumicost-spec adding `string arn = 5` to GetActualCostRequest in proto/pulumicost/v1/costsource.proto
-- [ ] T002 Add documentation comment for arn field describing format and usage
-- [ ] T003 Run `make generate` in pulumicost-spec to regenerate Go SDK code
-- [ ] T004 Merge PR and tag new spec release (e.g., v0.4.8 or v0.5.0)
+- [x] T001 Create PR in rshade/pulumicost-spec adding `string arn = 5` to GetActualCostRequest in proto/pulumicost/v1/costsource.proto
+- [x] T002 Add documentation comment for arn field describing format and usage
+- [x] T003 Run `make generate` in pulumicost-spec to regenerate Go SDK code
+- [x] T004 Merge PR and tag new spec release (e.g., v0.4.8 or v0.5.0)
 
 ---
 

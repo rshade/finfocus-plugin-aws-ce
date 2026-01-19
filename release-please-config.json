@@ -1,0 +1,14 @@
+{
+    "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+    "release-type": "go",
+    "packages": {
+        ".": {
+            "release-type": "go",
+            "package-name": "pulumicost-plugin-aws-ce",
+            "extra-files": [
+                "manifest.json",
+                "manifest.yaml"
+            ]
+        }
+    }
+}

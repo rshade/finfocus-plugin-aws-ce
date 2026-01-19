@@ -11,6 +11,7 @@ make test       # Run all tests
 make lint       # Run golangci-lint
 make install    # Build and install to ~/.pulumicost/plugins/aws-ce/1.0.0/
 make fmt        # Format code with go fmt
+make ensure     # Update dependencies (alias for deps)
 make deps       # Update dependencies (go mod tidy && go mod download)
 ```
 

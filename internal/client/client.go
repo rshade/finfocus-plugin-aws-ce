@@ -16,6 +16,7 @@ import (
 // This interface allows for mocking in tests.
 type CostExplorerAPI interface {
 	GetCostAndUsage(ctx context.Context, params *costexplorer.GetCostAndUsageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error)
+	GetCostForecast(ctx context.Context, params *costexplorer.GetCostForecastInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostForecastOutput, error)
 	GetReservationUtilization(ctx context.Context, params *costexplorer.GetReservationUtilizationInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetReservationUtilizationOutput, error)
 	GetSavingsPlansCoverage(ctx context.Context, params *costexplorer.GetSavingsPlansCoverageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetSavingsPlansCoverageOutput, error)
 }
@@ -94,6 +95,109 @@ type CostResult struct {
 	ReservationARN string
 	// SavingsPlanARN is the ARN of the savings plan if applicable.
 	SavingsPlanARN string
+}
+
+// ForecastResult represents the cost forecast for a resource.
+type ForecastResult struct {
+	// MeanValue is the mean forecasted cost.
+	MeanValue float64
+	// Currency is the currency code (e.g., "USD").
+	Currency string
+	// StartDate is the start of the forecast period.
+	StartDate time.Time
+	// EndDate is the end of the forecast period.
+	EndDate time.Time
+	// PredictionIntervalLowerBound is the lower bound of the prediction interval (if available).
+	PredictionIntervalLowerBound *float64
+	// PredictionIntervalUpperBound is the upper bound of the prediction interval (if available).
+	PredictionIntervalUpperBound *float64
+}
+
+// GetCostForecast retrieves the cost forecast for a given time period.
+func (c *Client) GetCostForecast(ctx context.Context, filter *types.Expression, startTime, endTime time.Time, granularity string) ([]ForecastResult, error) {
+	// Validate granularity (AWS limitation: only DAILY and MONTHLY are supported)
+	if granularity != string(types.GranularityDaily) && granularity != string(types.GranularityMonthly) {
+		return nil, fmt.Errorf("invalid granularity: %s. Supported values are DAILY and MONTHLY", granularity)
+	}
+
+	input := &costexplorer.GetCostForecastInput{
+		TimePeriod: &types.DateInterval{
+			Start: aws.String(startTime.Format("2006-01-02")),
+			End:   aws.String(endTime.Format("2006-01-02")),
+		},
+		Granularity:       types.Granularity(granularity),
+		Metric:            types.MetricUnblendedCost,
+		Filter:            filter,
+		PredictionIntervalLevel: aws.Int32(80), // Default to 80% confidence interval
+	}
+
+	output, err := WithRetry(ctx, DefaultRetryConfig(), func(ctx context.Context) (*costexplorer.GetCostForecastOutput, error, bool) {
+		out, err := c.ceClient.GetCostForecast(ctx, input)
+		if err != nil {
+			return nil, err, isRetryableError(err)
+		}
+		return out, nil, false
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("getting cost forecast: %w", err)
+	}
+
+	return c.parseForecastResults(output)
+}
+
+// parseForecastResults converts AWS Cost Explorer forecast output to ForecastResult slice.
+func (c *Client) parseForecastResults(output *costexplorer.GetCostForecastOutput) ([]ForecastResult, error) {
+	var results []ForecastResult
+
+	for _, forecast := range output.ForecastResultsByTime {
+		startDate, err := time.Parse("2006-01-02", *forecast.TimePeriod.Start)
+		if err != nil {
+			return nil, fmt.Errorf("parsing start date: %w", err)
+		}
+
+		endDate, err := time.Parse("2006-01-02", *forecast.TimePeriod.End)
+		if err != nil {
+			return nil, fmt.Errorf("parsing end date: %w", err)
+		}
+
+		result := ForecastResult{
+			StartDate: startDate,
+			EndDate:   endDate,
+		}
+
+		if forecast.MeanValue != nil {
+			var amount float64
+			if _, err := fmt.Sscanf(*forecast.MeanValue, "%f", &amount); err == nil {
+				result.MeanValue = amount
+			}
+		}
+
+		// Try to find currency from Total (ForecastResultsByTime entries don't have currency field usually)
+		if output.Total != nil && output.Total.Unit != nil {
+			result.Currency = *output.Total.Unit
+		} else {
+			result.Currency = "USD" // Default fallback
+		}
+
+		if forecast.PredictionIntervalLowerBound != nil {
+			var lower float64
+			if _, err := fmt.Sscanf(*forecast.PredictionIntervalLowerBound, "%f", &lower); err == nil {
+				result.PredictionIntervalLowerBound = &lower
+			}
+		}
+
+		if forecast.PredictionIntervalUpperBound != nil {
+			var upper float64
+			if _, err := fmt.Sscanf(*forecast.PredictionIntervalUpperBound, "%f", &upper); err == nil {
+				result.PredictionIntervalUpperBound = &upper
+			}
+		}
+
+		results = append(results, result)
+	}
+
+	return results, nil
 }
 
 // GetCost retrieves cost data with flexible filtering and grouping.

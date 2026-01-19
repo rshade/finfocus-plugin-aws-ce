@@ -38,6 +38,10 @@ func (m *mockCostExplorerAPI) GetSavingsPlansCoverage(ctx context.Context, param
 	return &costexplorer.GetSavingsPlansCoverageOutput{}, nil
 }
 
+func (m *mockCostExplorerAPI) GetCostForecast(ctx context.Context, params *costexplorer.GetCostForecastInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostForecastOutput, error) {
+	return nil, nil
+}
+
 func TestNewClientWithAPI(t *testing.T) {
 	mockAPI := &mockCostExplorerAPI{}
 	client := NewClientWithAPI(mockAPI, "us-east-1")

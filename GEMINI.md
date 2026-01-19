@@ -29,6 +29,7 @@ This file provides context and instructions for Gemini agents working on the `pu
 | `make test` | Runs all unit tests. |
 | `make lint` | Runs `golangci-lint` to ensure code quality. |
 | `make install` | Builds and installs the plugin to `~/.pulumicost/plugins/aws-ce/1.0.0/`. |
+| `make ensure` | Updates Go dependencies (alias for `deps`). |
 | `make deps` | Updates Go dependencies (`go mod tidy` + `download`). |
 | `make fmt` | Formats code using `go fmt`. |
 
@@ -119,3 +120,10 @@ The project is currently executing against the following milestones and issues:
 
 ### v0.3.0 - Advanced Features
 - **Issue #13**: Feature: Optimization Recommendations (Rightsizing, Savings Plans).
+
+## Active Technologies
+- Go 1.25.5 + goreleaser (for cross-platform binary builds), golangci-lint v2.6.2 (for code quality), release-please (for automated versioning), GitHub Actions (for CI/CD workflows) (001-cicd-infrastructure)
+- N/A (configuration and documentation files only) (001-cicd-infrastructure)
+
+## Recent Changes
+- 001-cicd-infrastructure: Added Go 1.25.5 + goreleaser (for cross-platform binary builds), golangci-lint v2.6.2 (for code quality), release-please (for automated versioning), GitHub Actions (for CI/CD workflows)

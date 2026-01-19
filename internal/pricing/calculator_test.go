@@ -32,6 +32,10 @@ func (m *mockCostExplorerAPI) GetSavingsPlansCoverage(ctx context.Context, param
 	return nil, nil
 }
 
+func (m *mockCostExplorerAPI) GetCostForecast(ctx context.Context, params *costexplorer.GetCostForecastInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostForecastOutput, error) {
+	return nil, nil
+}
+
 func TestCalculator_Structure(t *testing.T) {
 	c := NewCalculator()
 	if c == nil {
