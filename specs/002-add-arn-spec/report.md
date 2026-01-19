@@ -7,7 +7,7 @@
 The implementation plan has been fully executed. The feature allows the plugin to accept an `arn` field in `GetActualCostRequest`, enabling robust resource identification and handling of discrepancies between `ResourceId` and `ARN`.
 
 ## Key Achievements
-- **Upstream Dependency**: Verified usage of `pulumicost-spec` v0.4.7+ (containing `arn` field).
+- **Upstream Dependency**: Verified usage of `finfocus-spec` v0.5.2+ (containing `arn` field).
 - **Core Logic**: Implemented `resolveIdentifier` and `ParseARN` to handle ARN logic in `internal/pricing/calculator.go` and `internal/pricing/arn.go`.
 - **Tests Fixed**: 
   - Updated mocks in `internal/client/client_test.go` and `internal/pricing/calculator_test.go` to match `CostExplorerAPI` interface.

@@ -9,7 +9,7 @@ This feature is a **refactoring task** that does not introduce new API endpoints
 
 ## Existing Contracts (Unchanged)
 
-The gRPC service contract is defined in `pulumicost-spec` and remains unchanged:
+The gRPC service contract is defined in `finfocus-spec` and remains unchanged:
 
 - `CostSourceService.Name()` - Returns plugin name
 - `CostSourceService.Supports()` - Checks resource support

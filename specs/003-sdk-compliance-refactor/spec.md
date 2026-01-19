@@ -129,7 +129,7 @@ As an operator managing plugin lifecycle, I want the plugin to shut down cleanly
 
 ### Assumptions
 
-- The project already uses `pulumicost-spec v0.4.7` which includes all required SDK helpers.
+- The project already uses `finfocus-spec v0.5.2` which includes all required SDK helpers.
 - Existing zerolog usage will be migrated to SDK-provided logger initialization for consistency.
 - The SDK validation helpers cover the validation cases currently implemented with custom logic.
 - **Strict SDK compliance**: Any behavioral differences between current implementation and SDK helpers are treated as bug fixes, not breaking changes. No backward-compatibility shims will be added.

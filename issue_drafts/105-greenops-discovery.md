@@ -21,5 +21,5 @@ Investigate the feasibility of retrieving Carbon Footprint data programmatically
 *   *Future:* Re-evaluate only if AWS releases a `carbon:GetCarbonFootprint` API.
 
 ## Research Tasks
-- [ ] Confirm if `pulumicost-spec` allows "Carbon Emissions" to be `null/zero` while still being compliant. (Yes, optional).
+- [ ] Confirm if `finfocus-spec` allows "Carbon Emissions" to be `null/zero` while still being compliant. (Yes, optional).
 - [ ] Document this limitation in `CONTEXT.md` explicitly.

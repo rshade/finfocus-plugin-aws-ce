@@ -26,12 +26,12 @@ This is a Go plugin project with structure:
 ## Phase 1: Setup (Upstream Dependency)
 
 **Purpose**: Upstream spec change must be completed and released before plugin work.
-**NOTE**: These tasks are to be executed in the `rshade/pulumicost-spec` repository. They cannot be directly executed within this project context.
+**NOTE**: These tasks are to be executed in the `rshade/finfocus-spec` repository. They cannot be directly executed within this project context.
 
-- [x] T001 Create PR in rshade/pulumicost-spec adding `string arn = 5` to GetActualCostRequest in proto/pulumicost/v1/costsource.proto
+- [x] T001 Create PR in rshade/finfocus-spec adding `string arn = 5` to GetActualCostRequest in proto/pulumicost/v1/costsource.proto
 - [x] T002 Add documentation comment for arn field describing format and usage
-- [x] T003 Run `make generate` in pulumicost-spec to regenerate Go SDK code
-- [x] T004 Merge PR and tag new spec release (e.g., v0.4.8 or v0.5.0)
+- [x] T003 Run `make generate` in finfocus-spec to regenerate Go SDK code
+- [x] T004 Merge PR and tag new spec release (e.g., v0.5.2 or v0.5.0)
 
 ---
 
@@ -41,7 +41,7 @@ This is a Go plugin project with structure:
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [x] T005 Update go.mod to require new pulumicost-spec version in go.mod
+- [x] T005 Update go.mod to require new finfocus-spec version in go.mod
 - [x] T006 Run `go mod tidy` to update dependencies
 - [x] T007 Verify `req.GetArn()` method is available in pbc.GetActualCostRequest
 - [x] T008 Run `make build` to confirm compilation succeeds

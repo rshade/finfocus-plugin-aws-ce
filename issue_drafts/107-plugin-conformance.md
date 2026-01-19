@@ -5,10 +5,10 @@
 **Priority:** High
 
 ## User Story
-As a plugin maintainer, I want to verify that my plugin strictly adheres to the `pulumicost-spec` contract, so that it guarantees interoperability with the Core engine.
+As a plugin maintainer, I want to verify that my plugin strictly adheres to the `finfocus-spec` contract, so that it guarantees interoperability with the Core engine.
 
 ## Technical Thesis
-Integrate the official `Plugin Conformance Test Suite` provided by `github.com/rshade/pulumicost-spec/sdk/go/conformance`.
+Integrate the official `Plugin Conformance Test Suite` provided by `github.com/rshade/finfocus-spec/sdk/go/conformance`.
 
 ### Implementation Plan
 1.  Create `cmd/conformance/main.go` or a test file `conformance_test.go`.

@@ -1,45 +1,132 @@
 # Roadmap
 
-This roadmap outlines the development path for `pulumicost-plugin-aws-ce`, prioritizing direct API integration, FOCUS standard compliance, and adherence to the `pulumicost-spec`.
+This roadmap outlines the development path for `finfocus-plugin-aws-ce`, prioritizing direct API integration, FOCUS standard compliance, and adherence to the `finfocus-spec` v0.5.2+.
 
-## 1. Core Platform & Compliance
+> **Constitutional Reference:** All features must comply with [CONTEXT.md](./CONTEXT.md) boundaries. Features violating "Hard No's" are rejected.
 
-| Status | Item & Link | Technical Thesis / Scope | Boundary Guardrail (NO-GO) |
-| :--- | :--- | :--- | :--- |
-| **[In Progress]** | **Core Cost Plugin** (#11) | Implement `GetActualCost` with full FOCUS 1.2 record construction using SDK helpers. | Do not calculate costs locally; use values directly from `GetCostAndUsage`. |
-| **[In Progress]** | **CI/CD Infrastructure** (#7) | Establish GitHub Actions for testing, linting, and releasing single binaries. | No complex multi-arch builds unless requested by users (currently focused on typical Linux/Mac envs). |
-| **[Done]** | **SDK Compliance** (#6) | Adopt `pluginsdk` for logging, validation, and config. | Do not use `fmt.Println` or custom loggers. |
-| **[Done]** | **Contextual Identity** (#14) | Support `arn` in `GetActualCostRequest` as the primary identifier. | Do not attempt to guess ARNs if not provided or resolvable via API. |
-| **[Planned]** | **Plugin Conformance** (#31) | Integrate the official `Plugin Conformance Test Suite` from the SDK into `make test`. | Do not modify the test suite to pass; fix the plugin code. |
+## Overview
 
-## 2. Cost Intelligence Features
+| Milestone | Focus | Status |
+|-----------|-------|--------|
+| v0.1.0 | Foundation & CI/CD | 🔄 In Progress (2 open / 3 closed) |
+| v0.2.0 | Core Features | 📋 Planned (13 open / 2 closed) |
+| v0.3.0 | Advanced Features | 🔬 Research (5 open) |
 
-| Status | Item & Link | Technical Thesis / Scope | Boundary Guardrail (NO-GO) |
-| :--- | :--- | :--- | :--- |
-| **[Planned]** | **Cost Forecasting** (#25) | Implement `GetProjectedCost` using `ce:GetCostForecast`. | **HARD NO:** Do not implement linear regression or custom forecasting math. If API fails, return error. |
-| **[Planned]** | **AWS Budgets** (#24) | Implement `getbudgets` RPC by proxying AWS Budgets API. | Do not implement alerting logic or "budget remaining" math if the API provides it. |
-| **[Researching]** | **Anomaly Detection** (#26) | Map `ce:GetAnomalies` to the new `AnomalyRecord` structure. | **HARD NO:** Do not train local ML models. Only report anomalies detected by AWS. |
-| **[Researching]** | **Optimization: Rightsizing** (#27) | Implement EC2/RDS rightsizing using `ce:GetRightsizingRecommendation`. | Do not calculate rightsizing locally. Proxy AWS "Modify"/"Terminate" actions. |
-| **[Researching]** | **Optimization: Savings Plans** (#32) | Implement SP recommendations using `ce:GetSavingsPlansPurchaseRecommendation`. | Rely on AWS for ROI/Break-even math. |
-| **[Researching]** | **Optimization: Reservations** (#33) | Implement RI recommendations using `ce:GetReservationPurchaseRecommendation`. | Focus on non-Compute services (RDS, Redshift) where SPs don't apply. |
-| **[Researching]** | **EstimateCost (What-If)** (#30) | Investigate `EstimateCost` RPC using AWS Pricing API or CE "What-If" scenarios. | Do not maintain a local price list database. |
-| **[Researching]** | **Spot Market Advisor** (#34) | Implement `DescribeSpotPriceHistory` and investigate Risk data sources. | Do not calculate risk scores; rely on external data feeds (Spot Advisor). |
+## Past Milestones (Done)
 
-## 3. Advanced Standards & Discovery
+### SDK Compliance & ARN Support
 
-| Status | Item & Link | Technical Thesis / Scope | Boundary Guardrail (NO-GO) |
-| :--- | :--- | :--- | :--- |
-| **[Researching]** | **FOCUS 1.3 Transition** (#28) | Audit new FOCUS 1.3 columns (Contract Commitment) against AWS data. | Do not invent values for new columns. Map only what AWS provides explicitly. |
-| **[Researching]** | **Greenops Discovery** (#29) | Investigate AWS Carbon Footprint API availability for Greenops metrics. | Do not calculate carbon emissions based on instance types/usage hours. |
+| Status | Issue | Description |
+|--------|-------|-------------|
+| ✅ Done | [#6](https://github.com/rshade/finfocus-plugin-aws-ce/issues/6) | SDK Compliance - Adopt `pluginsdk` for logging, validation, and config |
+| ✅ Done | [#14](https://github.com/rshade/finfocus-plugin-aws-ce/issues/14) | ARN Support - Primary identifier in `GetActualCostRequest` |
+| ✅ Done | [#2](https://github.com/rshade/finfocus-plugin-aws-ce/issues/2) | Initial plugin creation for real AWS billing data |
+| ✅ Done | [#7](https://github.com/rshade/finfocus-plugin-aws-ce/issues/7) | Establish CI/CD Infrastructure |
 
-## 4. Rejected / Out of Scope
+## Current Focus (v0.1.0 - Foundation & CI/CD)
 
-| Status | Item & Link | Reasoning |
-| :--- | :--- | :--- |
-| **[Rejected]** | **Smart Sizing (Dev Mode)** | Proposal to recommend `t3` instances for `UsageProfile=DEV`. **Reason:** Violates the "No Logic" boundary. This is Policy-as-Code logic that belongs in `pulumicost-core`, not the data adapter. |
+| Status | Issue | Technical Thesis | Boundary Guardrail |
+|--------|-------|------------------|-------------------|
+| 🔄 In Progress | [#11](https://github.com/rshade/finfocus-plugin-aws-ce/issues/11) | Core Cost Plugin - `GetActualCost` with FOCUS 1.2 records | Use values directly from `GetCostAndUsage` |
+| 📋 Planned | [#12](https://github.com/rshade/finfocus-plugin-aws-ce/issues/12) | Installation & Documentation polish | Out-of-the-box experience |
+| 📋 Planned | [#31](https://github.com/rshade/finfocus-plugin-aws-ce/issues/31) | Plugin Conformance Test Suite integration | Do not modify test suite to pass |
+| 📋 Planned | [#23](https://github.com/rshade/finfocus-plugin-aws-ce/issues/23) | Update finfocus-spec to enable gRPC reflection | Dependency update only |
+
+## Near-Term Vision (v0.2.0 - Core Features)
+
+### Plugin Infrastructure (HIGH Priority)
+
+| Status | Issue | Technical Thesis | Boundary Guardrail |
+|--------|-------|------------------|-------------------|
+| 📋 Planned | [#40](https://github.com/rshade/finfocus-plugin-aws-ce/issues/40) | Add GetPluginInfo() RPC | Return plugin metadata for discovery |
+| 📋 Planned | [#41](https://github.com/rshade/finfocus-plugin-aws-ce/issues/41) | Add Supports() RPC | Validate resource/provider support |
+| 📋 Planned | [#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42) | Docker support with multi-stage build | Container deployment |
+| 📋 Planned | [#43](https://github.com/rshade/finfocus-plugin-aws-ce/issues/43) | HTTP health endpoint | Container orchestration support |
+| 📋 Planned | [#44](https://github.com/rshade/finfocus-plugin-aws-ce/issues/44) | Documentation directory | API and deployment guides |
+| 📋 Planned | [#45](https://github.com/rshade/finfocus-plugin-aws-ce/issues/45) | Integration tests for gRPC server | Server behavior verification |
+| 📋 Planned | [#46](https://github.com/rshade/finfocus-plugin-aws-ce/issues/46) | Trace ID propagation | Distributed tracing support |
+| 📋 Planned | [#47](https://github.com/rshade/finfocus-plugin-aws-ce/issues/47) | Proto ErrorCode enum | Standardized error handling |
+| 📋 Planned | [#48](https://github.com/rshade/finfocus-plugin-aws-ce/issues/48) | Standardize workflow names | CI/CD consistency |
+| 📋 Planned | [#50](https://github.com/rshade/finfocus-plugin-aws-ce/issues/50) | Makefile targets | Developer experience |
+| 📋 Planned | [#51](https://github.com/rshade/finfocus-plugin-aws-ce/issues/51) | Config parsing tests | Configuration reliability |
+| 📋 Planned | [#53](https://github.com/rshade/finfocus-plugin-aws-ce/issues/53) | CONTRIBUTING.md | Contributor onboarding |
+
+### AWS Cost Features
+
+| Status | Issue | Technical Thesis | Boundary Guardrail |
+|--------|-------|------------------|-------------------|
+| 📋 Planned | [#8](https://github.com/rshade/finfocus-plugin-aws-ce/issues/8) / [#24](https://github.com/rshade/finfocus-plugin-aws-ce/issues/24) | AWS Budgets - Proxy `budgets:DescribeBudgets` | Read-only; no alerting logic |
+| 📋 Planned | [#25](https://github.com/rshade/finfocus-plugin-aws-ce/issues/25) | Cost Forecasting - Proxy `ce:GetCostForecast` | **HARD NO:** No custom forecasting math |
+| 📋 Planned | [#36](https://github.com/rshade/finfocus-plugin-aws-ce/issues/36) | GetProjectedCost with prediction intervals | Use AWS forecast intervals |
+| 📋 Planned | [#37](https://github.com/rshade/finfocus-plugin-aws-ce/issues/37) | Enrich GetActualCost with RI/SP data | Map existing CE data |
+| 🔬 Research | [#26](https://github.com/rshade/finfocus-plugin-aws-ce/issues/26) / [#38](https://github.com/rshade/finfocus-plugin-aws-ce/issues/38) | Anomaly Detection - Map `ce:GetAnomalies` | **HARD NO:** No local ML models |
+
+## Future Vision (v0.3.0+ - Advanced Features)
+
+### Plugin Enhancements
+
+| Status | Issue | Technical Thesis | Boundary Guardrail |
+|--------|-------|------------------|-------------------|
+| 🔬 Research | [#49](https://github.com/rshade/finfocus-plugin-aws-ce/issues/49) | Web/Connect protocol support | Browser client access |
+| 🔬 Research | [#52](https://github.com/rshade/finfocus-plugin-aws-ce/issues/52) | Metadata enrichment | Growth hints, confidence levels |
+| 🔬 Research | [#54](https://github.com/rshade/finfocus-plugin-aws-ce/issues/54) | CORS support | Browser-based access |
+| 🔬 Research | [#55](https://github.com/rshade/finfocus-plugin-aws-ce/issues/55) | Batch configuration | Request handling tuning |
+
+### Optimization Recommendations
+
+| Status | Issue | Technical Thesis | Boundary Guardrail |
+|--------|-------|------------------|-------------------|
+| 🔬 Research | [#13](https://github.com/rshade/finfocus-plugin-aws-ce/issues/13) | Optimization Recommendations (umbrella) | Proxy AWS recommendations only |
+| 🔬 Research | [#27](https://github.com/rshade/finfocus-plugin-aws-ce/issues/27) | Rightsizing - `ce:GetRightsizingRecommendation` | Do not calculate utilization locally |
+| 🔬 Research | [#32](https://github.com/rshade/finfocus-plugin-aws-ce/issues/32) | Savings Plans Recommendations | Rely on AWS for ROI/break-even math |
+| 🔬 Research | [#33](https://github.com/rshade/finfocus-plugin-aws-ce/issues/33) | Reserved Instance Recommendations | Focus on non-Compute (RDS, Redshift) |
+| 🔬 Research | [#22](https://github.com/rshade/finfocus-plugin-aws-ce/issues/22) | RI/SP Purchase Recommendations (combined) | Proxy AWS API only |
+
+### Coverage Detection
+
+| Status | Issue | Technical Thesis | Boundary Guardrail |
+|--------|-------|------------------|-------------------|
+| 🔬 Research | [#19](https://github.com/rshade/finfocus-plugin-aws-ce/issues/19) | RI Coverage Detection & Pricing | Read coverage data only |
+| 🔬 Research | [#20](https://github.com/rshade/finfocus-plugin-aws-ce/issues/20) | Savings Plans Coverage Detection | Read coverage data only |
+| 🔬 Research | [#21](https://github.com/rshade/finfocus-plugin-aws-ce/issues/21) | Blended vs Unblended Cost Comparison | Map existing CE data fields |
+
+### Pricing & Estimation
+
+| Status | Issue | Technical Thesis | Boundary Guardrail |
+|--------|-------|------------------|-------------------|
+| 🔬 Research | [#30](https://github.com/rshade/finfocus-plugin-aws-ce/issues/30) | EstimateCost (What-If) via Pricing API | Disclaimer: list prices only |
+| 🔬 Research | [#34](https://github.com/rshade/finfocus-plugin-aws-ce/issues/34) | Spot Market Advisor | Use external data feeds for risk |
+
+### Standards & Compliance
+
+| Status | Issue | Technical Thesis | Boundary Guardrail |
+|--------|-------|------------------|-------------------|
+| 🔬 Research | [#28](https://github.com/rshade/finfocus-plugin-aws-ce/issues/28) | FOCUS 1.3 Transition (Commitment columns) | Map only what AWS provides explicitly |
+| 🔬 Research | [#29](https://github.com/rshade/finfocus-plugin-aws-ce/issues/29) | Greenops Discovery (Carbon API) | **Blocked:** No public AWS Carbon API |
+
+## Icebox / Backlog
+
+| Status | Issue | Description |
+|--------|-------|-------------|
+| 📋 Backlog | [#3](https://github.com/rshade/finfocus-plugin-aws-ce/issues/3) | Adopt pluginsdk/mapping for property extraction |
+
+## Rejected / Out of Scope
+
+| Status | Item | Reasoning |
+|--------|------|-----------|
+| ❌ Rejected | Smart Sizing (Dev Mode) | Violates "No Logic" boundary. Policy-as-Code belongs in core engine. |
+| ❌ Blocked | Greenops/Carbon Metrics | No public AWS API available for synchronous queries |
+| ❌ Closed | [#1](https://github.com/rshade/finfocus-plugin-aws-ce/issues/1) | Wrong repo - belongs to aws-public plugin |
+| ❌ Closed | [#4](https://github.com/rshade/finfocus-plugin-aws-ce/issues/4) | Duplicate of #24 |
+| ❌ Closed | [#9](https://github.com/rshade/finfocus-plugin-aws-ce/issues/9) | Duplicate of #25 |
+| ❌ Closed | [#10](https://github.com/rshade/finfocus-plugin-aws-ce/issues/10) | Duplicate of #26 |
 
 ## Legend
-*   **[Done]**: Feature delivered and merged.
-*   **[In Progress]**: Active development with defined spec.
-*   **[Planned]**: Spec drafted or next in queue; ready for implementation.
-*   **[Researching]**: Investigating API capabilities; scope and thesis being defined.
+
+| Icon | Status | Description |
+|------|--------|-------------|
+| ✅ | Done | Feature delivered and merged |
+| 🔄 | In Progress | Active development |
+| 📋 | Planned | Spec drafted, ready for implementation |
+| 🔬 | Research | Investigating API capabilities |
+| ❌ | Rejected/Blocked | Not implementing |

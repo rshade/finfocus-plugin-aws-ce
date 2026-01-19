@@ -14,7 +14,7 @@ This feature establishes CI/CD infrastructure and does not introduce new API con
 
 ## Existing Contracts Unaffected
 
-The existing pulumicost-spec gRPC contracts remain unchanged:
+The existing finfocus-spec gRPC contracts remain unchanged:
 - CostSourceService (GetActualCost, GetProjectedCost, etc.)
-- Protocol buffers defined in pulumicost-spec repository
+- Protocol buffers defined in finfocus-spec repository
 - FOCUS 1.2 compliance maintained

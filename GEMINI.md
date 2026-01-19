@@ -4,7 +4,7 @@ This file provides context and instructions for Gemini agents working on the `pu
 
 ## Project Overview
 
-`pulumicost-plugin-aws-ce` is a PulumiCost plugin designed to retrieve **actual** and **projected** cloud costs directly from the AWS Cost Explorer API. It integrates with the `pulumicost-core` engine via gRPC, adhering to the `pulumicost-spec` interface.
+`pulumicost-plugin-aws-ce` is a PulumiCost plugin designed to retrieve **actual** and **projected** cloud costs directly from the AWS Cost Explorer API. It integrates with the `pulumicost-core` engine via gRPC, adhering to the `finfocus-spec` interface.
 
 **Key Features:**
 - Retrieves actual historical cost data (Cost Explorer API).
@@ -52,7 +52,7 @@ This project is a single-binary gRPC server.
 - `.github/workflows/`: CI/CD definitions (Test, Release).
 
 ### Integration Points
-- **Core Engine**: Communicates via gRPC (Protocol Buffers defined in `pulumicost-spec`).
+- **Core Engine**: Communicates via gRPC (Protocol Buffers defined in `finfocus-spec`).
 - **AWS API**: Authenticates using standard AWS SDK credential chains (Env vars, Profile, Role).
 
 ## Development Conventions
@@ -69,9 +69,9 @@ This project is a single-binary gRPC server.
     - Integration tests with mocked AWS clients.
     - E2E tests with real AWS credentials (guarded by build tags or env vars).
 
-## Plugin SDK Reference (v0.4.6)
+## Plugin SDK Reference (v0.5.2)
 
-The `pluginsdk` package (`github.com/rshade/pulumicost-spec/sdk/go/pluginsdk`) provides standardized helpers that **MUST** be used.
+The `pluginsdk` package (`github.com/rshade/finfocus-spec/sdk/go/pluginsdk`) provides standardized helpers that **MUST** be used.
 
 ### 1. Environment Variables (`env.go`)
 - **Usage**: Replace manual `os.Getenv` calls.
@@ -108,7 +108,7 @@ The `pluginsdk` package (`github.com/rshade/pulumicost-spec/sdk/go/pluginsdk`) p
 The project is currently executing against the following milestones and issues:
 
 ### v0.1.0 - Foundation & CI/CD
-- **Issue #6**: Update Dependencies & Refactor for SDK Compliance (Spec v0.4.6, SDK helpers, Zerolog, `PULUMICOST_LOG_FILE`, `--port`).
+- **Issue #6**: Update Dependencies & Refactor for SDK Compliance (Spec v0.5.2, SDK helpers, Zerolog, `PULUMICOST_LOG_FILE`, `--port`).
 - **Issue #7**: Establish CI/CD Infrastructure (Workflows, Goreleaser, release-please).
 - **Issue #11**: Implement Core Cost Plugin (Spec 001) & E2E Testing (AWS Integration, CI Secrets, FOCUS 1.2 Compliance).
 - **Issue #12**: Polish: Installation & Documentation (Makefile version fix, README rewrite, Manifest consolidation).

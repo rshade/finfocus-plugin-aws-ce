@@ -194,7 +194,7 @@ prevents unauthorized network access.
   - Pass all CI checks (lint, test, build)
   - Update CLAUDE.md if new conventions or patterns emerge
 - Markdown files MUST be linted with markdownlint after editing
-- **gRPC changes:** Update proto definitions in pulumicost-spec if protocol
+- **gRPC changes:** Update proto definitions in finfocus-spec if protocol
   changes needed
 
 **Code review requirements:**

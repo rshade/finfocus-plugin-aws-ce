@@ -44,7 +44,7 @@ arn:partition:service:region:account-id:resource-type:resource-id
 **Rationale**: Protobuf3 fields are optional by default. Field number 5 is the next
 available in `GetActualCostRequest`. Adding a new field is backward compatible.
 
-**Current GetActualCostRequest Fields** (from pulumicost-spec):
+**Current GetActualCostRequest Fields** (from finfocus-spec):
 
 ```protobuf
 message GetActualCostRequest {
@@ -171,8 +171,8 @@ release sequence must be: spec PR → spec release → plugin update → plugin 
 
 **Release Sequence**:
 
-1. Create PR in `rshade/pulumicost-spec` adding `arn` field
-2. Release new spec version (e.g., v0.4.8 or v0.5.0)
+1. Create PR in `rshade/finfocus-spec` adding `arn` field
+2. Release new spec version (e.g., v0.5.2 or v0.5.0)
 3. Update plugin's `go.mod` to new spec version
 4. Implement ARN consumption in plugin
 5. Release plugin version

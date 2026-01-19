@@ -24,7 +24,7 @@ go test -v -run TestCalculatorName ./internal/pricing/
 ## Architecture
 
 This is a PulumiCost plugin that retrieves **actual costs** from AWS Cost
-Explorer. It implements the `pulumicost-spec` plugin SDK interface.
+Explorer. It implements the `finfocus-spec` plugin SDK interface.
 
 ### Key Components
 
@@ -45,7 +45,7 @@ The plugin embeds `pluginsdk.BasePlugin` and uses:
 - `pluginsdk.Calculator()` - Response builders
 - `pluginsdk.NotSupportedError()`, `pluginsdk.NoDataError()` - Standard errors
 
-### SDK Compliance (v0.4.7+)
+### SDK Compliance (v0.5.2+)
 
 The plugin uses standardized SDK helpers for configuration and logging:
 
@@ -99,7 +99,7 @@ testPlugin.TestActualCost(resourceID, from, to, expectError)
 
 ## Dependencies
 
-- `github.com/rshade/pulumicost-spec` - Plugin SDK and protobuf definitions
+- `github.com/rshade/finfocus-spec` - Plugin SDK and protobuf definitions
 - `github.com/aws/aws-sdk-go-v2` - AWS SDK for Cost Explorer API
 
 ## Notes
@@ -108,9 +108,9 @@ testPlugin.TestActualCost(resourceID, from, to, expectError)
 - Cost Explorer is a global AWS service; region doesn't affect data access
 - Client initialization is lazy (on first API call)
 
-## Plugin SDK Reference (v0.4.6)
+## Plugin SDK Reference (v0.5.2)
 
-The `pluginsdk` package (`github.com/rshade/pulumicost-spec/sdk/go/pluginsdk`) provides standardized helpers that **MUST** be used.
+The `pluginsdk` package (`github.com/rshade/finfocus-spec/sdk/go/pluginsdk`) provides standardized helpers that **MUST** be used.
 
 ### 1. Environment Variables (`env.go`)
 - **Usage**: Replace manual `os.Getenv` calls.
@@ -143,10 +143,10 @@ The `pluginsdk` package (`github.com/rshade/pulumicost-spec/sdk/go/pluginsdk`) p
 - **Interfaces**: Implement `BudgetsProvider` and `RecommendationsProvider` for new features.
 
 ## Active Technologies
-- Go 1.25.5 + pulumicost-spec v0.4.7+ (requires upstream change), aws-sdk-go-v2 (002-add-arn-spec)
+- Go 1.25.5 + finfocus-spec v0.5.2+ (requires upstream change), aws-sdk-go-v2 (002-add-arn-spec)
 - N/A (stateless plugin, optional cache) (002-add-arn-spec)
-- Go 1.25.5 + pulumicost-spec v0.4.7, aws-sdk-go-v2, zerolog (003-sdk-compliance-refactor)
+- Go 1.25.5 + finfocus-spec v0.5.2, aws-sdk-go-v2, zerolog (003-sdk-compliance-refactor)
 - N/A (stateless plugin with optional cache) (003-sdk-compliance-refactor)
 
 ## Recent Changes
-- 002-add-arn-spec: Added Go 1.25.5 + pulumicost-spec v0.4.7+ (requires upstream change), aws-sdk-go-v2
+- 002-add-arn-spec: Added Go 1.25.5 + finfocus-spec v0.5.2+ (requires upstream change), aws-sdk-go-v2

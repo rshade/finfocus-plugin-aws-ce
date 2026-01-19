@@ -38,7 +38,7 @@ Per plan.md, this is a single-binary Go plugin:
 
 **Purpose**: No new foundation needed - this is a refactoring feature. Existing structure is reused.
 
-**Note**: Skip to User Story phases. The SDK helpers are already available in `pulumicost-spec v0.4.7`.
+**Note**: Skip to User Story phases. The SDK helpers are already available in `finfocus-spec v0.5.2`.
 
 ---
 

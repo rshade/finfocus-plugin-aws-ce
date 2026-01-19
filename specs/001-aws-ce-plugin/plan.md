@@ -18,7 +18,7 @@ Create a PulumiCost plugin that retrieves actual historical billing data from AW
 -->
 
 **Language/Version**: Go 1.25.5
-**Primary Dependencies**: github.com/rshade/pulumicost-spec (PulumiCost plugin SDK), github.com/aws/aws-sdk-go-v2 (AWS SDK for Cost Explorer API)
+**Primary Dependencies**: github.com/rshade/finfocus-spec (PulumiCost plugin SDK), github.com/aws/aws-sdk-go-v2 (AWS SDK for Cost Explorer API)
 **Storage**: N/A (stateless API client plugin with hybrid in-memory/disk caching)
 **Testing**: Go testing with pluginsdk.NewTestPlugin integration pattern, table-driven unit tests for pure functions
 **Target Platform**: Linux (cross-platform Go binary compatible with PulumiCost core)
