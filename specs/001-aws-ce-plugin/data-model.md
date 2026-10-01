@@ -1,4 +1,4 @@
-# Data Model: AWS Cost Explorer Plugin for PulumiCost
+# Data Model: AWS Cost Explorer Plugin for FinFocus
 
 **Date**: 2025-12-10
 **Context**: Entity definitions and relationships for AWS Cost Explorer cost data integration
@@ -31,7 +31,7 @@ Represents a single cost data point returned from AWS Cost Explorer API.
 - May reference ReservationData or SavingsPlanData
 
 ### ResourceDescriptor
-Identifies the AWS resource or scope being queried (from PulumiCost SDK).
+Identifies the AWS resource or scope being queried (from FinFocus SDK).
 
 **Fields**:
 - `provider` (string): Cloud provider ("aws" for this plugin)
@@ -125,7 +125,7 @@ Represents a cached cost query result with metadata.
 - Used by Calculator for performance optimization
 
 ### FallbackHint
-Enum signaling whether PulumiCost core should try fallback plugins.
+Enum signaling whether FinFocus core should try fallback plugins.
 
 **Values**:
 - `NONE`: Data returned successfully, no fallback needed
@@ -185,5 +185,5 @@ ResourceDescriptor ──┬─── DateRange ───┬─── CostQuery 
 - **No AWS Credentials**: Clear authentication error
 - **Rate Limited**: Implement exponential backoff retry
 - **No Data Available**: Return empty results with RECOMMENDED fallback
-- **API Errors**: Translate to appropriate PulumiCost error codes</content>
-<parameter name="filePath">/mnt/c/GitHub/go/src/github.com/rshade/pulumicost-plugin-aws-ce/specs/001-aws-ce-plugin/data-model.md
+- **API Errors**: Translate to appropriate FinFocus error codes</content>
+<parameter name="filePath">$GOPATH/src/github.com/rshade/finfocus-plugin-aws-ce/specs/001-aws-ce-plugin/data-model.md

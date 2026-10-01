@@ -1,4 +1,4 @@
-# pulumicost-plugin-aws-ce Development Guidelines
+# finfocus-plugin-aws-ce Development Guidelines
 
 Auto-generated from all feature plans. Last updated: 2025-12-10
 
@@ -6,7 +6,7 @@ Auto-generated from all feature plans. Last updated: 2025-12-10
 - Go 1.25.5 + goreleaser (for cross-platform binary builds), golangci-lint v2.6.2 (for code quality), release-please (for automated versioning), GitHub Actions (for CI/CD workflows) (001-cicd-infrastructure)
 - N/A (configuration and documentation files only) (001-cicd-infrastructure)
 
-- Go 1.25.5 + github.com/rshade/finfocus-spec (PulumiCost plugin SDK), github.com/aws/aws-sdk-go-v2 (AWS SDK for Cost Explorer API) (001-aws-ce-plugin)
+- Go 1.25.5 + github.com/rshade/finfocus-spec (FinFocus plugin SDK), github.com/aws/aws-sdk-go-v2 (AWS SDK for Cost Explorer API) (001-aws-ce-plugin)
 
 ## Project Structure
 
@@ -30,7 +30,7 @@ Go 1.25.5: Follow standard conventions
 ## Recent Changes
 - 001-cicd-infrastructure: Added Go 1.25.5 + goreleaser (for cross-platform binary builds), golangci-lint v2.6.2 (for code quality), release-please (for automated versioning), GitHub Actions (for CI/CD workflows)
 
-- 001-aws-ce-plugin: Added Go 1.25.5 + github.com/rshade/finfocus-spec (PulumiCost plugin SDK), github.com/aws/aws-sdk-go-v2 (AWS SDK for Cost Explorer API)
+- 001-aws-ce-plugin: Added Go 1.25.5 + github.com/rshade/finfocus-spec (FinFocus plugin SDK), github.com/aws/aws-sdk-go-v2 (AWS SDK for Cost Explorer API)
 
 ## Roadmap & Active Issues
 
@@ -61,10 +61,10 @@ The `pluginsdk` package (`github.com/rshade/finfocus-spec/sdk/go/pluginsdk`) pro
 
 ### 1. Environment Variables (`env.go`)
 - **Usage**: Replace manual `os.Getenv` calls.
-- `GetPort()`: `PULUMICOST_PLUGIN_PORT`
-- `GetLogLevel()`: `PULUMICOST_LOG_LEVEL`
-- `GetLogFile()`: `PULUMICOST_LOG_FILE` (Absolute path)
-- `IsTestMode()`: `PULUMICOST_TEST_MODE == "true"`
+- `GetPort()`: `FINFOCUS_PLUGIN_PORT`
+- `GetLogLevel()`: `FINFOCUS_LOG_LEVEL`
+- `GetLogFile()`: `FINFOCUS_LOG_FILE` (Absolute path)
+- `IsTestMode()`: `FINFOCUS_TEST_MODE == "true"`
 
 ### 2. Validation (`validation.go`)
 - **Usage**: Call at the start of RPC handlers.
@@ -79,7 +79,7 @@ The `pluginsdk` package (`github.com/rshade/finfocus-spec/sdk/go/pluginsdk`) pro
 
 ### 4. Logging (`logging.go`)
 - **Usage**: Structured Zerolog setup.
-- `NewLogWriter()`: Returns writer for `PULUMICOST_LOG_FILE`.
+- `NewLogWriter()`: Returns writer for `FINFOCUS_LOG_FILE`.
 - `NewPluginLogger(name, version, level, writer)`: Creates standard logger.
 - `LogOperation(logger, "OperationName")`: returns a done function to defer for timing.
 

@@ -7,7 +7,7 @@
 
 ## Summary
 
-Implement a robust CI/CD pipeline for the Go-based pulumicost-plugin-aws-ce project, creating configuration files (.goreleaser.yaml, release-please config), GitHub workflows for testing/linting/release, and documentation updates. The approach follows the reference standards from pulumicost-plugin-aws-public but adapted for single-binary Go builds targeting linux, darwin, windows with amd64/arm64 architectures.
+Implement a robust CI/CD pipeline for the Go-based finfocus-plugin-aws-ce project, creating configuration files (.goreleaser.yaml, release-please config), GitHub workflows for testing/linting/release, and documentation updates. The approach follows the reference standards from finfocus-plugin-aws-public but adapted for single-binary Go builds targeting linux, darwin, windows with amd64/arm64 architectures.
 
 ## Technical Context
 

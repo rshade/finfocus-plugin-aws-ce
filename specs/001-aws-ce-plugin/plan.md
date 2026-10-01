@@ -1,13 +1,13 @@
-# Implementation Plan: AWS Cost Explorer Plugin for PulumiCost
+# Implementation Plan: AWS Cost Explorer Plugin for FinFocus
 
-**Branch**: `001-aws-ce-plugin` | **Date**: 2025-12-10 | **Spec**: /mnt/c/GitHub/go/src/github.com/rshade/pulumicost-plugin-aws-ce/specs/001-aws-ce-plugin/spec.md
+**Branch**: `001-aws-ce-plugin` | **Date**: 2025-12-10 | **Spec**: $GOPATH/src/github.com/rshade/finfocus-plugin-aws-ce/specs/001-aws-ce-plugin/spec.md
 **Input**: Feature specification from `/specs/001-aws-ce-plugin/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
 
 ## Summary
 
-Create a PulumiCost plugin that retrieves actual historical billing data from AWS Cost Explorer API. The plugin implements the PulumiCost plugin SDK gRPC interface, authenticates with AWS using standard credential providers, and provides cost data grouped by various dimensions (service, account, tags, availability zone). The implementation focuses on actual cost retrieval only (GetProjectedCost returns error), with support for date range queries, reservation utilization data, and graceful handling of AWS API rate limits.
+Create a FinFocus plugin that retrieves actual historical billing data from AWS Cost Explorer API. The plugin implements the FinFocus plugin SDK gRPC interface, authenticates with AWS using standard credential providers, and provides cost data grouped by various dimensions (service, account, tags, availability zone). The implementation focuses on actual cost retrieval only (GetProjectedCost returns error), with support for date range queries, reservation utilization data, and graceful handling of AWS API rate limits.
 
 ## Technical Context
 
@@ -18,10 +18,10 @@ Create a PulumiCost plugin that retrieves actual historical billing data from AW
 -->
 
 **Language/Version**: Go 1.25.5
-**Primary Dependencies**: github.com/rshade/finfocus-spec (PulumiCost plugin SDK), github.com/aws/aws-sdk-go-v2 (AWS SDK for Cost Explorer API)
+**Primary Dependencies**: github.com/rshade/finfocus-spec (FinFocus plugin SDK), github.com/aws/aws-sdk-go-v2 (AWS SDK for Cost Explorer API)
 **Storage**: N/A (stateless API client plugin with hybrid in-memory/disk caching)
 **Testing**: Go testing with pluginsdk.NewTestPlugin integration pattern, table-driven unit tests for pure functions
-**Target Platform**: Linux (cross-platform Go binary compatible with PulumiCost core)
+**Target Platform**: Linux (cross-platform Go binary compatible with FinFocus core)
 **Project Type**: Single project (gRPC plugin binary)
 **Performance Goals**: <10 seconds for GetActualCost RPC, <500ms plugin startup, <5 seconds for Cost Explorer API calls, <10ms for Supports RPC
 **Constraints**: AWS Cost Explorer API limits (14 months historical lookback), rate limiting with exponential backoff, read-only ce:GetCostAndUsage permissions, bounded memory usage, loopback-only gRPC serving
@@ -78,10 +78,10 @@ internal/
     └── data_test.go     # Unit tests for data transformations
 
 bin/
-└── pulumicost-plugin-aws-ce # Built plugin binary (make build output)
+└── finfocus-plugin-aws-ce # Built plugin binary (make build output)
 ```
 
-**Structure Decision**: Single Go project following standard Go layout conventions. The `internal/` directory contains private packages not intended for external use. `cmd/plugin/` contains the main application entry point. This structure aligns with Go best practices and the existing PulumiCost plugin SDK patterns.
+**Structure Decision**: Single Go project following standard Go layout conventions. The `internal/` directory contains private packages not intended for external use. `cmd/plugin/` contains the main application entry point. This structure aligns with Go best practices and the existing FinFocus plugin SDK patterns.
 
 ## Complexity Tracking
 

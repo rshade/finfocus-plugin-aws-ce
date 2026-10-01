@@ -14,11 +14,11 @@ milestone:      v0.1.0 - Foundation & CI/CD
 number: 7
 --
 ## Objective
-Implement a robust CI/CD pipeline for the project, mirroring the standards of `pulumicost-plugin-aws-public` but adapted for a single-binary architecture.
+Implement a robust CI/CD pipeline for the project, mirroring the standards of `finfocus-plugin-aws-public` but adapted for a single-binary architecture.
 
 ## Research
 - [ ] Review `product.md` for the detailed infrastructure plan.
-- [ ] Review `../pulumicost-plugin-aws-public/.github/workflows` and config files for reference patterns.
+- [ ] Review `../finfocus-plugin-aws-public/.github/workflows` and config files for reference patterns.
 
 ## Tasks
 - [ ] **Configuration Files**:

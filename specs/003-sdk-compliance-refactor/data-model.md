@@ -27,11 +27,11 @@ While no data entities change, the plugin's configuration surface expands:
 
 | Variable | Type | Default | Description |
 | -------- | ---- | ------- | ----------- |
-| `PULUMICOST_PLUGIN_PORT` | int | 0 (auto) | gRPC server port |
-| `PULUMICOST_LOG_FILE` | string | "" (stderr) | Log output file path |
-| `PULUMICOST_LOG_LEVEL` | string | "info" | Log verbosity (debug/info/warn/error) |
-| `PULUMICOST_LOG_FORMAT` | string | "json" | Log format (json/text) |
-| `PULUMICOST_TEST_MODE` | string | "false" | Enable test mode behaviors |
+| `FINFOCUS_PLUGIN_PORT` | int | 0 (auto) | gRPC server port |
+| `FINFOCUS_LOG_FILE` | string | "" (stderr) | Log output file path |
+| `FINFOCUS_LOG_LEVEL` | string | "info" | Log verbosity (debug/info/warn/error) |
+| `FINFOCUS_LOG_FORMAT` | string | "json" | Log format (json/text) |
+| `FINFOCUS_TEST_MODE` | string | "false" | Enable test mode behaviors |
 
 ### CLI Flags (New)
 

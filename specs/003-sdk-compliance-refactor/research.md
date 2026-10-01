@@ -13,14 +13,14 @@ This document captures research findings for the SDK compliance refactoring. Sin
 
 | Function | Signature | Behavior |
 | -------- | --------- | -------- |
-| `GetPort()` | `func GetPort() int` | Reads `PULUMICOST_PLUGIN_PORT`, returns 0 if unset |
-| `GetLogLevel()` | `func GetLogLevel() string` | Reads `PULUMICOST_LOG_LEVEL`, falls back to `LOG_LEVEL` |
-| `GetLogFile()` | `func GetLogFile() string` | Reads `PULUMICOST_LOG_FILE`, empty = stderr |
-| `GetLogFormat()` | `func GetLogFormat() string` | Reads `PULUMICOST_LOG_FORMAT` (json/text) |
-| `IsTestMode()` | `func IsTestMode() bool` | Reads `PULUMICOST_TEST_MODE == "true"` |
+| `GetPort()` | `func GetPort() int` | Reads `FINFOCUS_PLUGIN_PORT`, returns 0 if unset |
+| `GetLogLevel()` | `func GetLogLevel() string` | Reads `FINFOCUS_LOG_LEVEL`, falls back to `LOG_LEVEL` |
+| `GetLogFile()` | `func GetLogFile() string` | Reads `FINFOCUS_LOG_FILE`, empty = stderr |
+| `GetLogFormat()` | `func GetLogFormat() string` | Reads `FINFOCUS_LOG_FORMAT` (json/text) |
+| `IsTestMode()` | `func IsTestMode() bool` | Reads `FINFOCUS_TEST_MODE == "true"` |
 
 **Decision**: Use all environment variable helpers directly. No custom fallback logic needed.
-**Rationale**: SDK helpers provide consistent behavior across all PulumiCost plugins.
+**Rationale**: SDK helpers provide consistent behavior across all FinFocus plugins.
 **Alternatives Considered**: Keep existing manual `os.Getenv` calls - rejected for consistency.
 
 ### CLI Flag Helpers
@@ -37,7 +37,7 @@ This document captures research findings for the SDK compliance refactoring. Sin
 
 | Function | Signature | Behavior |
 | -------- | --------- | -------- |
-| `NewLogWriter()` | `func NewLogWriter() io.Writer` | Returns file writer if `PULUMICOST_LOG_FILE` set, else stderr |
+| `NewLogWriter()` | `func NewLogWriter() io.Writer` | Returns file writer if `FINFOCUS_LOG_FILE` set, else stderr |
 | `NewPluginLogger()` | `func NewPluginLogger(pluginName, version string, level zerolog.Level, w io.Writer) zerolog.Logger` | Creates configured zerolog logger |
 | `LogOperation()` | `func LogOperation(logger zerolog.Logger, operation string) func()` | Returns defer-able function that logs operation timing |
 | `ResetLogWriter()` | `func ResetLogWriter()` | Closes and resets the global log writer (for tests) |

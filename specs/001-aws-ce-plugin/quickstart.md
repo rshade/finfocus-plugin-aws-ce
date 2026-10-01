@@ -1,4 +1,4 @@
-# Quick Start: AWS Cost Explorer Plugin for PulumiCost
+# Quick Start: AWS Cost Explorer Plugin for FinFocus
 
 **Plugin Name**: aws-ce
 **Purpose**: Retrieve actual historical billing data from AWS Cost Explorer
@@ -32,7 +32,7 @@
 ### Option 1: Build from Source
 ```bash
 git clone <repository-url>
-cd pulumicost-plugin-aws-ce
+cd finfocus-plugin-aws-ce
 make build
 make install
 ```
@@ -40,7 +40,7 @@ make install
 ### Option 2: Download Binary
 ```bash
 # Download from releases page
-# Place binary in ~/.pulumicost/plugins/aws-ce/1.0.0/
+# Place binary in ~/.finfocus/plugins/aws-ce/1.0.0/
 ```
 
 ## Configuration
@@ -186,16 +186,16 @@ The plugin logs structured JSON to stderr. Monitor for:
 
 ### Enable Debug Logging
 ```bash
-export PULUMICOST_LOG_LEVEL=debug
+export FINFOCUS_LOG_LEVEL=debug
 ```
 
 ### Check Plugin Status
 ```bash
 # Verify plugin is installed
-ls -la ~/.pulumicost/plugins/aws-ce/1.0.0/
+ls -la ~/.finfocus/plugins/aws-ce/1.0.0/
 
 # Check plugin binary
-./pulumicost-plugin-aws-ce --help
+./finfocus-plugin-aws-ce --help
 ```
 
 ### Test AWS Credentials
@@ -209,4 +209,4 @@ aws ce get-cost-and-usage --time-period Start=2024-12-01,End=2024-12-02 --granul
 - **Issues**: GitHub repository issues
 - **Documentation**: Full API reference in `/specs/001-aws-ce-plugin/contracts/`
 - **Logs**: Check plugin stderr output for detailed error information</content>
-<parameter name="filePath">/mnt/c/GitHub/go/src/github.com/rshade/pulumicost-plugin-aws-ce/specs/001-aws-ce-plugin/quickstart.md
+<parameter name="filePath">$GOPATH/src/github.com/rshade/finfocus-plugin-aws-ce/specs/001-aws-ce-plugin/quickstart.md

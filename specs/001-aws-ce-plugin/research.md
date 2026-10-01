@@ -1,14 +1,14 @@
-# Research Findings: AWS Cost Explorer Plugin for PulumiCost
+# Research Findings: AWS Cost Explorer Plugin for FinFocus
 
 **Date**: 2025-12-10
 **Researcher**: opencode
-**Context**: Implementation planning for AWS Cost Explorer integration with PulumiCost plugin SDK
+**Context**: Implementation planning for AWS Cost Explorer integration with FinFocus plugin SDK
 
 ## Decision: AWS Cost Explorer API Integration Approach
 
 **Chosen**: Direct AWS SDK v2 integration with lazy client initialization and structured error handling
 
-**Rationale**: AWS SDK v2 provides the most reliable and up-to-date Cost Explorer API access. Lazy initialization ensures fast plugin startup while maintaining connection efficiency. Structured error handling allows proper translation to PulumiCost error codes.
+**Rationale**: AWS SDK v2 provides the most reliable and up-to-date Cost Explorer API access. Lazy initialization ensures fast plugin startup while maintaining connection efficiency. Structured error handling allows proper translation to FinFocus error codes.
 
 **Alternatives considered**:
 - Third-party Cost Explorer libraries: Rejected due to maintenance overhead and potential compatibility issues
@@ -29,7 +29,7 @@
 
 **Chosen**: Exponential backoff with configurable retry limits, AWS-specific error code translation
 
-**Rationale**: AWS Cost Explorer API has rate limits that require intelligent retry logic. Exponential backoff prevents thundering herd problems. Error code translation ensures PulumiCost core receives actionable error information.
+**Rationale**: AWS Cost Explorer API has rate limits that require intelligent retry logic. Exponential backoff prevents thundering herd problems. Error code translation ensures FinFocus core receives actionable error information.
 
 **Alternatives considered**:
 - Simple retry with fixed delays: Rejected due to inefficient rate limit handling
@@ -69,7 +69,7 @@
 
 **Chosen**: Embed pluginsdk.BasePlugin and implement Calculator interface methods
 
-**Rationale**: Follows established PulumiCost plugin patterns. Ensures compatibility with core gRPC protocol expectations and standard error handling.
+**Rationale**: Follows established FinFocus plugin patterns. Ensures compatibility with core gRPC protocol expectations and standard error handling.
 
 **Alternatives considered**:
 - Custom gRPC implementation: Rejected due to protocol compatibility risks
@@ -79,7 +79,7 @@
 
 **Chosen**: zerolog structured JSON logging to stderr with component identification
 
-**Rationale**: Meets PulumiCost protocol requirements for gRPC services. Structured logging enables better debugging and monitoring without stdout pollution.
+**Rationale**: Meets FinFocus protocol requirements for gRPC services. Structured logging enables better debugging and monitoring without stdout pollution.
 
 **Alternatives considered**:
 - Standard library log: Rejected due to lack of structured fields and protocol compliance
@@ -97,7 +97,7 @@
 
 ## Key Integration Points Identified
 
-1. **PulumiCost Core Protocol**: gRPC CostSourceService with specific method signatures and error codes
+1. **FinFocus Core Protocol**: gRPC CostSourceService with specific method signatures and error codes
 2. **AWS Cost Explorer API**: Rate-limited service requiring pagination and proper error handling
 3. **Plugin Lifecycle**: Lazy initialization, graceful shutdown, and resource cleanup
 4. **Caching Layer**: Filesystem-based persistence with timestamp validation
@@ -123,4 +123,4 @@
 - FallbackHint enum signals core when to try alternative plugins
 - Error codes must match proto definitions for proper core handling
 - gRPC protocol compatibility is critical for integration</content>
-<parameter name="filePath">/mnt/c/GitHub/go/src/github.com/rshade/pulumicost-plugin-aws-ce/specs/001-aws-ce-plugin/research.md
+<parameter name="filePath">$GOPATH/src/github.com/rshade/finfocus-plugin-aws-ce/specs/001-aws-ce-plugin/research.md

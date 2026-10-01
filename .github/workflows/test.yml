@@ -2,28 +2,29 @@ name: Test
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
   pull_request:
-    branches: [ "main" ]
+    branches: [main]
 
 jobs:
   test:
-    name: Test and Lint
+    name: Test, Lint, and Security Scan
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - name: Set up tools with mise
+        uses: jdx/mise-action@v2
         with:
-          go-version: '1.25.5'
-          cache: true
+          install_args: go@1.27.1 golangci-lint@2.14.0 go:golang.org/x/vuln/cmd/govulncheck@1.8.0
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v7
-        with:
-          version: v2.6.2
+        run: golangci-lint run
+
+      - name: Run vulnerability check
+        run: govulncheck ./...
+        continue-on-error: true
 
       - name: Run tests
         run: go test -v ./...

@@ -1,6 +1,6 @@
-# Implementation Tasks: AWS Cost Explorer Plugin for PulumiCost
+# Implementation Tasks: AWS Cost Explorer Plugin for FinFocus
 
-**Feature**: AWS Cost Explorer Plugin for PulumiCost
+**Feature**: AWS Cost Explorer Plugin for FinFocus
 **Source**: `specs/001-aws-ce-plugin/plan.md`
 **Status**: Pending
 

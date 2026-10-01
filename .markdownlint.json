@@ -1,0 +1,16 @@
+{
+  "line-length": {
+    "line_length": 120,
+    "heading_line_length": 120,
+    "code_block_line_length": 120
+  },
+  "MD013": false,
+  "MD024": {
+    "siblings_only": true
+  },
+  "MD034": false,
+  "MD040": false,
+  "MD060": false,
+  "no-hard-tabs": false,
+  "default": true
+}

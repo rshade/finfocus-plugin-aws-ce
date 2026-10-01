@@ -6,10 +6,10 @@ code in this repository.
 ## Build Commands
 
 ```bash
-make build      # Build plugin binary to bin/pulumicost-plugin-aws-ce
+make build      # Build plugin binary to bin/finfocus-plugin-aws-ce
 make test       # Run all tests
 make lint       # Run golangci-lint
-make install    # Build and install to ~/.pulumicost/plugins/aws-ce/1.0.0/
+make install    # Build and install to ~/.finfocus/plugins/aws-ce/1.0.0/
 make fmt        # Format code with go fmt
 make ensure     # Update dependencies (alias for deps)
 make deps       # Update dependencies (go mod tidy && go mod download)
@@ -23,7 +23,7 @@ go test -v -run TestCalculatorName ./internal/pricing/
 
 ## Architecture
 
-This is a PulumiCost plugin that retrieves **actual costs** from AWS Cost
+This is a FinFocus plugin that retrieves **actual costs** from AWS Cost
 Explorer. It implements the `finfocus-spec` plugin SDK interface.
 
 ### Key Components
@@ -114,10 +114,10 @@ The `pluginsdk` package (`github.com/rshade/finfocus-spec/sdk/go/pluginsdk`) pro
 
 ### 1. Environment Variables (`env.go`)
 - **Usage**: Replace manual `os.Getenv` calls.
-- `GetPort()`: `PULUMICOST_PLUGIN_PORT`
-- `GetLogLevel()`: `PULUMICOST_LOG_LEVEL`
-- `GetLogFile()`: `PULUMICOST_LOG_FILE` (Absolute path)
-- `IsTestMode()`: `PULUMICOST_TEST_MODE == "true"`
+- `GetPort()`: `FINFOCUS_PLUGIN_PORT`
+- `GetLogLevel()`: `FINFOCUS_LOG_LEVEL`
+- `GetLogFile()`: `FINFOCUS_LOG_FILE` (Absolute path)
+- `IsTestMode()`: `FINFOCUS_TEST_MODE == "true"`
 
 ### 2. Validation (`validation.go`)
 - **Usage**: Call at the start of RPC handlers.
@@ -132,7 +132,7 @@ The `pluginsdk` package (`github.com/rshade/finfocus-spec/sdk/go/pluginsdk`) pro
 
 ### 4. Logging (`logging.go`)
 - **Usage**: Structured Zerolog setup.
-- `NewLogWriter()`: Returns writer for `PULUMICOST_LOG_FILE`.
+- `NewLogWriter()`: Returns writer for `FINFOCUS_LOG_FILE`.
 - `NewPluginLogger(name, version, level, writer)`: Creates standard logger.
 - `LogOperation(logger, "OperationName")`: returns a done function to defer for timing.
 
@@ -147,6 +147,7 @@ The `pluginsdk` package (`github.com/rshade/finfocus-spec/sdk/go/pluginsdk`) pro
 - N/A (stateless plugin, optional cache) (002-add-arn-spec)
 - Go 1.25.5 + finfocus-spec v0.5.2, aws-sdk-go-v2, zerolog (003-sdk-compliance-refactor)
 - N/A (stateless plugin with optional cache) (003-sdk-compliance-refactor)
+- Go 1.25.5 + finfocus-spec v0.5.2+ (plugin SDK), aws-sdk-go-v2 (Cost Explorer), zerolog (logging) (004-core-cost-e2e)
 
 ## Recent Changes
 - 002-add-arn-spec: Added Go 1.25.5 + finfocus-spec v0.5.2+ (requires upstream change), aws-sdk-go-v2

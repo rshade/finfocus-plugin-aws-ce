@@ -1,4 +1,4 @@
-// Package pricing implements the PulumiCost plugin interface for AWS Cost Explorer.
+// Package pricing implements the FinFocus plugin interface for AWS Cost Explorer.
 package pricing
 
 import (
@@ -13,12 +13,12 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"github.com/rshade/pulumicost-plugin-aws-ce/internal/client"
+	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
 	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
 	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
 )
 
-// Calculator implements the PulumiCost plugin interface for AWS Cost Explorer.
+// Calculator implements the FinFocus plugin interface for AWS Cost Explorer.
 type Calculator struct {
 	*pluginsdk.BasePlugin
 	ceClient *client.Client
@@ -40,7 +40,7 @@ func NewCalculator() *Calculator {
 	cm, _ := NewCacheManager("", 24*time.Hour)
 
 	// Configure logger with component field
-	logger := log.With().Str("component", "pulumicost-plugin-aws-ce").Logger()
+	logger := log.With().Str("component", "finfocus-plugin-aws-ce").Logger()
 
 	return &Calculator{
 		BasePlugin: base,

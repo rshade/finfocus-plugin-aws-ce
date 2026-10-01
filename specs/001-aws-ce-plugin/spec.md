@@ -1,9 +1,9 @@
-# Feature Specification: AWS Cost Explorer Plugin for PulumiCost
+# Feature Specification: AWS Cost Explorer Plugin for FinFocus
 
 **Feature Branch**: `001-aws-ce-plugin`
 **Created**: 2025-12-05
 **Status**: Draft
-**Input**: User description: "Create pulumicost-plugin-aws-costexplorer for real AWS billing data"
+**Input**: User description: "Create finfocus-plugin-aws-costexplorer for real AWS billing data"
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -57,7 +57,7 @@ As a cloud architect, I want to see the impact of Reserved Instances and Savings
 
 ### User Story 4 - Handle API Rate Limits Gracefully (Priority: P4)
 
-As a developer integrating with PulumiCost, I want the plugin to handle AWS API rate limits gracefully so that my cost analysis workflows don't fail unexpectedly.
+As a developer integrating with FinFocus, I want the plugin to handle AWS API rate limits gracefully so that my cost analysis workflows don't fail unexpectedly.
 
 **Why this priority**: Operational reliability is important but becomes critical only at scale. Initial users may not hit rate limits, but enterprise adoption requires this resilience.
 
@@ -87,7 +87,7 @@ As a developer integrating with PulumiCost, I want the plugin to handle AWS API 
 - **FR-003**: System MUST support date range queries with start and end dates
 - **FR-004**: System MUST support grouping costs by standard dimensions (SERVICE, LINKED_ACCOUNT, TAG, AZ)
 - **FR-005**: System MUST return costs in USD currency format
-- **FR-006**: System MUST implement the PulumiCost plugin SDK interface (gRPC)
+- **FR-006**: System MUST implement the FinFocus plugin SDK interface (gRPC)
 - **FR-007**: System MUST return appropriate errors when GetProjectedCost is called (actual costs only)
 - **FR-008**: System MUST translate AWS API errors into meaningful user-facing error messages
 - **FR-009**: System MUST implement retry logic with exponential backoff for rate-limited requests
@@ -135,7 +135,7 @@ As a developer integrating with PulumiCost, I want the plugin to handle AWS API 
 
 - Q: Should the plugin cache Cost Explorer responses? → A: Hybrid caching - in-memory while plugin is alive, persist to disk on close, load from disk on startup. Use filesystem timestamps for freshness checks.
 - Q: What is the maximum historical data lookback period? → A: 14 months (AWS Cost Explorer maximum).
-- Q: How should the plugin respond when a valid query returns no data? → A: Return empty result set (not an error) with `FallbackHint.RECOMMENDED` in the gRPC response to signal pulumicost-core to try fallback plugins (e.g., aws-public). When data exists, use `FallbackHint.NONE`.
+- Q: How should the plugin respond when a valid query returns no data? → A: Return empty result set (not an error) with `FallbackHint.RECOMMENDED` in the gRPC response to signal finfocus-core to try fallback plugins (e.g., aws-public). When data exists, use `FallbackHint.NONE`.
 
 ### Session 2025-12-10
 
@@ -151,5 +151,5 @@ As a developer integrating with PulumiCost, I want the plugin to handle AWS API 
 - Users will configure appropriate IAM permissions before using the plugin
 - The plugin operates as a read-only integration with no ability to modify AWS resources or billing
 - AWS Cost Explorer data may have up to 24-hour delay for recent costs (standard AWS behavior)
-- The plugin will be distributed as a single binary compatible with the PulumiCost plugin system
+- The plugin will be distributed as a single binary compatible with the FinFocus plugin system
 - The finfocus-spec SDK requires `FallbackHint` enum addition ([finfocus-spec#124](https://github.com/rshade/finfocus-spec/issues/124)) - FR-015 is blocked until this is merged

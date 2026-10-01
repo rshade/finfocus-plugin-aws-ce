@@ -2,7 +2,7 @@
 
 ## Core Architectural Identity
 **Lightweight gRPC Plugin / Adapter**
-This project is a stateless "Provider Plugin" for the PulumiCost engine. It acts as a translation layer between the `pulumicost-core` (gRPC client) and the AWS Cost Explorer API (External Service).
+This project is a stateless "Provider Plugin" for the FinFocus engine. It acts as a translation layer between the `finfocus-core` (gRPC client) and the AWS Cost Explorer API (External Service).
 
 It is **NOT** a standalone application, CLI tool, or dashboard. It is a worker node in a plugin architecture.
 

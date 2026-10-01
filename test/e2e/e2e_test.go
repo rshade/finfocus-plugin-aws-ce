@@ -34,8 +34,8 @@ const (
 )
 
 func TestE2E(t *testing.T) {
-	if os.Getenv("PULUMICOST_E2E") != "true" {
-		t.Skip("Skipping E2E tests. Set PULUMICOST_E2E=true to run.")
+	if os.Getenv("finfocus_E2E") != "true" {
+		t.Skip("Skipping E2E tests. Set finfocus_E2E=true to run.")
 	}
 
 	// 1. Setup Plugin Server
@@ -124,8 +124,8 @@ func startPluginServer(t *testing.T, ctx context.Context, port int) func() {
 	
 	// Set Env vars for testing
 	cmd.Env = append(os.Environ(), 
-		"PULUMICOST_LOG_LEVEL=debug",
-		"PULUMICOST_TEST_MODE=true",
+		"finfocus_LOG_LEVEL=debug",
+		"finfocus_TEST_MODE=true",
 	)
 
 	if err := cmd.Start(); err != nil {

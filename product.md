@@ -1,4 +1,4 @@
-Here is the analysis of the current state of `pulumicost-plugin-aws-ce` in relation to the `finfocus-spec` releases, AWS Cost Explorer capabilities, and the `spec-kit` methodology.
+Here is the analysis of the current state of `finfocus-plugin-aws-ce` in relation to the `finfocus-spec` releases, AWS Cost Explorer capabilities, and the `spec-kit` methodology.
 
 ### 1. Spec-Kit & Project Alignment
 The project is well-aligned with the **Spec-Kit** methodology, evidenced by the presence of `.gemini/`, `.claude/`, and `specs/` directories.
@@ -13,7 +13,7 @@ The project is well-aligned with the **Spec-Kit** methodology, evidenced by the 
     *   **Context:** `v0.5.2` introduced request validation helpers in the `pluginsdk`.
     *   **Action:** When implementing new features, utilize the `pluginsdk` validation helpers to improve `SR-001` (Input Validation) instead of writing custom validation logic where possible.
 *   **Unified Logging & Configuration (New in Spec PRs):**
-    *   **Context:** Recent PRs (#145, #143) added support for `PULUMICOST_LOG_FILE` and `--port` flag parsing in the SDK.
+    *   **Context:** Recent PRs (#145, #143) added support for `FINFOCUS_LOG_FILE` and `--port` flag parsing in the SDK.
     *   **Action:** Ensure `main.go` and logger initialization respect these configurations to integrate seamlessly with the Core's orchestration.
 *   **Security (Least Privilege):**
     *   **Issue:** `SR-005` requests `ce:GetCostForecast` permission, but `FR-007` in `specs/001-aws-ce-plugin/spec.md` explicitly requires the system to *error* when `GetProjectedCost` is called.
@@ -51,7 +51,7 @@ Based on the **AWS Cost Explorer API** capabilities and **finfocus-spec v0.5.2**
     *   The plugin uses ARN as the source of truth when available, with fallback to `resource_id` for backward compatibility.
 
 ### 6. CI/CD Infrastructure Plan
-The project currently lacks the CI/CD infrastructure present in the sibling project `pulumicost-plugin-aws-public`. Unlike the public plugin, which requires complex region-specific builds, this plugin is a **single-binary application**.
+The project currently lacks the CI/CD infrastructure present in the sibling project `finfocus-plugin-aws-public`. Unlike the public plugin, which requires complex region-specific builds, this plugin is a **single-binary application**.
 
 **Required Files & Configuration:**
 
@@ -75,7 +75,7 @@ The project currently lacks the CI/CD infrastructure present in the sibling proj
 ### 8. Execution Roadmap (Active Issues)
 
 #### v0.1.0 - Foundation & CI/CD
-- **Issue #6**: ✅ Update Dependencies & Refactor for SDK Compliance (Spec v0.5.2, SDK helpers, Zerolog, `PULUMICOST_LOG_FILE`, `--port`).
+- **Issue #6**: ✅ Update Dependencies & Refactor for SDK Compliance (Spec v0.5.2, SDK helpers, Zerolog, `FINFOCUS_LOG_FILE`, `--port`).
 - **Issue #7**: Establish CI/CD Infrastructure (Workflows, Goreleaser, release-please).
 - **Issue #11**: Implement Core Cost Plugin (Spec 001) & E2E Testing (AWS Integration, CI Secrets, FOCUS 1.2 Compliance).
 - **Issue #12**: Polish: Installation & Documentation (Makefile version fix, README rewrite, Manifest consolidation).

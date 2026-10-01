@@ -1,5 +1,5 @@
-// Proto change for pulumicost-spec repository
-// Target file: proto/pulumicost/v1/costsource.proto
+// Proto change for finfocus-spec repository
+// Target file: proto/finfocus/v1/costsource.proto
 // This is a PATCH specification, not the full file
 
 // Add the following field to GetActualCostRequest message:

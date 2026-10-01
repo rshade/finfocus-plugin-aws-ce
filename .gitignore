@@ -35,3 +35,7 @@ node_modules/
 
 # PR workflow
 PR_MESSAGE.md
+
+# Vale styles (fetched by vale sync, not tracked)
+.vale/styles/*
+!.vale/styles/config/

@@ -5,7 +5,7 @@
 **Priority:** High
 
 ## User Story
-As a FinOps practitioner, I want to see projected costs for the coming months directly in PulumiCost, so that I can anticipate budget overruns without leaving my workflow.
+As a FinOps practitioner, I want to see projected costs for the coming months directly in FinFocus, so that I can anticipate budget overruns without leaving my workflow.
 
 ## Technical Thesis
 Implement the `GetProjectedCost` RPC by acting as a direct proxy to the AWS Cost Explorer `GetCostForecast` API.

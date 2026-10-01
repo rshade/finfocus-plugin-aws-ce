@@ -26,7 +26,7 @@ func NewCacheManager(cacheDir string, ttl time.Duration) (*CacheManager, error) 
 		if err != nil {
 			return nil, fmt.Errorf("getting user home dir: %w", err)
 		}
-		cacheDir = filepath.Join(homeDir, ".pulumicost", "cache", "aws-ce")
+		cacheDir = filepath.Join(homeDir, ".finfocus", "cache", "aws-ce")
 	}
 
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {

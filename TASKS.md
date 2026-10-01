@@ -1,0 +1,1079 @@
+# AWS Cost Explorer Plugin v0.1.0 - Task Breakdown
+
+<!-- markdownlint-disable MD013 MD060 -->
+
+**Goal:** Release v0.1.0 as a production-ready actual-cost plugin backed by AWS Cost Explorer, with spec compliance, proper testing, Docker support, and documentation.
+
+**Roadmap:** Phase-by-phase implementation, skipping PR gates until a working v0.1.0 exists.
+
+---
+
+## Scope (decided 2026-10-01)
+
+**v0.1.0 is a complete, correct actual-cost plugin (Tier A).** Everything else is written up
+below as Tier B tasks (CE-7.x) for a second run, so all 40 open issues are covered here. Seven
+issues are duplicates and two are stale: they are marked in the Issue Index and no GitHub
+change is made by this plan. The owner closes or merges them.
+
+| Tier | Issues | Tasks |
+| --- | --- | --- |
+| A, v0.1.0 | #11, #12, #31, #37, #40 to #48, #50 to #53, #55 | CE-1.x to CE-5.x and CE-6.x |
+| B, second run | #8, #13, #21, #27, #29, #30, #32, #33, #34, #36, #38, #49, #54 | CE-7.x |
+| Duplicates | #19, #20, #28 (of #37), #22 (of #13), #24 (of #8), #25 (of #36), #26 (of #38) | none, see Issue Index |
+| Stale | #3 (cites `pulumicost-spec` and a field that does not exist), #23 (satisfied by spec v0.7.0) | none |
+
+### What the research found that this plan did not know (2026-10-01)
+
+Sources and confidence tags are in `finfocus-pm` research notes (`aws-ce-api-facts.md`,
+`aws-ce-issue-reconcile.md`). The ones that change the work:
+
+- `GetCostAndUsage` **cannot group or filter by `RESOURCE_ID`** as the current code assumes.
+  Per-resource cost needs `GetCostAndUsageWithResources`, which needs an opt-in by the management
+  account, covers **the last 14 days only**, is daily (hourly for EC2 only), and lags up to 48
+  hours. The "14 months" lookback is for account and service totals. Whether it works for non-EC2
+  resources is unverified. The code filters on the **full ARN**, which is probably wrong. See
+  CE-6.7.
+- Each paginated request costs **$0.01**, there is no published rate limit, only
+  `LimitExceededException`, and AWS recommends a cache layer. See CE-6.8.
+- `ActualCostResult` has **no `metadata` field** (issue #52's code does not compile). Use
+  `FocusCostRecord.extended_columns`.
+- The SDK already provides a health endpoint and web/CORS config (`WebConfig`). Do not hand-roll
+  #43; wire the SDK's.
+- Spec blockers cited by #36 and #38 (`finfocus-spec` #314, #315) are closed.
+- Silent-failure defects in the current code are listed in CE-6.2 to CE-6.3 with file and line.
+- **No live AWS account exists and no sandbox, test data or free tier was found.** Moto returns
+  only canned results; LocalStack Cost Explorer is a paid tier. Verification therefore uses the
+  contract fixtures in `internal/client/testdata/ce-contract/` (CE-6.1) and an opt-in live test.
+
+---
+
+## Current State
+
+### Checkout vs. GitHub Mismatch
+
+| Item | Current | Should Be | Action |
+|------|---------|-----------|--------|
+| Local directory | `finfocus-plugin-aws-ce` | N/A (local dir name doesn't matter) | None |
+| Remote URL | `git@github.com:rshade/finfocus-plugin-aws-ce.git` | `git@github.com:rshade/finfocus-plugin-aws-ce.git` | Rename repo on GitHub or update remote |
+| go.mod module | `github.com/rshade/finfocus-plugin-aws-ce` | `github.com/rshade/finfocus-plugin-aws-ce` | Rename in v0.1.0 migration |
+| Logging component | `finfocus-plugin-aws-ce` | `finfocus-plugin-aws-ce` | Rename in v0.1.0 migration |
+
+**Drift Summary:** GitHub repo is renamed to `finfocus-plugin-aws-ce`, and local checkout, go.mod, and all references have been updated to use the new name.
+
+### Toolchain Baseline (Completed 2026-09-30)
+
+✅ **COMPLETE** - All ecosystem baseline tooling installed and configured:
+
+| Component | Version | Status | Notes |
+|-----------|---------|--------|-------|
+| **Language & Build** | | | |
+| Go | 1.27.1 | ✅ | Updated in go.mod and mise.toml |
+| finfocus-spec | v0.7.0 | ✅ | Unblocks per-request credentials + FOCUS 1.4 |
+| ax-go | v0.7.0+ | ✅ | Arrives transitively via spec |
+| goreleaser | 2.18.2 | ✅ | Multi-platform release build configuration updated |
+| **Code Quality & Testing** | | | |
+| golangci-lint | 2.14.0 | ✅ | Matches finfocus baseline |
+| govulncheck | 1.8.0 | ✅ | Workflow integrated (non-blocking for GO-2026-6443) |
+| **Documentation & Linting** | | | |
+| markdownlint-cli2 | 0.23.3 | ✅ | .markdownlint.json configured for 120-char lines |
+| vale | 3.20.0 | ✅ | .vale.ini configured for Google style |
+| actionlint | 1.7.12 | ✅ | All workflows validated |
+| commitlint | 20.5.2 (config-conventional 20.5.3) | ✅ | Conventional commit validation |
+| **Naming Migration** | | | |
+| Legacy name → FinFocus | — | ✅ | All tracked files renamed; 0 remaining in tracked code |
+| `.github/workflows` | — | ✅ | Updated to use mise-action with explicit tool pins |
+| Manifest files | — | ✅ | Updated descriptions and paths |
+| **Configuration** | | | |
+| mise.toml | Latest | ✅ | Tool versioning pinned to ecosystem baseline |
+| .goreleaser.yaml | Updated | ✅ | Asset naming fixed for plugin installer compatibility |
+| .github/workflows/test.yml | Updated | ✅ | go@1.27.1, golangci-lint@2.14.0, govulncheck@1.8.0 |
+| .github/workflows/release.yml | Updated | ✅ | go@1.27.1, goreleaser@2.18.2 via mise-action |
+| .github/workflows/commitlint.yml | Created | ✅ | Conventional commit validation on PRs |
+| .github/workflows/prose-lint.yml | Created | ✅ | Vale + markdownlint via reviewdog |
+
+**Validation Results (2026-09-30):**
+
+- ✅ `go build ./...` - Pass
+- ✅ `go vet ./...` - Pass
+- ✅ `go test -count=1 ./...` - All packages pass
+- ✅ `actionlint .github/workflows/*.yml` - All workflows pass
+- ✅ Remaining legacy references in tracked files: **0** (all removed)
+- ⚠️ Legacy references in untracked specs/004-core-cost-e2e/: 4 files (intentionally not edited per safety rules)
+
+### Build & Test Results (Latest: 2026-09-30 Post-Toolchain)
+
+```bash
+$ go build ./...
+# ✅ Pass
+
+$ go vet ./...
+# ✅ Pass
+
+$ go test -count=1 ./...
+# ✅ All packages pass
+?       github.com/rshade/finfocus-plugin-aws-ce/cmd/plugin             [no test files]
+ok      github.com/rshade/finfocus-plugin-aws-ce/internal/client        0.064s
+ok      github.com/rshade/finfocus-plugin-aws-ce/internal/pricing       0.016s
+ok      github.com/rshade/finfocus-plugin-aws-ce/internal/test          0.004s
+ok      github.com/rshade/finfocus-plugin-aws-ce/test/e2e               0.005s
+```
+
+### RPC Implementation Status
+
+| RPC | Status | Notes |
+|-----|--------|-------|
+| `GetActualCost()` | ✅ Implemented | Calls AWS Cost Explorer `GetCostAndUsage` API |
+| `GetProjectedCost()` | ❌ Not implemented | Returns error "projected cost not supported" |
+| `Supports()` | ⚠️ Inherited only | Uses BasePlugin default; no custom logic |
+| `GetPluginInfo()` | ❌ Not implemented | Missing entirely |
+| `BatchCost` | ❌ Not implemented | The spec upgrade to v0.7.0 is done, so the RPC exists. Post-v0.1.0 unless the run has time. |
+| `GetRecommendations()` | ❌ Not implemented | Future roadmap (issues #22, #26, #27) |
+
+### AWS Cost Explorer API Usage
+
+- **API Used:** `GetCostAndUsage` (real billing data)
+- **Retry Logic:** Exponential backoff with configurable retry count
+- **Lookback Limit:** account and service totals reach back 14 months; per-resource data only 14 days (see Scope). The code enforces 14 months for everything, which is wrong for resource-level queries
+- **Per-Request Cost:** AWS charges $0.01 per paginated request; there is no client-side metering or request budget (CE-6.8)
+- **Resource Filtering:** the code filters on `RESOURCE_ID` (the full ARN) with `GetCostAndUsage`, which cannot do that; Account ID is supported; `tags` in the request are ignored (CE-6.7)
+- **Caching:** Basic in-memory cache (no TTL/expires_at support)
+
+### Open Issues Summary
+
+- **Total:** 40 open issues (8 closed, 48 total)
+- **In Scope for v0.1.0 (Tier A):** 18 issues (CE-1 to CE-6)
+- **Second run (Tier B):** 13 issues (CE-7)
+- **Duplicates / stale:** 7 and 2, marked in the Issue Index
+
+### Known Limitations (Pre-v0.1.0)
+
+1. **No Supports() customization** - Falls back to BasePlugin default (fixed by CE-1.2)
+2. **No trace_id propagation** - Logging doesn't capture distributed trace IDs ([#46](https://github.com/rshade/finfocus-plugin-aws-ce/issues/46)) (fixed by CE-1.4)
+3. **No per-request credentials** - Only uses default AWS credential chain (CE-1.6, v0.1.0)
+4. **No FOCUS 1.4 billing detail** - Missing invoice_detail_id and commitment columns (CE-1.7, post-v0.1.0)
+5. **No Docker build** - Binary only, no container support ([#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42)) (fixed by CE-3.2)
+6. **No CI/CD workflows** - Manual release process ([#48](https://github.com/rshade/finfocus-plugin-aws-ce/issues/48)) (fixed by CE-3.4)
+7. **Minimal documentation** - No deployment guides or contribution guidelines ([#44](https://github.com/rshade/finfocus-plugin-aws-ce/issues/44), [#53](https://github.com/rshade/finfocus-plugin-aws-ce/issues/53)) (fixed by CE-4.1, CE-4.2)
+
+---
+
+## Phase 1: Spec Conformance (CE-1.x)
+
+### CE-1.1: Upgrade finfocus-spec to v0.7.0 and Go to 1.27.1
+
+**ID:** CE-1.1  
+**Description:** Update `go.mod` to use finfocus-spec v0.7.0 and Go 1.27.1. This unblocks per-request credentials (new `PerRequestCredentialConsumer` interface), FOCUS 1.4 billing columns (`invoice_detail_id`, `commitment_program_eligibility_details`), and ax-go v0.7.0 integration.
+
+**Files Modified:**
+
+- `go.mod` - Update Go version to 1.27.1, update finfocus-spec to v0.7.0
+- `go.sum` - Auto-updated by `go mod tidy`
+
+**Acceptance Criteria:**
+
+- Go version in go.mod is 1.27.1
+- finfocus-spec version in go.mod is v0.7.0 (or later)
+- `go mod tidy` succeeds
+- `go build ./...` succeeds with Go 1.27.1
+- All tests still pass: `go test ./...`
+- Binary builds without deprecation warnings
+- ax-go v0.7.0 arrives transitively (plugins do not import ax-go directly)
+
+**Related Issues:**
+
+- [#23](https://github.com/rshade/finfocus-plugin-aws-ce/issues/23) - Update finfocus-spec to enable gRPC reflection
+
+---
+
+### CE-1.2: Implement Supports() RPC with Custom Logic
+
+**ID:** CE-1.2  
+**Description:** Add custom `Supports()` method to Calculator to check if a resource is supported by aws-ce. AWS Cost Explorer only supports AWS resources with proper resource IDs or ARNs, so Supports() must validate request data quality.
+
+**Files Modified:**
+
+- `internal/pricing/calculator.go` - Add `Supports()` method
+
+**Acceptance Criteria:**
+
+- `Supports()` method added to Calculator struct
+- Returns true for "aws" provider only
+- Returns true when ResourceId or ARN is present and valid
+- Returns false for resources without identifiers
+- Returns proto ErrorCode for invalid input
+- Unit tests cover: valid ARN, valid ResourceId, missing identifiers, non-AWS resources
+- All tests pass: `go test ./...`
+
+**Related Issues:**
+
+- [#41](https://github.com/rshade/finfocus-plugin-aws-ce/issues/41) - Add Supports() RPC implementation
+
+---
+
+### CE-1.3: Implement GetPluginInfo() RPC
+
+**ID:** CE-1.3  
+**Description:** Add `GetPluginInfo()` method to Calculator to return plugin metadata (name, version, supported providers, supported RPCs).
+
+**Files Modified:**
+
+- `internal/pricing/calculator.go` - Add `GetPluginInfo()` method
+- `cmd/plugin/main.go` - Update version constant (optional)
+
+**Acceptance Criteria:**
+
+- `GetPluginInfo()` method returns PluginInfo proto message
+- Plugin name: "aws-ce"
+- Plugin version: "0.1.0" (or auto-detected from git tag)
+- Supported providers: ["aws"]
+- Supported RPCs: ["GetActualCost", "Supports", "GetPluginInfo", "GetProjectedCost"]
+- Unit test verifies response structure
+- All tests pass: `go test ./...`
+
+**Related Issues:**
+
+- [#40](https://github.com/rshade/finfocus-plugin-aws-ce/issues/40) - Add GetPluginInfo() RPC implementation
+
+---
+
+### CE-1.4: Implement Trace ID Propagation
+
+**ID:** CE-1.4  
+**Description:** Extract and log `trace_id` from gRPC metadata to enable distributed tracing. Trace ID should appear in all structured log entries for this request.
+
+**Files Modified:**
+
+- `internal/pricing/calculator.go` - Extract trace_id from context metadata
+- All RPC handler methods - Pass trace_id to structured logger
+
+**Acceptance Criteria:**
+
+- Trace ID extracted from gRPC metadata key `finfocus-trace-id`
+- Trace ID added to all log entries for this request
+- When trace ID is missing, use empty string (graceful degradation)
+- Integration test verifies trace ID in stderr JSON logs
+- All tests pass: `go test ./...`
+
+**Related Issues:**
+
+- [#46](https://github.com/rshade/finfocus-plugin-aws-ce/issues/46) - Implement trace ID propagation for distributed tracing
+
+---
+
+### CE-1.5: Use Proto ErrorCode Enum for Standardized Errors
+
+**ID:** CE-1.5  
+**Description:** Replace custom error strings with proto ErrorCode enum values. All errors returned by RPC methods should use the standardized error codes defined in finfocus-spec.
+
+**Files Modified:**
+
+- `internal/pricing/calculator.go` - Use ErrorCode enum
+- `internal/client/client.go` - Standardize error codes
+
+**Acceptance Criteria:**
+
+- All error returns use proto ErrorCode (not custom strings)
+- `ERROR_CODE_UNSUPPORTED_REGION` for region mismatches
+- `ERROR_CODE_INVALID_RESOURCE` for missing identifiers
+- `ERROR_CODE_INVALID_ARGUMENT` for bad input (date range, ARN format)
+- Unit tests verify error codes in responses
+- All tests pass: `go test ./...`
+
+**Related Issues:**
+
+- [#47](https://github.com/rshade/finfocus-plugin-aws-ce/issues/47) - Use proto ErrorCode enum for standardized error handling
+
+---
+
+### CE-1.6: Implement Per-Request Credentials Support (v0.7.0+)
+
+**ID:** CE-1.6  
+**Description:** Implement opt-in per-request AWS credentials support via the `PerRequestCredentialConsumer` interface (new in finfocus-spec v0.7.0). This allows hosts to pass AWS credentials (API keys, STS tokens, role ARNs) per-request via gRPC metadata (`x-finfocus-credential-*` headers), enabling multi-account and multi-credential scenarios without environment variables.
+
+**Background:**
+
+AWS Cost Explorer supports multiple authentication methods: environment variables (current), CLI profiles, and temporary credentials. Per-request credentials enable plugins to work across multiple AWS accounts dynamically without restart.
+
+**Files Modified:**
+
+- `internal/pricing/calculator.go` - Implement `PerRequestCredentialConsumer` interface
+- `internal/client/client.go` - Extract and use per-request credentials when available
+- `cmd/plugin/main.go` - Register `PerRequestCredentialConsumer` capability
+
+**Acceptance Criteria:**
+
+- Calculator implements empty `ConsumesPerRequestCredentials()` method (marks opt-in)
+- `GetPluginInfo()` response includes metadata `supports_per_request_credentials: "true"`
+- Cost queries extract credentials via `pluginsdk.ExtractCredentials(ctx)`
+- Per-request credentials take precedence over environment variables
+- Falls back gracefully to default credential chain when no per-request creds provided
+- Request credentials names validated: alphanumeric + hyphens, max 64 chars, max 16 entries total
+- Credentials values masked in logs (never logged, only used)
+- Integration test verifies multi-account scenarios with different credentials per request
+- All tests pass: `go test ./...`
+
+**Note:** This coexists with the existing default AWS credential chain (env vars, ~/.aws/credentials, IMDSv2). Per-request credentials are opt-in and take priority when provided. Plugins remain backward-compatible: without credentials in the request, they use the default chain.
+
+**Related Issues:**
+
+- Links to be added based on finfocus-plugin ecosystem credentials task
+
+---
+
+### CE-1.7: Support FOCUS 1.4 Billing Period and Invoice Detail Columns (v0.7.0+, Post-v0.1.0)
+
+**ID:** CE-1.7  
+**Description:** Add optional support for FOCUS 1.4 cost-and-usage columns: `invoice_detail_id` (field 67) and `commitment_program_eligibility_details` (field 68) on actual cost results. AWS Cost Explorer provides line-item invoice data and commitment eligibility information; enriching actual cost responses with these fields enables downstream FinOps reporting on commitment utilization and invoice reconciliation.
+
+**Status:** Post-v0.1.0 (scheduled for v0.2.0 after invoice RPC support is added to finfocus-spec)
+
+**Background:**
+
+FOCUS 1.4 adds invoice-level detail tracking. AWS Cost Explorer's `GetCostAndUsageWithResources` API (14-day resource-level limit) includes invoice line item references. Plugins can map those to `invoice_detail_id` and optionally infer commitment eligibility from pricing and RI/SP coverage.
+
+**Open Questions (Needs Decision):**
+
+1. **Invoice Detail Mapping:** Should the plugin extract `invoice_detail_id` directly from Cost Explorer API responses, or require a downstream invoice-lookup RPC call (spec v0.7.0+)? Current design assumes mapping from CE response metadata.
+
+2. **Commitment Eligibility:** How should the plugin determine `commitment_program_eligibility_details` JSON? Options:
+   - Use RI/SP coverage data from Cost Explorer (if available)
+   - Leave as null/empty for v0.2.0, add in v0.3.0 once RI/SP coverage is mapped
+   - Reference external commitment datasets (out of scope for v0.1.0)
+
+3. **Backward Compatibility:** Should these fields be optional in responses (graceful degradation if not populated)?
+
+**Tentative Approach (for v0.2.0):**
+
+- Populate `invoice_detail_id` from Cost Explorer metadata when available
+- Leave `commitment_program_eligibility_details` empty/null in v0.2.0, implement in v0.3.0 after RI/SP research
+- Tests verify both fields are included in schema-validated responses
+
+**Related Issues:**
+
+- Links to be added based on FOCUS 1.4 roadmap
+
+---
+
+## Phase 2: Testing & Validation (CE-2.x)
+
+### CE-2.1: Add Integration Tests for gRPC Server
+
+**ID:** CE-2.1  
+**Description:** Add integration tests that start the gRPC server in a subprocess and make live RPC calls. Tests should verify GetActualCost with mocked Cost Explorer responses and trace ID propagation.
+
+**Files Modified:**
+
+- `test/integration/gRPC_test.go` (new file)
+- `internal/client/client_test.go` - Add mock Cost Explorer API client
+
+**Acceptance Criteria:**
+
+- Integration tests in new file `test/integration/gRPC_test.go`
+- Test: Server starts on ephemeral port
+- Test: GetActualCost returns results with mock data
+- Test: Supports() rejects unsupported resources
+- Test: Trace ID propagates through gRPC metadata to logs
+- Test: Graceful shutdown on context cancellation
+- Tests run with: `go test -v ./test/integration/...`
+- All tests pass
+
+**Related Issues:**
+
+- [#45](https://github.com/rshade/finfocus-plugin-aws-ce/issues/45) - Add integration tests for gRPC server
+
+---
+
+### CE-2.2: Add Config Parsing Tests for main.go
+
+**ID:** CE-2.2  
+**Description:** Add unit tests for CLI flag and environment variable parsing in `cmd/plugin/main.go`. Tests should verify port detection, log level parsing, and graceful error handling.
+
+**Files Modified:**
+
+- `cmd/plugin/main_test.go` (new file)
+- `cmd/plugin/main.go` - Export parseLogLevel() function
+
+**Acceptance Criteria:**
+
+- Tests for `parseLogLevel()` with valid/invalid inputs
+- Tests for port flag parsing (CLI override, env var fallback)
+- Tests for context cancellation and graceful shutdown
+- Test: Flag precedence (CLI flag > env var > default)
+- All tests pass: `go test ./cmd/...`
+
+**Related Issues:**
+
+- [#51](https://github.com/rshade/finfocus-plugin-aws-ce/issues/51) - Add config parsing tests for main.go
+
+---
+
+### CE-2.3: Plugin Conformance Testing
+
+**ID:** CE-2.3  
+**Description:** Create test suite to verify plugin conformance with finfocus-spec. Tests should validate proto message structure, error handling, and protocol compliance.
+
+**Files Modified:**
+
+- `test/conformance/conformance_test.go` (new file)
+- `test/conformance/fixtures.go` (new file)
+
+**Acceptance Criteria:**
+
+- Test: Proto message round-trip (marshal/unmarshal)
+- Test: gRPC error codes match proto ErrorCode enum
+- Test: Required fields present in responses
+- Test: Optional fields handled gracefully
+- Test: Request validation per spec
+- Tests run with: `go test -v ./test/conformance/...`
+- All tests pass
+
+**Related Issues:**
+
+- [#31](https://github.com/rshade/finfocus-plugin-aws-ce/issues/31) - Plugin Conformance Testing
+
+---
+
+## Phase 3: Build & CI/CD (CE-3.x)
+
+### CE-3.1: Add Missing Makefile Targets
+
+**ID:** CE-3.1  
+**Description:** Add Makefile targets for development workflows: `develop`, `test-integration`, `docker`, and `install-local`.
+
+**Files Modified:**
+
+- `Makefile` - Add new targets
+
+**Acceptance Criteria:**
+
+- `make develop` - Installs dependencies and prepares dev environment
+- `make test-integration` - Runs integration tests
+- `make docker` - Builds Docker image
+- `make install-local` - Installs binary to `~/.finfocus/plugins/aws-ce/0.1.0/`
+- All targets have help text (visible in `make help`)
+- `make lint` and `make test` still work
+
+**Related Issues:**
+
+- [#50](https://github.com/rshade/finfocus-plugin-aws-ce/issues/50) - Add missing Makefile targets (develop, test-integration, docker)
+
+---
+
+### CE-3.2: Add Docker Support with Multi-Stage Build
+
+**ID:** CE-3.2  
+**Description:** Create Dockerfile with multi-stage build (build stage with Go toolchain, runtime stage with minimal image). Docker image should be built as `finfocus-plugin-aws-ce:v0.1.0`.
+
+**Files Modified:**
+
+- `Dockerfile` (new file)
+- `.dockerignore` (new file)
+- `Makefile` - Add docker targets
+
+**Acceptance Criteria:**
+
+- Multi-stage Dockerfile (builder + runtime)
+- Base image for runtime: `alpine:latest` or `gcr.io/distroless/base`
+- Binary size < 50MB
+- Docker build succeeds: `docker build -t finfocus-plugin-aws-ce:v0.1.0 .`
+- Container runs and responds to port probe
+- ENV vars passed through correctly (AWS_REGION, etc.)
+
+**Related Issues:**
+
+- [#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42) - Add Docker support with multi-stage build
+
+---
+
+### CE-3.3: Add HTTP Health Endpoint for Container Orchestration
+
+**Correction (2026-10-01):** the SDK already provides a health endpoint (`WebConfig.EnableHealthEndpoint`, served at `/healthz`) and a `HealthChecker` interface. Wire those: do not hand-roll `/health` and `/ready` unless the SDK cannot do what the Dockerfile needs, and say why in the report.
+
+**ID:** CE-3.3  
+**Description:** Add optional HTTP health endpoint (e.g., `/healthz`) for Kubernetes/container orchestration liveness probes. Endpoint should verify gRPC server health without requiring gRPC client.
+
+**Files Modified:**
+
+- `internal/pricing/calculator.go` - Add health check logic
+- `cmd/plugin/main.go` - Start HTTP server alongside gRPC
+
+**Acceptance Criteria:**
+
+- Health endpoint at `http://127.0.0.1:8080/healthz` (configurable port)
+- Returns 200 OK when gRPC server is healthy
+- Returns 503 Service Unavailable when gRPC server down
+- Controlled by env var `FINFOCUS_HEALTH_ENDPOINT` (default: enabled)
+- Both gRPC and HTTP servers shut down gracefully together
+
+**Related Issues:**
+
+- [#43](https://github.com/rshade/finfocus-plugin-aws-ce/issues/43) - Add HTTP health endpoint for container orchestration
+
+---
+
+### CE-3.4: Standardize CI/CD Workflows
+
+**ID:** CE-3.4  
+**Description:** Add GitHub Actions workflows for test, lint, build, and release. Workflows should follow finfocus standard patterns (from aws-public plugin).
+
+**Files Modified:**
+
+- `.github/workflows/test.yml` (new file)
+- `.github/workflows/lint.yml` (new file)
+- `.github/workflows/build.yml` (new file)
+- `.github/workflows/release.yml` (new file)
+
+**Acceptance Criteria:**
+
+- CI runs on push to main and PRs
+- Test workflow: `make test` on Go 1.25+
+- Lint workflow: `make lint` with golangci-lint
+- Build workflow: `go build ./...` with matrix for multiple regions (if applicable)
+- Release workflow: Triggered on git tag, builds binaries, creates GitHub release
+- All workflows pass on main branch
+
+**Related Issues:**
+
+- [#48](https://github.com/rshade/finfocus-plugin-aws-ce/issues/48) - Standardize workflow names and add missing CI/CD workflows
+
+---
+
+## Phase 4: Documentation & UX (CE-4.x)
+
+### CE-4.1: Create Documentation Directory with API & Deployment Guides
+
+**ID:** CE-4.1  
+**Description:** Add comprehensive documentation in `docs/` directory: API reference, deployment guide, configuration guide, troubleshooting.
+
+**Files Modified:**
+
+- `docs/API.md` (new file) - Proto API reference
+- `docs/DEPLOYMENT.md` (new file) - Docker, Kubernetes, local setup
+- `docs/CONFIGURATION.md` (new file) - Env vars, CLI flags, profiles
+- `docs/TROUBLESHOOTING.md` (new file) - Common errors and fixes
+- `README.md` - Update with links to docs
+
+**Acceptance Criteria:**
+
+- Docs cover: installation, configuration, usage, troubleshooting
+- API reference documents all RPC methods and proto messages
+- Deployment guide covers Docker, Kubernetes, local binary
+- Configuration guide lists all env vars with defaults and descriptions
+- README updated with quick-start link
+- Docs pass markdownlint (if available)
+
+**Related Issues:**
+
+- [#44](https://github.com/rshade/finfocus-plugin-aws-ce/issues/44) - Create documentation directory with API and deployment guides
+
+---
+
+### CE-4.2: Create CONTRIBUTING.md with Development Guidelines
+
+**ID:** CE-4.2  
+**Description:** Add `CONTRIBUTING.md` with development setup, testing, and contribution workflow.
+
+**Files Modified:**
+
+- `CONTRIBUTING.md` (new file)
+- `.github/PULL_REQUEST_TEMPLATE.md` (new file - optional)
+
+**Acceptance Criteria:**
+
+- Development setup: Prerequisites, `make develop` instructions
+- Testing: How to run unit tests, integration tests, E2E tests
+- Contribution workflow: Branch naming, commit message format, PR requirements
+- Code style: Go conventions, error handling, logging
+- Minimum test coverage and lint requirements
+- Clear instructions for first-time contributors
+
+**Related Issues:**
+
+- [#53](https://github.com/rshade/finfocus-plugin-aws-ce/issues/53) - Create CONTRIBUTING.md with development guidelines
+
+---
+
+### CE-4.3: Polish Installation & Documentation (Out-of-the-Box Experience)
+
+**ID:** CE-4.3  
+**Description:** Ensure first-time user experience is smooth: clear README, quick-start guide, example commands, error messages.
+
+**Files Modified:**
+
+- `README.md` - Update with current status
+- `docs/QUICKSTART.md` (new file) - Get started in 5 minutes
+- `internal/client/client.go` - Improve error messages
+
+**Acceptance Criteria:**
+
+- README has "Quick Start" section
+- Quick-start guide covers: install, authenticate (AWS credentials), run
+- Error messages are actionable (e.g., "Missing AWS_REGION, set it with: export AWS_REGION=us-east-1")
+- Binary announcement on startup is clear
+- Example Pulumi plan JSON included for testing
+
+**Related Issues:**
+
+- [#12](https://github.com/rshade/finfocus-plugin-aws-ce/issues/12) - Polish: Installation & Documentation (Out-of-the-Box Experience)
+
+---
+
+## Phase 5: Core Plugin Implementation (CE-5.x)
+
+*These tasks complete the v0.1.0 release:*
+
+### CE-5.1: Implement Core Cost Plugin (Spec 001) & E2E Testing
+
+**ID:** CE-5.1  
+**Description:** Ensure all v0.1.0 requirements are met: Supports(), GetPluginInfo(), GetActualCost with real AWS Cost Explorer calls, error handling, trace ID propagation, and end-to-end test against finfocus core.
+
+**Files Modified:**
+
+- All above tasks (cumulative)
+- `test/e2e/e2e_test.go` - Actual E2E test against finfocus core
+
+**Acceptance Criteria:**
+
+- All CE-1, CE-2, CE-3, CE-4 tasks completed
+- `make build` succeeds
+- `make test` - All unit tests pass
+- `make test-integration` - All integration tests pass
+- E2E test with finfocus core: `make test-e2e` passes (requires AWS credentials)
+- Binary runs: `./bin/finfocus-plugin-aws-ce --port 50051`
+- Manual test against finfocus: `finfocus cost actual --pulumi-json plan.json`
+
+**Related Issues:**
+
+- [#11](https://github.com/rshade/finfocus-plugin-aws-ce/issues/11) - Implement Core Cost Plugin (Spec 001) & E2E Testing
+
+---
+
+## Phase 6: Correctness and enrichment (CE-6.x), v0.1.0
+
+*Found by the 2026-10-01 audit of the code and the Cost Explorer documentation. CE-6.1 runs
+first, because its failures decide the order of the rest.*
+
+### CE-6.1: Contract fixtures gate (run first)
+
+**ID:** CE-6.1  
+**Description:** `internal/client/testdata/ce-contract/ce-contract.json` holds 26 Cost Explorer
+contract cases with independently computed expectations (official samples, pagination, Estimated
+flag, credits, precision, real zero, missing and unparseable amounts, empty results, mixed
+currencies, UTC date ranges, resource id forms). Write the test its `README.md` specifies: a fake
+HTTP Cost Explorer endpoint, a real gRPC server, every case. Add an endpoint override if the client
+has none (read the SDK for `BaseEndpoint`). The fixture files are read-only.
+
+**Acceptance Criteria:**
+
+- results table in `.superpowers/contract-results.md` and in the report
+- every `ok` case matches exactly as a decimal, every `error` case returns the stated code and never
+  a zero, `request_period` cases give the same answer under three `TZ` values
+- break check: change the amount parser to `float64` and watch the precision case fail
+- an opt-in live test exists (skipped by default, never in CI) and is marked BLOCKED-ON-CREDENTIALS
+
+### CE-6.2: Stop silent zeros and panics in the response parser
+
+**ID:** CE-6.2  
+**Description:** `client.go:363-365` and `:398-400` drop `Sscanf` errors, so an unparseable amount
+becomes 0, and the amount pointer is dereferenced without a nil check. `calculator.go:270-271` sets
+`UsageAmount` to 0 and `UsageUnit` to the currency code, though `UsageQuantity` is requested.
+Parse with a decimal type, return an explicit error for a missing or unparseable amount, return
+mixed currencies as an error, fill `UsageAmount` and its unit from `UsageQuantity` when present.
+
+**Acceptance Criteria:** the `amount_missing`, `amount_unparseable`, `mixed_currencies`,
+`precision_small_and_large` and `real_zero` contract cases pass.
+
+### CE-6.3: Dates, time zones and the exclusive end
+
+**ID:** CE-6.3  
+**Description:** `calculator.go:119-120` and `client.go:239-240` format dates in the host's local
+time zone and ignore that the Cost Explorer `End` is exclusive. Use UTC, apply the policy in the
+contract README (partial last day rounds up, `start >= end` is `InvalidArgument`), and clamp or
+reject by the real limit for the query kind (14 months for totals, 14 days for resources).
+
+**Acceptance Criteria:** all `request_period` cases pass under `TZ=UTC`,
+`TZ=America/Los_Angeles` and `TZ=Pacific/Auckland`.
+
+### CE-6.4: RI and Savings Plan data in the FOCUS record (#37)
+
+**ID:** CE-6.4  
+**Description:** Fill the `FocusCostRecord` commitment fields (`commitment_discount_category`,
+`_id`, `_name`, `_status`, `_type`, `_quantity`, `_unit`) that the spec already carries. Choose the
+metric deliberately: `UnblendedCost`, or `AmortizedCost` when commitments exist; never `BlendedCost`
+per resource. Say in the code and the docs which metric each field uses. The existing client methods
+for reservation and Savings Plans data (`client.go:423-462`) are not wired and have no pagination:
+wire them with pagination or remove them. This task supersedes duplicates #19, #20 and #28.
+
+**Acceptance Criteria:** a fixture with a commitment line maps to a record that passes
+`ValidateFocusRecord` (read the real signature in the spec first); a break check changes the metric
+and fails a test; no commitment data returns the fields unset, not zero.
+
+**Related Issues:** [#37](https://github.com/rshade/finfocus-plugin-aws-ce/issues/37),
+[#19](https://github.com/rshade/finfocus-plugin-aws-ce/issues/19),
+[#20](https://github.com/rshade/finfocus-plugin-aws-ce/issues/20),
+[#28](https://github.com/rshade/finfocus-plugin-aws-ce/issues/28)
+
+### CE-6.5: Metadata enrichment through the right field (#52)
+
+**ID:** CE-6.5  
+**Description:** The issue's code assumes a `metadata` map on `ActualCostResult`, which does not
+exist (fields 1 to 9 only). Carry data source, granularity, metric, `Estimated` and lookback through
+`FocusCostRecord.extended_columns`, or `lineage` where the spec defines it. If a response-level
+map is wanted, follow section 4b of the prompt and file the spec issue, then keep going.
+
+**Acceptance Criteria:** an `Estimated=true` fixture produces an extended column saying so; a test
+reads the real proto field; no field is invented.
+
+**Related Issues:** [#52](https://github.com/rshade/finfocus-plugin-aws-ce/issues/52)
+
+### CE-6.6: Batch configuration and a race-free client (#55)
+
+**ID:** CE-6.6  
+**Description:** Use `ServeConfig.MaxBatchSize` and `BatchWorkers` (the SDK serves a per-resource
+`BatchCost` fallback). The issue's `GetActualCostBatch` RPC does not exist: do not add it. The env
+var names are a plugin choice: document them. `initClient` (`calculator.go:61-74`) mutates
+`c.ceClient` without a lock and retries a failed init, with a credential-chain load, on every
+request: guard it, and cache the failure for a short time.
+
+**Acceptance Criteria:** `go test -race` passes a concurrent `BatchCost` test; invalid batch
+settings fail at start with a clear message.
+
+**Related Issues:** [#55](https://github.com/rshade/finfocus-plugin-aws-ce/issues/55)
+
+### CE-6.7: Per-resource cost the way Cost Explorer really does it
+
+**ID:** CE-6.7  
+**Description:** Per-resource cost needs `GetCostAndUsageWithResources` and the `RESOURCE_ID`
+dimension, not `GetCostAndUsage`. Switch resource-level requests to it, map an ARN to the resource
+id form Cost Explorer uses (the instance id for EC2: verify per service, mark the rest Unverified),
+return an explicit, documented error where resource-level cost is not available, and tell users
+about the opt-in and the 14-day window in the docs and in `Supports`. Honour `tags` in the request
+(`GetActualCostRequest.tags`) or document that they are ignored. Rows labelled "No resource ID" do
+not sum to a service total: say so in the notes.
+
+**Acceptance Criteria:** the `resource_id:*` contract cases pass or are recorded as named findings;
+no request sends a full ARN as an EC2 `RESOURCE_ID`.
+
+### CE-6.8: Cache that is safe, honest and cheap
+
+**ID:** CE-6.8  
+**Description:** `calculator.go:136` and `cache.go:87` use the request key as a file name: an ARN
+puts `/` and `:` in it and a `..` segment could leave the cache directory. Hash the key, include
+every parameter that changes the answer (granularity, group by, metric, tags), set `expires_at` on
+the response, and use a short TTL when the range includes recent days or any day is `Estimated`
+(a fixed 24 hours serves revised data stale). Count requests to Cost Explorer (each is $0.01),
+log the count, and offer a configurable per-minute limit.
+
+**Acceptance Criteria:** a key containing `../../x` stays inside the cache directory; the Estimated
+case gets the short TTL; a repeat request does not call the fake endpoint again; the request
+counter is tested.
+
+### CE-6.9: AWS errors become real gRPC codes
+
+**ID:** CE-6.9  
+**Description:** Plain `fmt.Errorf` becomes `Unknown`. Map `LimitExceededException` to
+`ResourceExhausted`, access denied to `PermissionDenied`, missing or expired credentials to
+`Unauthenticated` with the spec's `ErrorCode`, bad parameters to `InvalidArgument`, and "no data" to
+the spec's NO_COST_DATA style error. This extends CE-1.5.
+
+**Acceptance Criteria:** a table-driven test per AWS error class through a real gRPC server.
+
+### CE-6.10: Capabilities, dead code and test debt
+
+**ID:** CE-6.10  
+**Description:** `GetProjectedCost` returns a plain error after a `Supports` check: return
+`codes.Unimplemented` and declare the actual-cost capability in `GetPluginInfo`. Remove the unused
+types in `data.go`. The E2E gate variable is the lowercase `finfocus_E2E`: rename it with a
+fallback and document it. `calculator_test.go` covers only ARN handling: add `GetActualCost` tests
+through the fake endpoint for the cache, error paths and pagination. Declare the real-time
+dependency: Cost Explorer data lags 24 hours or more, which the docs must say.
+
+**Acceptance Criteria:** the listed items are done and each has a test; no TODO is added.
+
+### CE-6.11: Define the AWS per-request credential keys
+
+**ID:** CE-6.11  
+**Description:** The spec has no AWS credential key names (access key id, secret, session token,
+role arn). CE-1.6 needs them. Decide a convention in the plugin, document it, and file one spec
+issue (prompt section 4b) proposing the names, after checking `finfocus-spec` for an existing one.
+
+**Acceptance Criteria:** the keys are documented and tested; the spec issue URL is recorded.
+
+---
+
+## Phase 7: Second run, Tier B (CE-7.x)
+
+*Not part of v0.1.0. Each task needs a live AWS account to verify against real Cost Explorer, so the
+live part is BLOCKED-ON-CREDENTIALS; everything else is tested with the fake endpoint and fixtures.
+All carriers below exist in finfocus-spec v0.7.0 unless stated.*
+
+### CE-7.1: AWS Budgets
+
+**Issues:** [#8](https://github.com/rshade/finfocus-plugin-aws-ce/issues/8), duplicate
+[#24](https://github.com/rshade/finfocus-plugin-aws-ce/issues/24). **Carrier:** `GetBudgets`,
+`PLUGIN_CAPABILITY_BUDGETS`. Use the Budgets API (`budgets:ViewBudget`, a different endpoint and
+IAM action from Cost Explorer). **Acceptance:** fake-endpoint tests for pagination and empty lists.
+
+### CE-7.2: Recommendations umbrella, with the three slices
+
+**Issues:** [#13](https://github.com/rshade/finfocus-plugin-aws-ce/issues/13), duplicate
+[#22](https://github.com/rshade/finfocus-plugin-aws-ce/issues/22). **Carrier:** `GetRecommendations`.
+One shared recommendation mapper, then CE-7.3, CE-7.4, CE-7.5. A scorer plugin may consume the
+result: never include account ids or resource names beyond what the core's identifier mode allows.
+
+### CE-7.3: Rightsizing recommendations
+
+**Issue:** [#27](https://github.com/rshade/finfocus-plugin-aws-ce/issues/27).
+`GetRightsizingRecommendation` into `RECOMMENDATION_ACTION_TYPE_RIGHTSIZE`.
+
+### CE-7.4: Savings Plans purchase recommendations
+
+**Issue:** [#32](https://github.com/rshade/finfocus-plugin-aws-ce/issues/32).
+`GetSavingsPlansPurchaseRecommendation` into `PURCHASE_COMMITMENT`.
+
+### CE-7.5: Reserved Instance purchase recommendations
+
+**Issue:** [#33](https://github.com/rshade/finfocus-plugin-aws-ce/issues/33).
+`GetReservationPurchaseRecommendation` into `PURCHASE_COMMITMENT`.
+
+### CE-7.6: Blended, unblended and effective cost
+
+**Issue:** [#21](https://github.com/rshade/finfocus-plugin-aws-ce/issues/21). The actual side maps
+to the `FocusCostRecord` `billed_cost`, `list_cost`, `effective_cost` and `contracted_cost`. The
+projected-side `effective_*` fields the issue proposes do not exist in the spec and do not belong
+in an actual-cost plugin: record that decision, and file a spec issue only if the owner wants it.
+
+### CE-7.7: Greenops research
+
+**Issue:** [#29](https://github.com/rshade/finfocus-plugin-aws-ce/issues/29). A findings document.
+The issue itself says there is no public AWS API: confirm from AWS documentation, with sources,
+and recommend a data source or close the question.
+
+### CE-7.8: EstimateCost what-if
+
+**Issue:** [#30](https://github.com/rshade/finfocus-plugin-aws-ce/issues/30). Overlaps
+`finfocus-plugin-aws-public`, which already prices projected cost and which this plugin's own
+`GetProjectedCost` message points users to. Decide and document: implement through the Pricing API,
+or close as out of role.
+
+### CE-7.9: Spot market advisor research
+
+**Issue:** [#34](https://github.com/rshade/finfocus-plugin-aws-ce/issues/34). Outside Cost
+Explorer. A findings document on where spot price and interruption data can come from, and which
+plugin should own it.
+
+### CE-7.10: Forecasting with prediction intervals
+
+**Issues:** [#36](https://github.com/rshade/finfocus-plugin-aws-ce/issues/36), duplicate
+[#25](https://github.com/rshade/finfocus-plugin-aws-ce/issues/25). `GetCostForecast` into
+`GetProjectedCostResponse.prediction_interval_lower`, `_upper` and `confidence_level`. The client
+method exists (`client.go:117`). The blocking spec issue (#314) is closed.
+
+### CE-7.11: Anomaly detection through GetRecommendations
+
+**Issues:** [#38](https://github.com/rshade/finfocus-plugin-aws-ce/issues/38), duplicate
+[#26](https://github.com/rshade/finfocus-plugin-aws-ce/issues/26) (which proposes a new `GetAnomalies`
+RPC: do not add one). `RECOMMENDATION_CATEGORY_ANOMALY` with `ACTION_TYPE_INVESTIGATE`.
+
+### CE-7.12: Web and Connect protocol
+
+**Issue:** [#49](https://github.com/rshade/finfocus-plugin-aws-ce/issues/49). Enable
+`ServeConfig.Web` through environment configuration. The SDK does the work.
+
+### CE-7.13: CORS
+
+**Issue:** [#54](https://github.com/rshade/finfocus-plugin-aws-ce/issues/54). Set
+`WebConfig.AllowedOrigins`, `AllowCredentials` and `AllowedHeaders` from configuration. The SDK
+validates them. Never default to a wildcard with credentials.
+
+---
+
+## Issue Index (All 40 Open Issues)
+
+| # | Title | Labels | Disposition | Task ID |
+|---|-------|--------|-------------|---------|
+| [#3](https://github.com/rshade/finfocus-plugin-aws-ce/issues/3) | refactor: Adopt pluginsdk/mapping for property extraction | roadmap/future | stale: close or rewrite | — |
+| [#8](https://github.com/rshade/finfocus-plugin-aws-ce/issues/8) | Feature: AWS Budgets Support | roadmap/next | Tier B | CE-7.1 |
+| [#11](https://github.com/rshade/finfocus-plugin-aws-ce/issues/11) | Implement Core Cost Plugin (Spec 001) & E2E Testing | roadmap/current | **CE-5.1** | ✅ Umbrella |
+| [#12](https://github.com/rshade/finfocus-plugin-aws-ce/issues/12) | Polish: Installation & Documentation | roadmap/current | **CE-4.3** | ✅ Umbrella |
+| [#13](https://github.com/rshade/finfocus-plugin-aws-ce/issues/13) | Feature: Optimization Recommendations | roadmap/future | Tier B | CE-7.2 |
+| [#19](https://github.com/rshade/finfocus-plugin-aws-ce/issues/19) | Feature: Reserved Instance Coverage Detection & Pricing | enhancement, roadmap/future | duplicate of #37 | CE-6.4 |
+| [#20](https://github.com/rshade/finfocus-plugin-aws-ce/issues/20) | Feature: Savings Plans Coverage Detection & Pricing | enhancement, roadmap/future | duplicate of #37 | CE-6.4 |
+| [#21](https://github.com/rshade/finfocus-plugin-aws-ce/issues/21) | Feature: Blended vs Unblended Cost Comparison | enhancement, roadmap/future | Tier B | CE-7.6 |
+| [#22](https://github.com/rshade/finfocus-plugin-aws-ce/issues/22) | Feature: RI/Savings Plan Purchase Recommendations | enhancement, roadmap/future | duplicate of #13 | CE-7.2 |
+| [#23](https://github.com/rshade/finfocus-plugin-aws-ce/issues/23) | chore(deps): Update finfocus-spec to enable gRPC reflection | roadmap/current | stale: satisfied by spec v0.7.0 | CE-1.1 |
+| [#24](https://github.com/rshade/finfocus-plugin-aws-ce/issues/24) | Feature: AWS Budgets Support | roadmap/next | duplicate of #8 | CE-7.1 |
+| [#25](https://github.com/rshade/finfocus-plugin-aws-ce/issues/25) | Feature: Cost Forecasting | roadmap/next | duplicate of #36 | CE-7.10 |
+| [#26](https://github.com/rshade/finfocus-plugin-aws-ce/issues/26) | Feature: Anomaly Detection | roadmap/next | duplicate of #38 | CE-7.11 |
+| [#27](https://github.com/rshade/finfocus-plugin-aws-ce/issues/27) | Feature: Rightsizing Recommendations | roadmap/future | Tier B | CE-7.3 |
+| [#28](https://github.com/rshade/finfocus-plugin-aws-ce/issues/28) | Chore: FOCUS 1.3 Transition | roadmap/future | duplicate of #37, stale (FOCUS 1.3) | CE-6.4 |
+| [#29](https://github.com/rshade/finfocus-plugin-aws-ce/issues/29) | Research: Greenops Discovery | roadmap/future | Tier B | CE-7.7 |
+| [#30](https://github.com/rshade/finfocus-plugin-aws-ce/issues/30) | Feature: EstimateCost (What-If) | roadmap/future | Tier B | CE-7.8 |
+| [#31](https://github.com/rshade/finfocus-plugin-aws-ce/issues/31) | Chore: Plugin Conformance Testing | roadmap/current | **CE-2.3** | ✅ In scope |
+| [#32](https://github.com/rshade/finfocus-plugin-aws-ce/issues/32) | Feature: Savings Plans Recommendations | roadmap/future | Tier B | CE-7.4 |
+| [#33](https://github.com/rshade/finfocus-plugin-aws-ce/issues/33) | Feature: Reserved Instance Recommendations | roadmap/future | Tier B | CE-7.5 |
+| [#34](https://github.com/rshade/finfocus-plugin-aws-ce/issues/34) | Research: Spot Market Advisor | roadmap/future | Tier B | CE-7.9 |
+| [#36](https://github.com/rshade/finfocus-plugin-aws-ce/issues/36) | feat: Implement GetProjectedCost with prediction intervals | enhancement, roadmap/next | Tier B | CE-7.10 |
+| [#37](https://github.com/rshade/finfocus-plugin-aws-ce/issues/37) | feat: Enrich GetActualCost with RI/SP commitment discount data | enhancement, roadmap/next | **v0.1.0, Tier A** | **CE-6.4** |
+| [#38](https://github.com/rshade/finfocus-plugin-aws-ce/issues/38) | feat: Implement cost anomaly detection via GetRecommendations | enhancement, roadmap/next | Tier B | CE-7.11 |
+| [#40](https://github.com/rshade/finfocus-plugin-aws-ce/issues/40) | feat: Add GetPluginInfo() RPC implementation | enhancement, roadmap/current | **CE-1.3** | ✅ In scope |
+| [#41](https://github.com/rshade/finfocus-plugin-aws-ce/issues/41) | feat: Add Supports() RPC implementation | enhancement, roadmap/current | **CE-1.2** | ✅ In scope |
+| [#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42) | feat: Add Docker support with multi-stage build | enhancement, roadmap/current | **CE-3.2** | ✅ In scope |
+| [#43](https://github.com/rshade/finfocus-plugin-aws-ce/issues/43) | feat: Add HTTP health endpoint for container orchestration | enhancement, roadmap/current | **CE-3.3** | ✅ In scope |
+| [#44](https://github.com/rshade/finfocus-plugin-aws-ce/issues/44) | docs: Create documentation directory with API and deployment guides | documentation, roadmap/current | **CE-4.1** | ✅ In scope |
+| [#45](https://github.com/rshade/finfocus-plugin-aws-ce/issues/45) | test: Add integration tests for gRPC server | enhancement, roadmap/current | **CE-2.1** | ✅ In scope |
+| [#46](https://github.com/rshade/finfocus-plugin-aws-ce/issues/46) | feat: Implement trace ID propagation for distributed tracing | enhancement, roadmap/current | **CE-1.4** | ✅ In scope |
+| [#47](https://github.com/rshade/finfocus-plugin-aws-ce/issues/47) | feat: Use proto ErrorCode enum for standardized error handling | enhancement, roadmap/current | **CE-1.5** | ✅ In scope |
+| [#48](https://github.com/rshade/finfocus-plugin-aws-ce/issues/48) | ci: Standardize workflow names and add missing CI/CD workflows | enhancement, roadmap/current | **CE-3.4** | ✅ In scope |
+| [#49](https://github.com/rshade/finfocus-plugin-aws-ce/issues/49) | feat: Add Web/Connect protocol support for browser clients | enhancement, roadmap/next | Tier B | CE-7.12 |
+| [#50](https://github.com/rshade/finfocus-plugin-aws-ce/issues/50) | chore: Add missing Makefile targets | enhancement, roadmap/current | **CE-3.1** | ✅ In scope |
+| [#51](https://github.com/rshade/finfocus-plugin-aws-ce/issues/51) | test: Add config parsing tests for main.go | enhancement, roadmap/next | **CE-2.2** | ✅ In scope |
+| [#52](https://github.com/rshade/finfocus-plugin-aws-ce/issues/52) | feat: Add metadata enrichment to cost responses | enhancement, roadmap/next | **v0.1.0, Tier A** | **CE-6.5** |
+| [#53](https://github.com/rshade/finfocus-plugin-aws-ce/issues/53) | docs: Create CONTRIBUTING.md with development guidelines | documentation, roadmap/current | **CE-4.2** | ✅ In scope |
+| [#54](https://github.com/rshade/finfocus-plugin-aws-ce/issues/54) | feat: Add CORS support for browser-based clients | enhancement, roadmap/future | Tier B | CE-7.13 |
+| [#55](https://github.com/rshade/finfocus-plugin-aws-ce/issues/55) | feat: Add batch configuration options | enhancement, roadmap/future | **v0.1.0, Tier A** | **CE-6.6** |
+
+**Summary:** 40 open issues (8 closed, 48 total): 18 in Tier A for v0.1.0 (CE-1 to CE-6), 13 in Tier B for a second run (CE-7), 7 duplicates and 2 stale, marked above. This plan makes no GitHub change: the owner closes or merges the duplicates and stale issues.
+
+---
+
+## Toolchain Completion Summary (2026-09-30)
+
+### What Was Completed
+
+**Ecosystem Baseline Rollout** — All infrastructure and tooling for plugin development:
+
+1. **Language & Dependencies**
+   - ✅ Go upgraded from 1.25.5 → 1.27.1 (go.mod, mise.toml, CI workflows)
+   - ✅ finfocus-spec upgraded from v0.5.2 → v0.7.0 (go.mod, go get)
+   - ✅ go.mod tidy, go.sum verified, vendor directory removed
+
+2. **Local Development Environment (mise.toml)**
+   - ✅ All required tools pinned to versions matching ecosystem baseline
+   - ✅ golangci-lint 2.14.0, govulncheck 1.8.0, goreleaser 2.18.2
+   - ✅ Node 24 + npm dependencies (markdownlint, commitlint, reviewdog)
+   - ✅ Vale 3.20.0, actionlint 1.7.12
+
+3. **Build & Release Configuration**
+   - ✅ .goreleaser.yaml: project_name set, asset naming fixed for installer compatibility
+   - ✅ Internal test added to validate GoReleaser asset names
+   - ✅ Makefile targets available: lint, test, build, release-check
+
+4. **GitHub Actions Workflows**
+   - ✅ test.yml: go@1.27.1, golangci-lint, govulncheck (non-blocking), go test
+   - ✅ release.yml: updated to use mise-action with explicit tool pins
+   - ✅ commitlint.yml: created for conventional commit validation
+   - ✅ prose-lint.yml: created for Vale + markdownlint via reviewdog
+
+5. **Code Quality Configuration**
+   - ✅ .golangci-lint.yml: existing configuration preserved (no edits)
+   - ✅ .markdownlint.json: created with Google style, 120-char line length
+   - ✅ .vale.ini: created for prose linting
+   - ✅ renovate.json: created for dependency automation
+
+6. **Naming Migration (legacy → FinFocus)**
+   - ✅ go.mod module name: finfocus-plugin-aws-ce
+   - ✅ All tracked files: 0 remaining legacy references
+   - ✅ README.md, manifest files, internal package comments, docs, specs, tests
+   - ⚠️ Untracked specs/004-core-cost-e2e/: 4 files retain legacy references (not edited per safety rules)
+
+### Test Results Post-Toolchain
+
+- ✅ `go build ./...` — Pass
+- ✅ `go vet ./...` — Pass
+- ✅ `go test -count=1 ./...` — All 4 packages pass (5ms total)
+- ✅ `actionlint .github/workflows/*.yml` — All 4 workflows valid
+- ✅ Repo state: clean working tree, no uncommitted changes
+
+### What Happens Next
+
+The toolchain baseline is now in place. Remaining work:
+
+1. **Feature Implementation (CE-1.x through CE-5.x)**
+   - Spec conformance: Supports(), GetPluginInfo(), trace ID, error codes
+   - Per-request credentials (new in v0.7.0)
+   - FOCUS 1.4 billing columns (post-v0.1.0)
+
+2. **Testing & Documentation (CE-2.x, CE-4.x)**
+   - Integration tests, conformance tests, E2E tests
+   - API reference, deployment guides, CONTRIBUTING.md
+
+3. **Build & Release (CE-3.x)**
+   - Makefile targets, Docker support, CI/CD optimization
+   - v0.1.0 release with GitHub Actions automation
+
+### Files Modified in This Session
+
+**Created:**
+
+- `.specify/memory/constitution.md` (updated)
+- `mise.toml` (created, then refined to baseline)
+- `.markdownlint.json` (created)
+- `.vale.ini` (created)
+- `renovate.json` (created)
+- `.github/workflows/commitlint.yml` (created)
+- `.github/workflows/prose-lint.yml` (created)
+
+**Updated:**
+
+- `go.mod`: Go 1.27.1, finfocus-spec v0.7.0
+- `Makefile`: lint-md, vuln, release-check targets added
+- `.goreleaser.yaml`: project_name, name_template, asset naming fixed
+- `.github/workflows/test.yml`: mise-action, tool versions, govulncheck
+- `.github/workflows/release.yml`: mise-action, goreleaser pins
+- `README.md`: Go 1.27.1, FinFocus references
+- `manifest.yaml`, `manifest.json`: FinFocus descriptions
+- All docs/specs in `specs/001-*`, `specs/002-*`, `specs/003-*` — naming migration
+- `test/e2e/e2e_test.go` — naming migration
+- `internal/pricing/calculator.go` — naming migration, logger component
+- `TASKS.md`: toolchain status documented
+
+---
+
+## Open Questions
+
+1. **AWS Credentials for Testing:** E2E tests require live AWS credentials (e.g., `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`). Should e2e_test.go be marked with `BLOCKED-ON-CREDENTIALS`?
+
+2. **Docker Registry:** Where should Docker images be published? Docker Hub (`rshade/finfocus-plugin-aws-ce`), GitHub Container Registry (`ghcr.io/rshade/finfocus-plugin-aws-ce`), or ECR?
+
+3. **Release Strategy:** Should v0.1.0 be released as a single binary (one region) or multi-region binaries like aws-public? aws-ce uses dynamic region from config, so single binary should suffice.
+
+4. **Cost Explorer API Costs:** AWS charges ~$0.01 per GetCostAndUsage API call. Should client-side rate limiting or request deduplication be implemented in v0.1.0, or defer to v0.2+?
+
+5. **Multi-Account Support:** Does v0.1.0 need to support cross-account Cost Explorer queries, or focus on single-account setup first?
+
+---
+
+## Verification Commands (Run Before Release)
+
+```bash
+# Build
+make build
+
+# Test
+make test
+make test-integration
+make test-e2e  # Requires AWS credentials and PULUMI_CONFIG_PASSPHRASE set
+
+# Lint
+make lint
+
+# Docker
+docker build -t finfocus-plugin-aws-ce:v0.1.0 .
+
+# Manual smoke test
+./bin/finfocus-plugin-aws-ce --port 50051 &
+sleep 1
+grpcurl -plaintext localhost:50051 list
+pkill finfocus-plugin-aws-ce
+```
+
+---
+
+## Notes
+
+- **Spec Migration:** Upgrading finfocus-spec must happen early (CE-1.1) to unblock later features
+- **Testing First:** Integration tests (CE-2.1) should validate all RPC methods before CI/CD setup
+- **Docker Build:** Should use region-agnostic binary (vs region-specific as in aws-public)
+- **No PR Blocking:** Tasks should be implemented phase-by-phase without PR approval gates
+- **E2E with Core:** Final verification should test against finfocus core binary, not just plugin isolation

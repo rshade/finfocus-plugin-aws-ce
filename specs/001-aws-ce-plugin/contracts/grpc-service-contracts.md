@@ -276,4 +276,4 @@ enum Granularity {
 - **Authorization**: Read-only ce:GetCostAndUsage permission required
 - **Input Validation**: Reject malformed ResourceDescriptor gracefully
 - **Logging**: No credentials or secrets in logs or responses</content>
-<parameter name="filePath">/mnt/c/GitHub/go/src/github.com/rshade/pulumicost-plugin-aws-ce/specs/001-aws-ce-plugin/contracts/grpc-service-contracts.md
+<parameter name="filePath">$GOPATH/src/github.com/rshade/finfocus-plugin-aws-ce/specs/001-aws-ce-plugin/contracts/grpc-service-contracts.md
