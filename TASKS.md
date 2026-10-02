@@ -714,6 +714,8 @@ reject by the real limit for the query kind (14 months for totals, 14 days for r
 
 ### CE-6.4: RI and Savings Plan data in the FOCUS record (#37)
 
+**Status:** DONE, `go test -count=1 ./...`, all packages pass including TestCEContractFixtures (pricing 0.195s); break check selected UnblendedCost for the 2.50/3.00 reservation row, TestCommitmentLineMapsToFocusRecord failed (`amount_decimal "3", want 2.50`), then AmortizedCost was restored.
+
 **ID:** CE-6.4  
 **Description:** Fill the `FocusCostRecord` commitment fields (`commitment_discount_category`,
 `_id`, `_name`, `_status`, `_type`, `_quantity`, `_unit`) that the spec already carries. Choose the

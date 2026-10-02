@@ -41,6 +41,7 @@ type CostEntry struct {
 	Tags             map[string]string `json:"tags"`
 	ReservationARN   string            `json:"reservation_arn,omitempty"`
 	SavingsPlanARN   string            `json:"savings_plan_arn,omitempty"`
+	Metric           string            `json:"metric,omitempty"`
 }
 
 // ReservationData contains information about RI or Savings Plan utilization.

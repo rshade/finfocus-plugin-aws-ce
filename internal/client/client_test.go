@@ -13,9 +13,7 @@ import (
 
 // mockCostExplorerAPI implements CostExplorerAPI for testing.
 type mockCostExplorerAPI struct {
-	getCostAndUsageFunc         func(ctx context.Context, params *costexplorer.GetCostAndUsageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error)
-	getReservationUtilizationFn func(ctx context.Context, params *costexplorer.GetReservationUtilizationInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetReservationUtilizationOutput, error)
-	getSavingsPlansCoverageFn   func(ctx context.Context, params *costexplorer.GetSavingsPlansCoverageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetSavingsPlansCoverageOutput, error)
+	getCostAndUsageFunc func(ctx context.Context, params *costexplorer.GetCostAndUsageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error)
 }
 
 func (m *mockCostExplorerAPI) GetCostAndUsage(ctx context.Context, params *costexplorer.GetCostAndUsageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error) {
@@ -23,20 +21,6 @@ func (m *mockCostExplorerAPI) GetCostAndUsage(ctx context.Context, params *coste
 		return m.getCostAndUsageFunc(ctx, params, optFns...)
 	}
 	return &costexplorer.GetCostAndUsageOutput{}, nil
-}
-
-func (m *mockCostExplorerAPI) GetReservationUtilization(ctx context.Context, params *costexplorer.GetReservationUtilizationInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetReservationUtilizationOutput, error) {
-	if m.getReservationUtilizationFn != nil {
-		return m.getReservationUtilizationFn(ctx, params, optFns...)
-	}
-	return &costexplorer.GetReservationUtilizationOutput{}, nil
-}
-
-func (m *mockCostExplorerAPI) GetSavingsPlansCoverage(ctx context.Context, params *costexplorer.GetSavingsPlansCoverageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetSavingsPlansCoverageOutput, error) {
-	if m.getSavingsPlansCoverageFn != nil {
-		return m.getSavingsPlansCoverageFn(ctx, params, optFns...)
-	}
-	return &costexplorer.GetSavingsPlansCoverageOutput{}, nil
 }
 
 func (m *mockCostExplorerAPI) GetCostForecast(ctx context.Context, params *costexplorer.GetCostForecastInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostForecastOutput, error) {

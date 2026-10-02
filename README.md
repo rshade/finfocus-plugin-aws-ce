@@ -12,6 +12,8 @@ This plugin provides cost calculation capabilities for aws resources in FinFocus
 
 An EC2 instance id (`i-` plus 8 to 17 lowercase hex characters), from an instance ARN or a bare resource id, is queried with `GetCostAndUsageWithResources` and `RESOURCE_ID` set to that id, never the full ARN. Other ids, including `contract-*`, stay on unfiltered `GetCostAndUsage` grouped by service. Resource-level data covers the last 14 days and needs the Cost Explorer resource-level opt-in. A non-EC2 ARN returns an error instead of a guessed id.
 
+The query metric is `UnblendedCost`. `AmortizedCost` is used only for a row whose requested group key is a reservation id or a savings plan ARN and that metric is present. `BlendedCost` is never used. `GetActualCost` does not group by reservation or savings plan, so those FOCUS fields stay unset. That is a gap, not a stub. Quantity and status are not invented. `GetReservationUtilization` and `GetSavingsPlansCoverage` are not called.
+
 Rows labelled "No resource ID" are not a service total.
 
 `GetActualCostRequest.tags` are ignored in v0.1.0.

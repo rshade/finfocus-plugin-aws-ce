@@ -23,8 +23,6 @@ type CostExplorerAPI interface {
 	GetCostAndUsage(ctx context.Context, params *costexplorer.GetCostAndUsageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error)
 	GetCostAndUsageWithResources(ctx context.Context, params *costexplorer.GetCostAndUsageWithResourcesInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageWithResourcesOutput, error)
 	GetCostForecast(ctx context.Context, params *costexplorer.GetCostForecastInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostForecastOutput, error)
-	GetReservationUtilization(ctx context.Context, params *costexplorer.GetReservationUtilizationInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetReservationUtilizationOutput, error)
-	GetSavingsPlansCoverage(ctx context.Context, params *costexplorer.GetSavingsPlansCoverageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetSavingsPlansCoverageOutput, error)
 }
 
 // Client represents a client for AWS Cost Explorer API.
@@ -204,6 +202,10 @@ type CostResult struct {
 	ReservationARN string
 	// SavingsPlanARN is the ARN of the savings plan if applicable.
 	SavingsPlanARN string
+	// Metric names the Cost Explorer metric stored in AmountExact.
+	// AmortizedCost is selected only when exactly one commitment id is set and that
+	// metric is present and parseable. Every other row uses UnblendedCost.
+	Metric string
 }
 
 // ForecastResult represents the cost forecast for a resource.
@@ -345,11 +347,15 @@ func (c *Client) GetCost(ctx context.Context, filter *types.Expression, dimensio
 		return nil, err
 	}
 	groups := groupDefinitions(dimensions)
-	return c.collectCosts(ctx, func(ctx context.Context, token *string) ([]types.ResultByTime, *string, error) {
+	metrics := []string{metricUnblendedCost, metricUsageQuantity}
+	if commitmentDimension(dimensions) {
+		metrics = append(metrics, metricAmortizedCost)
+	}
+	return c.collectCosts(ctx, dimensions, func(ctx context.Context, token *string) ([]types.ResultByTime, *string, error) {
 		input := &costexplorer.GetCostAndUsageInput{
 			TimePeriod:    interval,
 			Granularity:   types.Granularity(granularity),
-			Metrics:       []string{"UnblendedCost", "UsageQuantity"},
+			Metrics:       metrics,
 			NextPageToken: token,
 			GroupBy:       groups,
 			Filter:        filter,
@@ -405,11 +411,11 @@ func (c *Client) GetCostWithResources(ctx context.Context, resourceID, accountID
 		Type: types.GroupDefinitionTypeDimension,
 		Key:  aws.String(string(types.DimensionResourceId)),
 	}}
-	return c.collectCosts(ctx, func(ctx context.Context, token *string) ([]types.ResultByTime, *string, error) {
+	return c.collectCosts(ctx, []string{string(types.DimensionResourceId)}, func(ctx context.Context, token *string) ([]types.ResultByTime, *string, error) {
 		input := &costexplorer.GetCostAndUsageWithResourcesInput{
 			TimePeriod:    interval,
 			Granularity:   types.GranularityDaily,
-			Metrics:       []string{"UnblendedCost", "UsageQuantity"},
+			Metrics:       []string{metricUnblendedCost, metricUsageQuantity},
 			NextPageToken: token,
 			GroupBy:       groups,
 			Filter:        filter,
@@ -431,7 +437,7 @@ func (c *Client) GetCostWithResources(ctx context.Context, resourceID, accountID
 	})
 }
 
-func (c *Client) collectCosts(ctx context.Context, fetch func(context.Context, *string) ([]types.ResultByTime, *string, error)) ([]CostResult, error) {
+func (c *Client) collectCosts(ctx context.Context, dimensions []string, fetch func(context.Context, *string) ([]types.ResultByTime, *string, error)) ([]CostResult, error) {
 	var all []CostResult
 	var token *string
 	for page := 0; page < 100; page++ {
@@ -442,7 +448,7 @@ func (c *Client) collectCosts(ctx context.Context, fetch func(context.Context, *
 		if err != nil {
 			return nil, err
 		}
-		rows, err := parseResultPeriods(periods)
+		rows, err := parseResultPeriods(periods, dimensions)
 		if err != nil {
 			return nil, fmt.Errorf("parsing cost results: %w", err)
 		}
@@ -519,7 +525,25 @@ func (c *Client) GetCostByTag(ctx context.Context, tagKey string, startTime, end
 	return c.GetCost(ctx, nil, []string{"TAG:" + tagKey}, startTime, endTime, "DAILY")
 }
 
-func parseResultPeriods(periods []types.ResultByTime) ([]CostResult, error) {
+const (
+	metricUnblendedCost = "UnblendedCost"
+	metricAmortizedCost = "AmortizedCost"
+	metricUsageQuantity = "UsageQuantity"
+	dimService          = "SERVICE"
+	dimReservationID    = "RESERVATION_ID"
+	dimSavingsPlanARN   = "SAVINGS_PLAN_ARN"
+)
+
+func commitmentDimension(dimensions []string) bool {
+	for _, dim := range dimensions {
+		if dim == dimReservationID || dim == dimSavingsPlanARN {
+			return true
+		}
+	}
+	return false
+}
+
+func parseResultPeriods(periods []types.ResultByTime, dimensions []string) ([]CostResult, error) {
 	var results []CostResult
 	for _, resultByTime := range periods {
 		if resultByTime.TimePeriod == nil || resultByTime.TimePeriod.Start == nil || resultByTime.TimePeriod.End == nil {
@@ -535,11 +559,7 @@ func parseResultPeriods(periods []types.ResultByTime) ([]CostResult, error) {
 		}
 
 		for _, group := range resultByTime.Groups {
-			key := ""
-			if len(group.Keys) > 0 {
-				key = group.Keys[0]
-			}
-			row, err := rowFromMetrics(group.Metrics, startDate, endDate, resultByTime.Estimated, key)
+			row, err := rowFromMetrics(group.Metrics, startDate, endDate, resultByTime.Estimated, group.Keys, dimensions)
 			if err != nil {
 				return nil, err
 			}
@@ -547,8 +567,8 @@ func parseResultPeriods(periods []types.ResultByTime) ([]CostResult, error) {
 		}
 
 		if len(resultByTime.Groups) == 0 && len(resultByTime.Total) > 0 {
-			if _, ok := resultByTime.Total["UnblendedCost"]; ok {
-				row, err := rowFromMetrics(resultByTime.Total, startDate, endDate, resultByTime.Estimated, "")
+			if _, ok := resultByTime.Total[metricUnblendedCost]; ok {
+				row, err := rowFromMetrics(resultByTime.Total, startDate, endDate, resultByTime.Estimated, nil, nil)
 				if err != nil {
 					return nil, err
 				}
@@ -559,35 +579,109 @@ func parseResultPeriods(periods []types.ResultByTime) ([]CostResult, error) {
 	return results, nil
 }
 
-func rowFromMetrics(metrics map[string]types.MetricValue, start, end time.Time, estimated bool, key string) (CostResult, error) {
-	mv, ok := metrics["UnblendedCost"]
-	if !ok {
-		return CostResult{}, fmt.Errorf("%w for group %q", ErrAmountMissing, key)
+func rowFromMetrics(metrics map[string]types.MetricValue, start, end time.Time, estimated bool, keys, dimensions []string) (CostResult, error) {
+	label := ""
+	if len(keys) > 0 {
+		label = keys[0]
 	}
-	amount, currency, err := parseDecimalAmount(mv)
+	service, reservation, savings := groupIdentity(dimensions, keys)
+	amount, currency, metric, err := selectedAmount(metrics, reservation, savings, label)
 	if err != nil {
-		return CostResult{}, fmt.Errorf("%w for group %q", err, key)
+		return CostResult{}, err
 	}
 	asFloat, _ := amount.Float64()
 	row := CostResult{
-		Amount:      asFloat,
-		AmountExact: amount,
-		Currency:    currency,
-		StartDate:   start,
-		EndDate:     end,
-		ServiceName: key,
-		Estimated:   estimated,
-		Tags:        map[string]string{},
+		Amount:         asFloat,
+		AmountExact:    amount,
+		Currency:       currency,
+		StartDate:      start,
+		EndDate:        end,
+		ServiceName:    service,
+		Estimated:      estimated,
+		Tags:           map[string]string{},
+		ReservationARN: reservation,
+		SavingsPlanARN: savings,
+		Metric:         metric,
 	}
-	if usage, ok := metrics["UsageQuantity"]; ok && usage.Amount != nil {
+	if usage, ok := metrics[metricUsageQuantity]; ok && usage.Amount != nil {
 		parsed, unit, err := parseDecimalAmount(usage)
 		if err != nil {
-			return CostResult{}, fmt.Errorf("usage: %w for group %q", err, key)
+			return CostResult{}, fmt.Errorf("usage: %w for group %q", err, label)
 		}
 		row.UsageExact = parsed
 		row.UsageUnit = unit
 	}
 	return row, nil
+}
+
+// groupIdentity aligns Keys with the requested dimensions, in GroupBy order.
+// An empty or blank commitment key is not an id. A single non-commitment
+// dimension keeps Keys[0] as the group key on ServiceName.
+func groupIdentity(dimensions, keys []string) (service, reservation, savings string) {
+	dims := dimensions
+	if len(dims) == 0 {
+		dims = []string{dimService}
+	}
+	if len(dims) == 1 {
+		key := ""
+		if len(keys) > 0 {
+			key = keys[0]
+		}
+		switch dims[0] {
+		case dimService:
+			return key, "", ""
+		case dimReservationID:
+			return "", commitmentID(key), ""
+		case dimSavingsPlanARN:
+			return "", "", commitmentID(key)
+		default:
+			return key, "", ""
+		}
+	}
+	for i, dim := range dims {
+		key := ""
+		if i < len(keys) {
+			key = keys[i]
+		}
+		switch dim {
+		case dimService:
+			service = key
+		case dimReservationID:
+			reservation = commitmentID(key)
+		case dimSavingsPlanARN:
+			savings = commitmentID(key)
+		}
+	}
+	return service, reservation, savings
+}
+
+func commitmentID(key string) string {
+	return strings.TrimSpace(key)
+}
+
+// selectedAmount uses AmortizedCost only for a single commitment id when that
+// metric is present. A present value that cannot be parsed is an error.
+// BlendedCost is never read.
+func selectedAmount(metrics map[string]types.MetricValue, reservation, savings, label string) (*big.Rat, string, string, error) {
+	singleCommitment := (reservation != "") != (savings != "")
+	if singleCommitment {
+		if mv, ok := metrics[metricAmortizedCost]; ok {
+			amount, currency, err := parseDecimalAmount(mv)
+			if err != nil {
+				return nil, "", "", fmt.Errorf("amortized: %w for group %q", err, label)
+			}
+			return amount, currency, metricAmortizedCost, nil
+		}
+	}
+	mv, ok := metrics[metricUnblendedCost]
+	if !ok {
+		return nil, "", "", fmt.Errorf("%w for group %q", ErrAmountMissing, label)
+	}
+	amount, currency, err := parseDecimalAmount(mv)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("%w for group %q", err, label)
+	}
+	return amount, currency, metricUnblendedCost, nil
 }
 
 func parseDecimalAmount(mv types.MetricValue) (*big.Rat, string, error) {
@@ -625,50 +719,6 @@ func isNumeric(s string) bool {
 	return true
 }
 
-// GetReservationUtilization retrieves reservation utilization metrics.
-func (c *Client) GetReservationUtilization(ctx context.Context, startTime, endTime time.Time) (*costexplorer.GetReservationUtilizationOutput, error) {
-	interval, err := dateInterval(startTime, endTime)
-	if err != nil {
-		return nil, err
-	}
-	input := &costexplorer.GetReservationUtilizationInput{
-		TimePeriod:  interval,
-		Granularity: types.GranularityDaily, // Or make configurable
-	}
-
-	output, err := WithRetry(ctx, DefaultRetryConfig(), func(ctx context.Context) (*costexplorer.GetReservationUtilizationOutput, error, bool) {
-		out, err := c.ceClient.GetReservationUtilization(ctx, input)
-		if err != nil {
-			return nil, err, isRetryableError(err)
-		}
-		return out, nil, false
-	})
-
-	return output, err
-}
-
-// GetSavingsPlanCoverage retrieves savings plan coverage metrics.
-func (c *Client) GetSavingsPlansCoverage(ctx context.Context, startTime, endTime time.Time) (*costexplorer.GetSavingsPlansCoverageOutput, error) {
-	interval, err := dateInterval(startTime, endTime)
-	if err != nil {
-		return nil, err
-	}
-	input := &costexplorer.GetSavingsPlansCoverageInput{
-		TimePeriod:  interval,
-		Granularity: types.GranularityDaily,
-	}
-
-	output, err := WithRetry(ctx, DefaultRetryConfig(), func(ctx context.Context) (*costexplorer.GetSavingsPlansCoverageOutput, error, bool) {
-		out, err := c.ceClient.GetSavingsPlansCoverage(ctx, input)
-		if err != nil {
-			return nil, err, isRetryableError(err)
-		}
-		return out, nil, false
-	})
-
-	return output, err
-}
-
 // ValidateCredentials checks if the client credentials are valid by making a lightweight API call.
 func (c *Client) ValidateCredentials(ctx context.Context) error {
 	// Use a minimal time range to validate credentials
@@ -682,7 +732,7 @@ func (c *Client) ValidateCredentials(ctx context.Context) error {
 	input := &costexplorer.GetCostAndUsageInput{
 		TimePeriod:  interval,
 		Granularity: types.GranularityDaily,
-		Metrics:     []string{"UnblendedCost"},
+		Metrics:     []string{metricUnblendedCost},
 	}
 
 	_, err = WithRetry(ctx, DefaultRetryConfig(), func(ctx context.Context) (*costexplorer.GetCostAndUsageOutput, error, bool) {

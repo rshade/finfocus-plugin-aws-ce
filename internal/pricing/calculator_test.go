@@ -33,14 +33,6 @@ func (m *mockCostExplorerAPI) GetCostAndUsage(ctx context.Context, params *coste
 	return &costexplorer.GetCostAndUsageOutput{}, nil
 }
 
-func (m *mockCostExplorerAPI) GetReservationUtilization(ctx context.Context, params *costexplorer.GetReservationUtilizationInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetReservationUtilizationOutput, error) {
-	return nil, nil
-}
-
-func (m *mockCostExplorerAPI) GetSavingsPlansCoverage(ctx context.Context, params *costexplorer.GetSavingsPlansCoverageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetSavingsPlansCoverageOutput, error) {
-	return nil, nil
-}
-
 func (m *mockCostExplorerAPI) GetCostForecast(ctx context.Context, params *costexplorer.GetCostForecastInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostForecastOutput, error) {
 	return nil, nil
 }

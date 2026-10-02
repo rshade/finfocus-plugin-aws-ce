@@ -97,23 +97,29 @@ func aggregateCosts(rows []client.CostResult) ([]CostEntry, error) {
 				return nil, fmt.Errorf("%w: %s and %s", client.ErrMixedCurrency, currency, row.Currency)
 			}
 		}
-		key := row.ServiceName
+		key := costMergeKey(row)
 		a, ok := byKey[key]
 		if !ok {
 			a = &acc{entry: CostEntry{
 				Timestamp:        row.StartDate.UTC(),
 				PeriodEnd:        row.EndDate.UTC(),
 				Currency:         row.Currency,
-				Service:          key,
+				Service:          row.ServiceName,
 				AccountID:        row.AccountID,
 				Region:           row.Region,
 				AvailabilityZone: row.AvailabilityZone,
 				Tags:             row.Tags,
 				ReservationARN:   row.ReservationARN,
 				SavingsPlanARN:   row.SavingsPlanARN,
+				Metric:           row.Metric,
 			}}
 			byKey[key] = a
 			order = append(order, key)
+		} else if row.Metric != "" && a.entry.Metric != "" && row.Metric != a.entry.Metric {
+			return nil, fmt.Errorf("mixed cost metrics %s and %s for group %q", a.entry.Metric, row.Metric, row.ServiceName)
+		}
+		if a.entry.Metric == "" {
+			a.entry.Metric = row.Metric
 		}
 		a.cost = addCost(a.cost, row.AmountExact)
 		if row.Estimated {
@@ -152,6 +158,10 @@ func aggregateCosts(rows []client.CostResult) ([]CostEntry, error) {
 	return out, nil
 }
 
+func costMergeKey(row client.CostResult) string {
+	return row.ServiceName + "\x00" + row.ReservationARN + "\x00" + row.SavingsPlanARN
+}
+
 func focusFor(entry CostEntry) *pbc.FocusCostRecord {
 	start := entry.Timestamp.UTC()
 	end := entry.PeriodEnd.UTC()
@@ -170,6 +180,28 @@ func focusFor(entry CostEntry) *pbc.FocusCostRecord {
 		category = pbc.FocusChargeCategory_FOCUS_CHARGE_CATEGORY_USAGE
 	}
 	estimated := strconv.FormatBool(entry.Estimated)
+	metric := entry.Metric
+	if metric == "" {
+		metric = "UnblendedCost"
+	}
+	description := "Unblended cost for " + entry.Service
+	if metric == "AmortizedCost" {
+		description = "Amortized cost for " + entry.Service
+	}
+	ri := entry.ReservationARN
+	sp := entry.SavingsPlanARN
+	commitmentID := ""
+	commitmentType := ""
+	if ((ri != "") != (sp != "")) && !entry.HasUsage {
+		if ri != "" {
+			commitmentID = ri
+			commitmentType = "Reserved Instance"
+		} else {
+			commitmentID = sp
+			commitmentType = "Savings Plan"
+		}
+	}
+	copyRawIDs := entry.HasUsage || (ri != "" && sp != "")
 	builder := pluginsdk.NewFocusRecordBuilder().
 		WithIdentity("AWS", account, account).
 		WithBillingPeriod(start, end, entry.Currency).
@@ -177,7 +209,7 @@ func focusFor(entry CostEntry) *pbc.FocusCostRecord {
 		WithChargeDetails(category, pbc.FocusPricingCategory_FOCUS_PRICING_CATEGORY_STANDARD).
 		WithChargeClassification(
 			pbc.FocusChargeClass_FOCUS_CHARGE_CLASS_REGULAR,
-			"Unblended cost for "+entry.Service,
+			description,
 			pbc.FocusChargeFrequency_FOCUS_CHARGE_FREQUENCY_USAGE_BASED,
 		).
 		WithService(pbc.FocusServiceCategory_FOCUS_SERVICE_CATEGORY_OTHER, entry.Service).
@@ -185,20 +217,47 @@ func focusFor(entry CostEntry) *pbc.FocusCostRecord {
 		WithExtension("estimated", estimated).
 		WithExtension("group_key", entry.Service).
 		WithExtension("currency", entry.Currency).
-		WithExtension("amount_decimal", entry.AmountDecimal)
+		WithExtension("amount_decimal", entry.AmountDecimal).
+		WithExtension("metric", metric)
+	if commitmentID != "" {
+		builder = builder.WithCommitmentDiscount(
+			pbc.FocusCommitmentDiscountCategory_FOCUS_COMMITMENT_DISCOUNT_CATEGORY_UNSPECIFIED,
+			commitmentID,
+			"",
+		)
+	}
+	if copyRawIDs {
+		if ri != "" {
+			builder = builder.WithExtension("reservation_id", ri)
+		}
+		if sp != "" {
+			builder = builder.WithExtension("savings_plan_arn", sp)
+		}
+	}
 	if entry.HasUsage && entry.UsageAmount > 0 {
 		builder = builder.WithUsage(entry.UsageAmount, entry.UsageUnit)
 	}
 	record, err := builder.Build()
 	if err != nil {
-		return &pbc.FocusCostRecord{
-			ExtendedColumns: map[string]string{
-				"estimated":      estimated,
-				"group_key":      entry.Service,
-				"currency":       entry.Currency,
-				"amount_decimal": entry.AmountDecimal,
-			},
+		columns := map[string]string{
+			"estimated":      estimated,
+			"group_key":      entry.Service,
+			"currency":       entry.Currency,
+			"amount_decimal": entry.AmountDecimal,
+			"metric":         metric,
 		}
+		if copyRawIDs {
+			if ri != "" {
+				columns["reservation_id"] = ri
+			}
+			if sp != "" {
+				columns["savings_plan_arn"] = sp
+			}
+		}
+		return &pbc.FocusCostRecord{ExtendedColumns: columns}
+	}
+	if commitmentType != "" {
+		record.CommitmentDiscountType = commitmentType
 	}
 	return record
 }
