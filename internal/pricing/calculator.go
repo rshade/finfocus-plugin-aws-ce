@@ -261,9 +261,9 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 			logger.Warn().Int("ce_requests", pages).Msg("Cost Explorer request limit reached")
 			return nil, statusWithDetail(codes.ResourceExhausted, err.Error(), pbc.ErrorCode_ERROR_CODE_RATE_LIMITED)
 		}
-		if msg, ok := perRequestAWSFailure(perRequest, err); ok {
-			logger.Error().Int("ce_requests", pages).Msg(msg)
-			return nil, status.Error(codes.Internal, msg)
+		if mapped, ok := mapAWSAPIError(err); ok {
+			logger.Error().Int("ce_requests", pages).Msg(status.Convert(mapped).Message())
+			return nil, mapped
 		}
 		logger.Error().Err(err).Int("ce_requests", pages).Msg("Failed to retrieve costs from AWS")
 		return nil, mapCostError(resourceID, err)
@@ -496,7 +496,11 @@ func (c *Calculator) GetServiceActualCost(ctx context.Context, serviceName strin
 			c.logger.Error().Str("service", serviceName).Msg(msg)
 			return 0, "", errors.New(msg)
 		}
-		c.logger.Error().Err(err).Str("service", serviceName).Msg("Failed to get service costs")
+		if code, ok := awsAPIErrorCode(err); ok {
+			c.logger.Error().Str("service", serviceName).Msg(awsAPIErrorText(code))
+		} else {
+			c.logger.Error().Err(err).Str("service", serviceName).Msg("Failed to get service costs")
+		}
 		return 0, "", fmt.Errorf("retrieving service costs: %w", err)
 	}
 
@@ -531,7 +535,11 @@ func (c *Calculator) GetAccountActualCost(ctx context.Context, startTime, endTim
 			c.logger.Error().Msg(msg)
 			return 0, "", errors.New(msg)
 		}
-		c.logger.Error().Err(err).Msg("Failed to get account costs")
+		if code, ok := awsAPIErrorCode(err); ok {
+			c.logger.Error().Msg(awsAPIErrorText(code))
+		} else {
+			c.logger.Error().Err(err).Msg("Failed to get account costs")
+		}
 		return 0, "", fmt.Errorf("retrieving account costs: %w", err)
 	}
 

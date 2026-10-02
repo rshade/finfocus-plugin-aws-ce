@@ -792,6 +792,8 @@ counter is tested.
 
 ### CE-6.9: AWS errors become real gRPC codes
 
+**Status:** DONE, `go test -count=1 ./...`, all packages pass including TestCEContractFixtures (pricing 0.199s); break check: LimitExceededException mapped to codes.Internal, TestGetActualCost_AWSErrorCodes/LimitExceededException failed (status.Code = Internal, want ResourceExhausted), then ResourceExhausted was restored.
+
 **ID:** CE-6.9  
 **Description:** Plain `fmt.Errorf` becomes `Unknown`. Map `LimitExceededException` to
 `ResourceExhausted`, access denied to `PermissionDenied`, missing or expired credentials to

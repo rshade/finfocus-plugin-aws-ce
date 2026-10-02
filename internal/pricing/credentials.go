@@ -11,6 +11,7 @@ import (
 	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
 	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // errPerRequestCredentialsIncomplete is an access key, secret, or session token
@@ -60,18 +61,56 @@ func invalidCredentials(err error) error {
 // It uses smithy.APIError.ErrorCode only. Error and ErrorMessage can contain
 // the role ARN, so neither is read.
 func perRequestAWSFailure(perRequest bool, err error) (string, bool) {
-	if !perRequest || err == nil {
+	if !perRequest {
 		return "", false
 	}
+	code, ok := awsAPIErrorCode(err)
+	if !ok {
+		return "", false
+	}
+	return awsAPIErrorText(code), true
+}
+
+// awsAPIErrorCode returns smithy.APIError.ErrorCode. Error and ErrorMessage
+// are not read: they can contain a role ARN.
+func awsAPIErrorCode(err error) (string, bool) {
 	var api smithy.APIError
-	if !errors.As(err, &api) {
+	if err == nil || !errors.As(err, &api) {
 		return "", false
 	}
-	code := api.ErrorCode()
+	return api.ErrorCode(), true
+}
+
+func awsAPIErrorText(code string) string {
 	if code == "" {
-		return "retrieving costs failed", true
+		return "retrieving costs failed"
 	}
-	return "retrieving costs failed: " + code, true
+	return "retrieving costs failed: " + code
+}
+
+// mapAWSAPIError classifies a Cost Explorer failure by ErrorCode.
+// Unknown codes stay Internal with no ErrorDetail. The status text is the
+// safe code string, never Error or ErrorMessage.
+func mapAWSAPIError(err error) (error, bool) {
+	code, ok := awsAPIErrorCode(err)
+	if !ok {
+		return nil, false
+	}
+	msg := awsAPIErrorText(code)
+	switch code {
+	case "LimitExceededException", "RequestLimitExceeded":
+		return statusWithDetail(codes.ResourceExhausted, msg, pbc.ErrorCode_ERROR_CODE_RATE_LIMITED), true
+	case "AccessDenied", "AccessDeniedException":
+		return statusWithDetail(codes.PermissionDenied, msg, pbc.ErrorCode_ERROR_CODE_PERMISSION_DENIED), true
+	case "ExpiredToken", "ExpiredTokenException", "InvalidClientTokenId", "UnrecognizedClientException", "AuthFailure":
+		return statusWithDetail(codes.Unauthenticated, msg, pbc.ErrorCode_ERROR_CODE_INVALID_CREDENTIALS), true
+	case "ValidationException", "InvalidParameterException", "InvalidParameterValue", "InvalidNextTokenException":
+		return status.Error(codes.InvalidArgument, msg), true
+	case "DataUnavailableException":
+		return statusWithDetail(codes.NotFound, msg, pbc.ErrorCode_ERROR_CODE_RESOURCE_NOT_FOUND), true
+	default:
+		return status.Error(codes.Internal, msg), true
+	}
 }
 
 func configFromCredentials(creds pluginsdk.Credentials) (client.Config, error) {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
+	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -58,12 +59,15 @@ func TestGetActualCost_AssumeRoleDeniedOmitsRoleARN(t *testing.T) {
 		"secret_access_key": secret,
 		"role_arn":          roleARN,
 	}), serviceCostRequest())
-	if status.Code(err) != codes.Internal {
-		t.Fatalf("status.Code = %s, want %s (%v)", status.Code(err), codes.Internal, err)
+	if status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("status.Code = %s, want %s (%v)", status.Code(err), codes.PermissionDenied, err)
 	}
 	msg := status.Convert(err).Message()
 	if msg != "retrieving costs failed: AccessDenied" {
 		t.Fatalf("message = %q", msg)
+	}
+	if got := errorDetailCode(err); got != pbc.ErrorCode_ERROR_CODE_PERMISSION_DENIED {
+		t.Fatalf("ErrorDetail code = %s, want %s; details=%v", got, pbc.ErrorCode_ERROR_CODE_PERMISSION_DENIED, status.Convert(err).Details())
 	}
 	if strings.Contains(msg, roleARN) || strings.Contains(msg, secret) || strings.Contains(err.Error(), roleARN) || strings.Contains(err.Error(), secret) {
 		t.Fatalf("status text contains credential material: %s", err)
