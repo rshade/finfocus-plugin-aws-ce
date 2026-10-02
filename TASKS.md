@@ -161,7 +161,9 @@ ok      github.com/rshade/finfocus-plugin-aws-ce/test/e2e               0.005s
 
 ### CE-1.1: Upgrade finfocus-spec to v0.7.0 and Go to 1.27.1
 
-**ID:** CE-1.1  
+**Status:** DONE, `grep -q 'finfocus-spec v0.7.0' go.mod && grep -q '^go 1.27.1' go.mod && go build ./... && go test -count=1 ./...`, already satisfied (go.mod go 1.27.1, finfocus-spec v0.7.0, ax-go v0.7.0 transitive, `go mod tidy` clean, build+tests pass); break check: same grep for v0.9.9 exits 1.
+
+**ID:** CE-1.1
 **Description:** Update `go.mod` to use finfocus-spec v0.7.0 and Go 1.27.1. This unblocks per-request credentials (new `PerRequestCredentialConsumer` interface), FOCUS 1.4 billing columns (`invoice_detail_id`, `commitment_program_eligibility_details`), and ax-go v0.7.0 integration.
 
 **Files Modified:**
