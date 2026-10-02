@@ -69,7 +69,29 @@ var (
 	ErrInvalidTimeRange = errors.New("start must be before end")
 	// ErrPageCap is returned when Cost Explorer still has a NextPageToken after 100 pages.
 	ErrPageCap = errors.New("cost explorer results exceed 100 pages")
+	// ErrRateLimited is returned when the next page would exceed the caller's
+	// per-minute budget. The Cost Explorer request is not made.
+	ErrRateLimited = errors.New("cost explorer request limit reached")
 )
+
+type pageHookKey struct{}
+
+// WithPageHook runs hook before each Cost Explorer page.
+// A non-nil error skips that page and stops the query. A nil hook returns ctx.
+func WithPageHook(ctx context.Context, hook func() error) context.Context {
+	if hook == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, pageHookKey{}, hook)
+}
+
+func runPageHook(ctx context.Context) error {
+	hook, _ := ctx.Value(pageHookKey{}).(func() error)
+	if hook == nil {
+		return nil
+	}
+	return hook()
+}
 
 type staticCredentials struct {
 	accessKeyID     string
@@ -413,6 +435,9 @@ func (c *Client) collectCosts(ctx context.Context, fetch func(context.Context, *
 	var all []CostResult
 	var token *string
 	for page := 0; page < 100; page++ {
+		if err := runPageHook(ctx); err != nil {
+			return nil, err
+		}
 		periods, next, err := fetch(ctx, token)
 		if err != nil {
 			return nil, err

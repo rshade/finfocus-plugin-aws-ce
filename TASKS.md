@@ -776,6 +776,8 @@ no request sends a full ARN as an EC2 `RESOURCE_ID`.
 
 ### CE-6.8: Cache that is safe, honest and cheap
 
+**Status:** DONE, `go test -count=1 ./...`, all packages pass including TestCEContractFixtures (pricing 0.210s); break check wrote the raw key as the cache file name, TestCacheKeyStaysInDirectory failed because rel was `../../x:arn:aws:ec2:us-east-1:123456789012:instance:i-0abc.json`, then the SHA-256 file name was restored.
+
 **ID:** CE-6.8  
 **Description:** `calculator.go:136` and `cache.go:87` use the request key as a file name: an ARN
 puts `/` and `:` in it and a `..` segment could leave the cache directory. Hash the key, include

@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
@@ -30,6 +31,10 @@ type Calculator struct {
 	// openClient builds the client for one call that carried credentials.
 	// Nil uses client.NewClient. The result is not stored on ceClient.
 	openClient func(context.Context, client.Config) (*client.Client, error)
+	// maxRequestsPerMinute is the Cost Explorer page budget. Zero means no limit.
+	maxRequestsPerMinute int
+	requestMu            sync.Mutex
+	requestTimes         []time.Time
 }
 
 var (
@@ -63,10 +68,11 @@ func NewCalculator() *Calculator {
 	logger := log.With().Str("component", "finfocus-plugin-aws-ce").Logger()
 
 	return &Calculator{
-		BasePlugin: base,
-		ceClient:   nil, // Will be initialized lazily
-		cache:      cm,
-		logger:     logger,
+		BasePlugin:           base,
+		ceClient:             nil, // Will be initialized lazily
+		cache:                cm,
+		logger:               logger,
+		maxRequestsPerMinute: maxRequestsPerMinuteFromEnv(),
 	}
 }
 
@@ -225,6 +231,9 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 		return nil, err
 	}
 
+	var pages int
+	ctx = c.withCostBudget(ctx, &pages)
+
 	ce, perRequest, err := c.clientForCall(ctx, logger)
 	if err != nil {
 		if _, ok := status.FromError(err); ok {
@@ -233,11 +242,11 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 		return nil, status.Errorf(codes.Internal, "client initialization failed: %v", err)
 	}
 
-	cacheKey := fmt.Sprintf("cost:%s:%d:%d", plan.cacheID, req.GetStart().GetSeconds(), req.GetEnd().GetSeconds())
+	cacheKey := actualCostCacheKey(plan, req)
 	if !perRequest && c.cache != nil {
-		if results, ok := c.cache.Get(cacheKey); ok {
-			logger.Debug().Msg("Cache hit for cost query")
-			return c.buildResponse(results), nil
+		if entry, ok := c.cache.getEntry(cacheKey); ok {
+			logger.Info().Int("ce_requests", 0).Msg("Cache hit for cost query")
+			return c.buildResponse(entry.Results, entry.ExpiresAt), nil
 		}
 	}
 
@@ -245,14 +254,18 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 	if plan.resourceLevel {
 		clientCosts, err = ce.GetCostWithResources(ctx, plan.resourceID, plan.accountID, startTime, endTime)
 	} else {
-		clientCosts, err = ce.GetCost(ctx, nil, []string{"SERVICE"}, startTime, endTime, "DAILY")
+		clientCosts, err = ce.GetCost(ctx, nil, []string{"SERVICE"}, startTime, endTime, cacheGranularity)
 	}
 	if err != nil {
+		if errors.Is(err, client.ErrRateLimited) {
+			logger.Warn().Int("ce_requests", pages).Msg("Cost Explorer request limit reached")
+			return nil, statusWithDetail(codes.ResourceExhausted, err.Error(), pbc.ErrorCode_ERROR_CODE_RATE_LIMITED)
+		}
 		if msg, ok := perRequestAWSFailure(perRequest, err); ok {
-			logger.Error().Msg(msg)
+			logger.Error().Int("ce_requests", pages).Msg(msg)
 			return nil, status.Error(codes.Internal, msg)
 		}
-		logger.Error().Err(err).Msg("Failed to retrieve costs from AWS")
+		logger.Error().Err(err).Int("ce_requests", pages).Msg("Failed to retrieve costs from AWS")
 		return nil, mapCostError(resourceID, err)
 	}
 
@@ -265,15 +278,21 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 		return nil, statusWithDetail(codes.NotFound, pluginsdk.NoDataError(resourceID).Error(), pbc.ErrorCode_ERROR_CODE_RESOURCE_NOT_FOUND)
 	}
 
-	logger.Info().Int("results_count", len(costs)).Msg("Retrieved costs from AWS")
-
+	ttl := actualCostTTL(endTime, costs, time.Now().UTC())
+	expires := time.Now().UTC().Add(ttl)
 	if !perRequest && c.cache != nil {
-		if err := c.cache.Set(cacheKey, costs); err != nil {
-			logger.Warn().Err(err).Msg("Failed to cache results")
+		stored, cacheErr := c.cache.SetWithTTL(cacheKey, costs, ttl)
+		if cacheErr != nil {
+			logger.Warn().Err(cacheErr).Msg("Failed to cache results")
+		}
+		if !stored.IsZero() {
+			expires = stored
 		}
 	}
 
-	return c.buildResponse(costs), nil
+	logger.Info().Int("ce_requests", pages).Int("results_count", len(costs)).Msg("Retrieved costs from AWS")
+
+	return c.buildResponse(costs, expires), nil
 }
 
 type costQueryPlan struct {
@@ -421,7 +440,8 @@ func statusWithDetail(code codes.Code, msg string, errorCode pbc.ErrorCode) erro
 	return detailed.Err()
 }
 
-func (c *Calculator) buildResponse(costs []CostEntry) *pbc.GetActualCostResponse {
+func (c *Calculator) buildResponse(costs []CostEntry, expires time.Time) *pbc.GetActualCostResponse {
+	expiresAt := timestamppb.New(expires.UTC())
 	results := make([]*pbc.ActualCostResult, 0, len(costs))
 	for _, cost := range costs {
 		usage := 0.0
@@ -437,6 +457,7 @@ func (c *Calculator) buildResponse(costs []CostEntry) *pbc.GetActualCostResponse
 			UsageUnit:   unit,
 			Source:      "aws-ce",
 			FocusRecord: focusFor(cost),
+			ExpiresAt:   expiresAt,
 		})
 	}
 

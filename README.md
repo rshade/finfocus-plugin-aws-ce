@@ -169,6 +169,8 @@ export FINFOCUS_LOG_FILE=/var/log/finfocus-aws-ce.log  # Log to file (default: s
 export FINFOCUS_LOG_LEVEL=debug          # Verbosity: debug|info|warn|error (default: info)
 ```
 
+`FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` caps Cost Explorer calls per minute, counting each page; unset or `0` means no limit.
+
 #### CLI Flags
 
 The `--port` flag overrides the environment variable:
