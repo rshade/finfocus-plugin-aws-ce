@@ -3,6 +3,7 @@ package pricing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -110,32 +111,26 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 	}
 	logEvent.Msg("GetActualCost request received")
 
-	// Initialize client if needed
+	startTime := req.GetStart().AsTime().UTC()
+	endTime := req.GetEnd().AsTime().UTC()
+	if !endTime.After(startTime) {
+		return nil, status.Error(codes.InvalidArgument, "start must be before end")
+	}
+
+	plan, err := c.planCostQuery(req)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateCostLookback(plan, startTime); err != nil {
+		c.logger.Error().Time("start", startTime).Err(err).Msg("Date range exceeds AWS limits")
+		return nil, err
+	}
+
 	if err := c.initClient(ctx); err != nil {
-		return nil, fmt.Errorf("client initialization failed: %w", err)
+		return nil, status.Errorf(codes.Internal, "client initialization failed: %v", err)
 	}
 
-	// Parse time range from protobuf Timestamp
-	startTime := time.Unix(req.GetStart().GetSeconds(), int64(req.GetStart().GetNanos()))
-	endTime := time.Unix(req.GetEnd().GetSeconds(), int64(req.GetEnd().GetNanos()))
-
-	// Validate 14 month lookback limit (AWS-specific, not in SDK validation)
-	lookbackLimit := time.Now().AddDate(0, -14, 0)
-	if startTime.Before(lookbackLimit) {
-		c.logger.Error().
-			Time("start", startTime).
-			Time("limit", lookbackLimit).
-			Msg("Date range exceeds AWS limits")
-		return nil, fmt.Errorf("invalid time range: start time (%v) exceeds 14 months lookback limit", startTime)
-	}
-
-	// Resolve identifier to use for lookup (ARN takes precedence if present)
-	lookupID := c.resolveIdentifier(req)
-
-	// Generate cache key
-	cacheKey := fmt.Sprintf("cost:%s:%d:%d", lookupID, req.GetStart().GetSeconds(), req.GetEnd().GetSeconds())
-
-	// Check cache
+	cacheKey := fmt.Sprintf("cost:%s:%d:%d", plan.cacheID, req.GetStart().GetSeconds(), req.GetEnd().GetSeconds())
 	if c.cache != nil {
 		if results, ok := c.cache.Get(cacheKey); ok {
 			c.logger.Debug().Msg("Cache hit for cost query")
@@ -143,81 +138,28 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 		}
 	}
 
-	// Granularity and Dimensions are not in request, using defaults
-	granularity := "DAILY"
-	dimensions := []string{"SERVICE"}
-
-	// Create filter
-	var filter *types.Expression
-
-	// Extract context from ARN if available
-	var accountID string
-	if arn != "" {
-		if parsed, err := ParseARN(arn); err == nil {
-			accountID = parsed.AccountID
-		}
+	var clientCosts []client.CostResult
+	if plan.resourceLevel {
+		clientCosts, err = c.ceClient.GetCostWithResources(ctx, plan.resourceID, plan.accountID, startTime, endTime)
+	} else {
+		clientCosts, err = c.ceClient.GetCost(ctx, nil, []string{"SERVICE"}, startTime, endTime, "DAILY")
 	}
-
-	if lookupID != "" {
-		resourceFilter := types.Expression{
-			Dimensions: &types.DimensionValues{
-				Key:    types.DimensionResourceId,
-				Values: []string{lookupID},
-			},
-		}
-
-		if accountID != "" {
-			accountFilter := types.Expression{
-				Dimensions: &types.DimensionValues{
-					Key:    types.DimensionLinkedAccount,
-					Values: []string{accountID},
-				},
-			}
-			filter = &types.Expression{
-				And: []types.Expression{resourceFilter, accountFilter},
-			}
-		} else {
-			filter = &resourceFilter
-		}
-	}
-
-	// Get costs from Cost Explorer
-	clientCosts, err := c.ceClient.GetCost(ctx, filter, dimensions, startTime, endTime, granularity)
 	if err != nil {
 		c.logger.Error().Err(err).Msg("Failed to retrieve costs from AWS")
-		return nil, fmt.Errorf("retrieving costs: %w", err)
+		return nil, mapCostError(resourceID, err)
 	}
 
-	c.logger.Info().
-		Int("results_count", len(clientCosts)).
-		Msg("Retrieved costs from AWS")
-
-	// If no costs found, return response with NoData hint
-	if len(clientCosts) == 0 {
-		return &pbc.GetActualCostResponse{
-			Results:      []*pbc.ActualCostResult{},
-			FallbackHint: pbc.FallbackHint_FALLBACK_HINT_RECOMMENDED,
-		}, nil
+	costs, err := aggregateCosts(clientCosts)
+	if err != nil {
+		c.logger.Error().Err(err).Msg("Failed to aggregate costs")
+		return nil, mapCostError(resourceID, err)
+	}
+	if len(costs) == 0 {
+		return nil, status.Error(codes.NotFound, pluginsdk.NoDataError(resourceID).Error())
 	}
 
-	// Map client costs to internal CostEntry
-	var costs []CostEntry
-	for _, cc := range clientCosts {
-		costs = append(costs, CostEntry{
-			Timestamp:        cc.StartDate,
-			Amount:           cc.Amount,
-			Currency:         cc.Currency,
-			Service:          cc.ServiceName,
-			AccountID:        cc.AccountID,
-			Region:           cc.Region,
-			AvailabilityZone: cc.AvailabilityZone,
-			Tags:             cc.Tags,
-			ReservationARN:   cc.ReservationARN,
-			SavingsPlanARN:   cc.SavingsPlanARN,
-		})
-	}
+	c.logger.Info().Int("results_count", len(costs)).Msg("Retrieved costs from AWS")
 
-	// Update cache
 	if c.cache != nil {
 		if err := c.cache.Set(cacheKey, costs); err != nil {
 			c.logger.Warn().Err(err).Msg("Failed to cache results")
@@ -227,52 +169,101 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 	return c.buildResponse(costs), nil
 }
 
-// resolveIdentifier determines which identifier to use for cost lookup.
-// Returns ARN if available, otherwise ResourceId.
-func (c *Calculator) resolveIdentifier(req *pbc.GetActualCostRequest) string {
+type costQueryPlan struct {
+	resourceLevel bool
+	resourceID    string
+	accountID     string
+	cacheID       string
+}
+
+func (c *Calculator) planCostQuery(req *pbc.GetActualCostRequest) (costQueryPlan, error) {
+	plan := costQueryPlan{cacheID: req.GetResourceId()}
 	arn := req.GetArn()
 	if arn == "" {
-		return req.GetResourceId()
+		return plan, nil
 	}
-
 	parsed, err := ParseARN(arn)
 	if err != nil {
 		c.logger.Warn().Err(err).Str("arn", arn).Msg("Malformed ARN provided; falling back to ResourceId")
-		return req.GetResourceId()
+		return plan, nil
 	}
-
-	// Verify identity: Check if ResourceId matches the parsed resource
-	// parsed.Resource might be "instance/i-12345" or "function:name"
-	// req.ResourceId might be "i-12345"
-	resourceID := req.GetResourceId()
-
-	// Check if the parsed resource ends with the request ResourceId
-	// This handles "instance/i-123" vs "i-123"
-	if !strings.HasSuffix(parsed.Resource, resourceID) {
-		// Strict check failed, try contains for safety or just log
+	if parsed.Service != "ec2" {
+		return costQueryPlan{}, status.Errorf(codes.InvalidArgument, "resource-level cost is not available for service %s", parsed.Service)
+	}
+	instanceID, ok := ec2InstanceID(parsed.Resource)
+	if !ok {
+		return costQueryPlan{}, status.Errorf(codes.InvalidArgument, "resource-level cost is not available for service ec2 resource %s", parsed.Resource)
+	}
+	if req.GetResourceId() != "" && req.GetResourceId() != instanceID && !strings.HasSuffix(parsed.Resource, req.GetResourceId()) {
 		c.logger.Warn().
-			Str("resource_id", resourceID).
+			Str("resource_id", req.GetResourceId()).
 			Str("arn_resource", parsed.Resource).
 			Msg("Identifier mismatch: ResourceId does not match ARN resource component. Using ARN as source of truth.")
 	}
+	plan.resourceLevel = true
+	plan.resourceID = instanceID
+	plan.accountID = parsed.AccountID
+	plan.cacheID = instanceID
+	return plan, nil
+}
 
-	return arn
+func ec2InstanceID(resource string) (string, bool) {
+	resource = strings.TrimPrefix(resource, "instance/")
+	if strings.HasPrefix(resource, "i-") && !strings.ContainsAny(resource, "/:") {
+		return resource, true
+	}
+	return "", false
+}
+
+func validateCostLookback(plan costQueryPlan, start time.Time) error {
+	now := time.Now().UTC()
+	if plan.resourceLevel {
+		if start.Before(now.AddDate(0, 0, -14)) {
+			return status.Error(codes.InvalidArgument, "resource-level cost data covers the last 14 days only")
+		}
+		return nil
+	}
+	limit := now.AddDate(0, -14, 0)
+	if start.Before(limit) {
+		return status.Errorf(codes.InvalidArgument, "invalid time range: start time (%s) exceeds 14 months lookback limit", start.Format(time.RFC3339))
+	}
+	return nil
+}
+
+func mapCostError(resourceID string, err error) error {
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, client.ErrNoCostData):
+		return status.Error(codes.NotFound, pluginsdk.NoDataError(resourceID).Error())
+	case errors.Is(err, client.ErrMixedCurrency):
+		return status.Error(codes.FailedPrecondition, err.Error())
+	case errors.Is(err, client.ErrAmountMissing), errors.Is(err, client.ErrAmountUnparseable):
+		return status.Error(codes.Internal, err.Error())
+	case errors.Is(err, client.ErrInvalidTimeRange):
+		return status.Error(codes.InvalidArgument, err.Error())
+	default:
+		return status.Error(codes.Internal, err.Error())
+	}
 }
 
 func (c *Calculator) buildResponse(costs []CostEntry) *pbc.GetActualCostResponse {
-	var results []*pbc.ActualCostResult
-
+	results := make([]*pbc.ActualCostResult, 0, len(costs))
 	for _, cost := range costs {
-		// Create result
-		res := &pbc.ActualCostResult{
-			Timestamp:   timestamppb.New(cost.Timestamp),
-			Cost:        cost.Amount,
-			UsageAmount: 0, // Not available in simple mapping
-			UsageUnit:   cost.Currency,
-			Source:      "aws-ce",
-			// FocusRecord: nil, // Leave empty for now
+		usage := 0.0
+		unit := ""
+		if cost.HasUsage {
+			usage = cost.UsageAmount
+			unit = cost.UsageUnit
 		}
-		results = append(results, res)
+		results = append(results, &pbc.ActualCostResult{
+			Timestamp:   timestamppb.New(cost.Timestamp.UTC()),
+			Cost:        cost.Amount,
+			UsageAmount: usage,
+			UsageUnit:   unit,
+			Source:      "aws-ce",
+			FocusRecord: focusFor(cost),
+		})
 	}
 
 	return &pbc.GetActualCostResponse{

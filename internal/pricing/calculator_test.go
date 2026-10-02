@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
 	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
@@ -36,6 +37,46 @@ func (m *mockCostExplorerAPI) GetCostForecast(ctx context.Context, params *coste
 	return nil, nil
 }
 
+func (m *mockCostExplorerAPI) GetCostAndUsageWithResources(ctx context.Context, params *costexplorer.GetCostAndUsageWithResourcesInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageWithResourcesOutput, error) {
+	if m.GetCostAndUsageFunc == nil {
+		return &costexplorer.GetCostAndUsageWithResourcesOutput{}, nil
+	}
+	out, err := m.GetCostAndUsageFunc(ctx, &costexplorer.GetCostAndUsageInput{}, optFns...)
+	if err != nil || out == nil {
+		return nil, err
+	}
+	return &costexplorer.GetCostAndUsageWithResourcesOutput{
+		ResultsByTime:            out.ResultsByTime,
+		NextPageToken:            out.NextPageToken,
+		GroupDefinitions:         out.GroupDefinitions,
+		DimensionValueAttributes: out.DimensionValueAttributes,
+	}, nil
+}
+
+func pricedCostOutput() *costexplorer.GetCostAndUsageOutput {
+	return &costexplorer.GetCostAndUsageOutput{
+		ResultsByTime: []types.ResultByTime{
+			{
+				TimePeriod: &types.DateInterval{
+					Start: aws.String("2026-09-01"),
+					End:   aws.String("2026-09-02"),
+				},
+				Groups: []types.Group{
+					{
+						Keys: []string{"Amazon Elastic Compute Cloud - Compute"},
+						Metrics: map[string]types.MetricValue{
+							"UnblendedCost": {
+								Amount: aws.String("1.00"),
+								Unit:   aws.String("USD"),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func TestCalculator_Structure(t *testing.T) {
 	c := NewCalculator()
 	if c == nil {
@@ -50,9 +91,7 @@ func TestGetActualCost_WithArn(t *testing.T) {
 			// In T015, we will update the filter to use ARN.
 			// For now, we just ensure the call goes through.
 			// Later we can inspect params.Filter to ensure ARN is used.
-			return &costexplorer.GetCostAndUsageOutput{
-				ResultsByTime: []types.ResultByTime{},
-			}, nil
+			return pricedCostOutput(), nil
 		},
 	}
 
@@ -83,9 +122,7 @@ func TestGetActualCost_WithArn(t *testing.T) {
 func TestGetActualCost_BackwardCompatibility(t *testing.T) {
 	mockAPI := &mockCostExplorerAPI{
 		GetCostAndUsageFunc: func(ctx context.Context, params *costexplorer.GetCostAndUsageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error) {
-			return &costexplorer.GetCostAndUsageOutput{
-				ResultsByTime: []types.ResultByTime{},
-			}, nil
+			return pricedCostOutput(), nil
 		},
 	}
 
@@ -116,9 +153,7 @@ func TestGetActualCost_BackwardCompatibility(t *testing.T) {
 func TestGetActualCost_MatchingIdentifiers(t *testing.T) {
 	mockAPI := &mockCostExplorerAPI{
 		GetCostAndUsageFunc: func(ctx context.Context, params *costexplorer.GetCostAndUsageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error) {
-			return &costexplorer.GetCostAndUsageOutput{
-				ResultsByTime: []types.ResultByTime{},
-			}, nil
+			return pricedCostOutput(), nil
 		},
 	}
 
@@ -146,9 +181,7 @@ func TestGetActualCost_MatchingIdentifiers(t *testing.T) {
 func TestGetActualCost_MismatchIdentifiers(t *testing.T) {
 	mockAPI := &mockCostExplorerAPI{
 		GetCostAndUsageFunc: func(ctx context.Context, params *costexplorer.GetCostAndUsageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error) {
-			return &costexplorer.GetCostAndUsageOutput{
-				ResultsByTime: []types.ResultByTime{},
-			}, nil
+			return pricedCostOutput(), nil
 		},
 	}
 
@@ -180,9 +213,7 @@ func TestGetActualCost_MismatchIdentifiers(t *testing.T) {
 func TestGetActualCost_MalformedArn(t *testing.T) {
 	mockAPI := &mockCostExplorerAPI{
 		GetCostAndUsageFunc: func(ctx context.Context, params *costexplorer.GetCostAndUsageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error) {
-			return &costexplorer.GetCostAndUsageOutput{
-				ResultsByTime: []types.ResultByTime{},
-			}, nil
+			return pricedCostOutput(), nil
 		},
 	}
 
