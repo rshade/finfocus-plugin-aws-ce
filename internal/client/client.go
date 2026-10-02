@@ -106,7 +106,9 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 		// with STS would recurse.
 		stsClient := sts.NewFromConfig(awsCfg)
 		ceCfg = awsCfg.Copy()
-		ceCfg.Credentials = stscreds.NewAssumeRoleProvider(stsClient, cfg.RoleARN)
+		ceCfg.Credentials = aws.NewCredentialsCache(
+			stscreds.NewAssumeRoleProvider(stsClient, cfg.RoleARN),
+		)
 	}
 
 	return &Client{

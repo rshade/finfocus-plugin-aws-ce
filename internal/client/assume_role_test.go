@@ -21,6 +21,8 @@ func TestNewClient_RoleARNAssumeRoleLoopback(t *testing.T) {
 
 	var mu sync.Mutex
 	var bodies []string
+	var costCalls int
+	expires := time.Now().UTC().Add(2 * time.Hour).Format(time.RFC3339)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host, _, err := net.SplitHostPort(r.Host)
 		if err != nil {
@@ -41,7 +43,34 @@ func TestNewClient_RoleARNAssumeRoleLoopback(t *testing.T) {
 		mu.Lock()
 		bodies = append(bodies, raw)
 		mu.Unlock()
-		http.Error(w, "not a cost response", http.StatusBadRequest)
+
+		values, _ := url.ParseQuery(raw)
+		if values.Get("Action") == "AssumeRole" {
+			w.Header().Set("Content-Type", "text/xml")
+			_, _ = io.WriteString(w, `<AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">
+  <AssumeRoleResult>
+    <Credentials>
+      <AccessKeyId>ASIACE16TEMP</AccessKeyId>
+      <SecretAccessKey>ce16-temp-secret</SecretAccessKey>
+      <SessionToken>ce16-temp-session</SessionToken>
+      <Expiration>`+expires+`</Expiration>
+    </Credentials>
+  </AssumeRoleResult>
+  <ResponseMetadata><RequestId>ce16-assume</RequestId></ResponseMetadata>
+</AssumeRoleResponse>`)
+			return
+		}
+
+		mu.Lock()
+		costCalls++
+		page := costCalls
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		token := ""
+		if page == 1 {
+			token = `,"NextPageToken":"page-2"`
+		}
+		_, _ = io.WriteString(w, `{"ResultsByTime":[{"Estimated":false,"TimePeriod":{"Start":"2026-09-01","End":"2026-09-02"},"Groups":[{"Keys":["AmazonS3"],"Metrics":{"UnblendedCost":{"Amount":"1.00","Unit":"USD"}}}]}]`+token+`}`)
 	})
 
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
@@ -97,19 +126,23 @@ func TestNewClient_RoleARNAssumeRoleLoopback(t *testing.T) {
 
 	mu.Lock()
 	seen := append([]string(nil), bodies...)
+	pages := costCalls
 	mu.Unlock()
 
-	var found bool
+	assumeRole := 0
 	for _, body := range seen {
 		values, parseErr := url.ParseQuery(body)
 		if parseErr != nil {
 			continue
 		}
 		if values.Get("Action") == "AssumeRole" && values.Get("RoleArn") == roleARN {
-			found = true
+			assumeRole++
 		}
 	}
-	if !found {
-		t.Fatalf("no AssumeRole for %s on loopback; costErr=%v bodies=%q", roleARN, costErr, seen)
+	if pages < 2 {
+		t.Fatalf("cost pages = %d, want at least 2; costErr=%v bodies=%d", pages, costErr, len(seen))
+	}
+	if assumeRole != 1 {
+		t.Fatalf("AssumeRole calls = %d, want 1; costErr=%v", assumeRole, costErr)
 	}
 }

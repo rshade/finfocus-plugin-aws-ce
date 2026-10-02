@@ -247,6 +247,10 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 		clientCosts, err = ce.GetCost(ctx, nil, []string{"SERVICE"}, startTime, endTime, "DAILY")
 	}
 	if err != nil {
+		if msg, ok := perRequestAWSFailure(perRequest, err); ok {
+			logger.Error().Msg(msg)
+			return nil, status.Error(codes.Internal, msg)
+		}
 		logger.Error().Err(err).Msg("Failed to retrieve costs from AWS")
 		return nil, mapCostError(resourceID, err)
 	}
@@ -447,7 +451,7 @@ func (c *Calculator) GetServiceActualCost(ctx context.Context, serviceName strin
 	done := pluginsdk.LogOperation(c.logger, "GetServiceActualCost")
 	defer done()
 
-	ce, _, err := c.clientForCall(ctx, c.logger)
+	ce, perRequest, err := c.clientForCall(ctx, c.logger)
 	if err != nil {
 		if _, ok := status.FromError(err); ok {
 			return 0, "", err
@@ -464,6 +468,10 @@ func (c *Calculator) GetServiceActualCost(ctx context.Context, serviceName strin
 	// Group by UsageType to mimic previous GetServiceCost behavior
 	costs, err := ce.GetCost(ctx, filter, []string{"USAGE_TYPE"}, startTime, endTime, "DAILY")
 	if err != nil {
+		if msg, ok := perRequestAWSFailure(perRequest, err); ok {
+			c.logger.Error().Str("service", serviceName).Msg(msg)
+			return 0, "", errors.New(msg)
+		}
 		c.logger.Error().Err(err).Str("service", serviceName).Msg("Failed to get service costs")
 		return 0, "", fmt.Errorf("retrieving service costs: %w", err)
 	}
@@ -486,7 +494,7 @@ func (c *Calculator) GetAccountActualCost(ctx context.Context, startTime, endTim
 	done := pluginsdk.LogOperation(c.logger, "GetAccountActualCost")
 	defer done()
 
-	ce, _, err := c.clientForCall(ctx, c.logger)
+	ce, perRequest, err := c.clientForCall(ctx, c.logger)
 	if err != nil {
 		if _, ok := status.FromError(err); ok {
 			return 0, "", err
@@ -497,6 +505,10 @@ func (c *Calculator) GetAccountActualCost(ctx context.Context, startTime, endTim
 	// Account cost typically aggregates by Service
 	costs, err := ce.GetCost(ctx, nil, []string{"SERVICE"}, startTime, endTime, "DAILY")
 	if err != nil {
+		if msg, ok := perRequestAWSFailure(perRequest, err); ok {
+			c.logger.Error().Msg(msg)
+			return 0, "", errors.New(msg)
+		}
 		c.logger.Error().Err(err).Msg("Failed to get account costs")
 		return 0, "", fmt.Errorf("retrieving account costs: %w", err)
 	}

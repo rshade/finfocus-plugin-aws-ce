@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/aws/smithy-go"
 	"github.com/rs/zerolog"
 	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
 	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
@@ -53,6 +54,24 @@ func (c *Calculator) clientForCall(ctx context.Context, logger zerolog.Logger) (
 
 func invalidCredentials(err error) error {
 	return statusWithDetail(codes.InvalidArgument, err.Error(), pbc.ErrorCode_ERROR_CODE_INVALID_CREDENTIALS)
+}
+
+// perRequestAWSFailure is the status and log text for a per-request AWS call.
+// It uses smithy.APIError.ErrorCode only. Error and ErrorMessage can contain
+// the role ARN, so neither is read.
+func perRequestAWSFailure(perRequest bool, err error) (string, bool) {
+	if !perRequest || err == nil {
+		return "", false
+	}
+	var api smithy.APIError
+	if !errors.As(err, &api) {
+		return "", false
+	}
+	code := api.ErrorCode()
+	if code == "" {
+		return "retrieving costs failed", true
+	}
+	return "retrieving costs failed: " + code, true
 }
 
 func configFromCredentials(creds pluginsdk.Credentials) (client.Config, error) {
