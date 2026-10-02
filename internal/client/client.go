@@ -58,6 +58,8 @@ var (
 	ErrNoCostData = errors.New("no cost data")
 	// ErrInvalidTimeRange is returned when the end instant is not after the start.
 	ErrInvalidTimeRange = errors.New("start must be before end")
+	// ErrPageCap is returned when Cost Explorer still has a NextPageToken after 100 pages.
+	ErrPageCap = errors.New("cost explorer results exceed 100 pages")
 )
 
 type staticCredentials struct {
@@ -395,14 +397,14 @@ func (c *Client) collectCosts(ctx context.Context, fetch func(context.Context, *
 		}
 		all = append(all, rows...)
 		if next == nil || *next == "" {
-			break
+			if len(all) == 0 {
+				return nil, ErrNoCostData
+			}
+			return all, nil
 		}
 		token = next
 	}
-	if len(all) == 0 {
-		return nil, ErrNoCostData
-	}
-	return all, nil
+	return nil, fmt.Errorf("%w; NextPageToken still set", ErrPageCap)
 }
 
 // isRetryableError checks if an error should trigger a retry.

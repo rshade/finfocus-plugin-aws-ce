@@ -26,6 +26,7 @@ type DateRange struct {
 // CostEntry represents a single cost data point.
 type CostEntry struct {
 	Timestamp        time.Time         `json:"timestamp"`
+	PeriodEnd        time.Time         `json:"period_end,omitempty"`
 	Amount           float64           `json:"amount"` // Single float64 conversion of the decimal sum
 	AmountDecimal    string            `json:"amount_decimal,omitempty"`
 	Currency         string            `json:"currency"`

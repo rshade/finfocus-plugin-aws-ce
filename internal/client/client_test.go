@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -330,4 +331,45 @@ type mockError struct {
 
 func (e *mockError) Error() string {
 	return e.msg
+}
+
+func TestClient_GetCost_PageCap(t *testing.T) {
+	calls := 0
+	mockAPI := &mockCostExplorerAPI{
+		getCostAndUsageFunc: func(ctx context.Context, params *costexplorer.GetCostAndUsageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error) {
+			calls++
+			return &costexplorer.GetCostAndUsageOutput{
+				NextPageToken: aws.String("page-101"),
+				ResultsByTime: []types.ResultByTime{
+					{
+						TimePeriod: &types.DateInterval{
+							Start: aws.String("2026-09-01"),
+							End:   aws.String("2026-09-02"),
+						},
+						Groups: []types.Group{
+							{
+								Keys: []string{"Amazon Simple Storage Service"},
+								Metrics: map[string]types.MetricValue{
+									"UnblendedCost": {Amount: aws.String("1.00"), Unit: aws.String("USD")},
+								},
+							},
+						},
+					},
+				},
+			}, nil
+		},
+	}
+	ce := NewClientWithAPI(mockAPI, "us-east-1")
+	start := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC)
+	results, err := ce.GetCost(context.Background(), nil, []string{"SERVICE"}, start, end, "DAILY")
+	if !errors.Is(err, ErrPageCap) {
+		t.Fatalf("page cap error = %v", err)
+	}
+	if results != nil {
+		t.Fatalf("page cap returned a success total of %d rows", len(results))
+	}
+	if calls != 100 {
+		t.Fatalf("pages fetched = %d, want 100 before the 101st token is refused", calls)
+	}
 }

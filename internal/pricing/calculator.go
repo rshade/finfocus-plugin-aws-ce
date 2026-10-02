@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -176,15 +177,33 @@ type costQueryPlan struct {
 	cacheID       string
 }
 
+// ec2InstanceIDPattern is an EC2 instance id: 8 to 17 lowercase hex characters.
+var ec2InstanceIDPattern = regexp.MustCompile(`^i-[0-9a-f]{8,17}$`)
+
 func (c *Calculator) planCostQuery(req *pbc.GetActualCostRequest) (costQueryPlan, error) {
-	plan := costQueryPlan{cacheID: req.GetResourceId()}
+	resourceID := req.GetResourceId()
+	plan := costQueryPlan{cacheID: resourceID}
+	if id, ok := ec2InstanceID(resourceID); ok {
+		plan.resourceLevel = true
+		plan.resourceID = id
+		plan.cacheID = id
+	}
 	arn := req.GetArn()
 	if arn == "" {
 		return plan, nil
 	}
 	parsed, err := ParseARN(arn)
 	if err != nil {
-		c.logger.Warn().Err(err).Str("arn", arn).Msg("Malformed ARN provided; falling back to ResourceId")
+		if resourceID == "" {
+			return costQueryPlan{}, status.Error(codes.InvalidArgument, "malformed ARN and empty resource id")
+		}
+		if plan.resourceLevel {
+			c.logger.Warn().Err(err).Str("arn", arn).Str("resource_id", plan.resourceID).
+				Msg("Malformed ARN; using ResourceId as the EC2 instance id")
+		} else {
+			c.logger.Warn().Err(err).Str("arn", arn).Str("resource_id", resourceID).
+				Msg("Malformed ARN; ResourceId is not an EC2 instance id, querying service totals")
+		}
 		return plan, nil
 	}
 	if parsed.Service != "ec2" {
@@ -194,9 +213,9 @@ func (c *Calculator) planCostQuery(req *pbc.GetActualCostRequest) (costQueryPlan
 	if !ok {
 		return costQueryPlan{}, status.Errorf(codes.InvalidArgument, "resource-level cost is not available for service ec2 resource %s", parsed.Resource)
 	}
-	if req.GetResourceId() != "" && req.GetResourceId() != instanceID && !strings.HasSuffix(parsed.Resource, req.GetResourceId()) {
+	if resourceID != "" && resourceID != instanceID && !strings.HasSuffix(parsed.Resource, resourceID) {
 		c.logger.Warn().
-			Str("resource_id", req.GetResourceId()).
+			Str("resource_id", resourceID).
 			Str("arn_resource", parsed.Resource).
 			Msg("Identifier mismatch: ResourceId does not match ARN resource component. Using ARN as source of truth.")
 	}
@@ -209,7 +228,7 @@ func (c *Calculator) planCostQuery(req *pbc.GetActualCostRequest) (costQueryPlan
 
 func ec2InstanceID(resource string) (string, bool) {
 	resource = strings.TrimPrefix(resource, "instance/")
-	if strings.HasPrefix(resource, "i-") && !strings.ContainsAny(resource, "/:") {
+	if ec2InstanceIDPattern.MatchString(resource) {
 		return resource, true
 	}
 	return "", false

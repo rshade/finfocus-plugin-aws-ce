@@ -102,6 +102,7 @@ func aggregateCosts(rows []client.CostResult) ([]CostEntry, error) {
 		if !ok {
 			a = &acc{entry: CostEntry{
 				Timestamp:        row.StartDate.UTC(),
+				PeriodEnd:        row.EndDate.UTC(),
 				Currency:         row.Currency,
 				Service:          key,
 				AccountID:        row.AccountID,
@@ -120,6 +121,9 @@ func aggregateCosts(rows []client.CostResult) ([]CostEntry, error) {
 		}
 		if row.StartDate.UTC().Before(a.entry.Timestamp) {
 			a.entry.Timestamp = row.StartDate.UTC()
+		}
+		if end := row.EndDate.UTC(); !end.IsZero() && end.After(a.entry.PeriodEnd) {
+			a.entry.PeriodEnd = end
 		}
 		if row.UsageExact != nil {
 			a.usage = addCost(a.usage, row.UsageExact)
@@ -150,7 +154,10 @@ func aggregateCosts(rows []client.CostResult) ([]CostEntry, error) {
 
 func focusFor(entry CostEntry) *pbc.FocusCostRecord {
 	start := entry.Timestamp.UTC()
-	end := start.Add(24 * time.Hour)
+	end := entry.PeriodEnd.UTC()
+	if !end.After(start) {
+		end = start.Add(24 * time.Hour)
+	}
 	account := entry.AccountID
 	if account == "" {
 		account = "unknown"
