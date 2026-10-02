@@ -65,11 +65,18 @@ func NewCalculator() *Calculator {
 	}
 }
 
+// traceLogger attaches the context trace id once. WithTrace on the returned
+// logger writes trace_id a second time, so a request must not call it again.
+func (c *Calculator) traceLogger(ctx context.Context) zerolog.Logger {
+	return pluginsdk.WithTrace(ctx, c.logger)
+}
+
 // GetPluginInfo returns discovery metadata for this plugin.
 // Capabilities lists actual costs only. Leaving it empty would make the server
 // infer projected cost from GetProjectedCost, which still returns an error.
-func (c *Calculator) GetPluginInfo(context.Context, *pbc.GetPluginInfoRequest) (*pbc.GetPluginInfoResponse, error) {
-	done := pluginsdk.LogOperation(c.logger, "GetPluginInfo")
+func (c *Calculator) GetPluginInfo(ctx context.Context, _ *pbc.GetPluginInfoRequest) (*pbc.GetPluginInfoResponse, error) {
+	logger := c.traceLogger(ctx)
+	done := pluginsdk.LogOperation(logger, "GetPluginInfo")
 	defer done()
 
 	return &pbc.GetPluginInfoResponse{
@@ -98,8 +105,9 @@ func NewCalculatorWithClient(ceClient *client.Client) *Calculator {
 // reason, never a Go error. Server.Supports replaces plugin errors with
 // codes.Internal, which would hide that reason. CapabilitiesEnum is left empty
 // so the server can fill it. Cost Explorer is global, so region is not checked.
-func (c *Calculator) Supports(_ context.Context, req *pbc.SupportsRequest) (*pbc.SupportsResponse, error) {
-	done := pluginsdk.LogOperation(c.logger, "Supports")
+func (c *Calculator) Supports(ctx context.Context, req *pbc.SupportsRequest) (*pbc.SupportsResponse, error) {
+	logger := c.traceLogger(ctx)
+	done := pluginsdk.LogOperation(logger, "Supports")
 	defer done()
 
 	resource := req.GetResource()
@@ -146,14 +154,14 @@ func awsResourceIdentified(resource *pbc.ResourceDescriptor) bool {
 }
 
 // initClient initializes the Cost Explorer client if not already done.
-func (c *Calculator) initClient(ctx context.Context) error {
+func (c *Calculator) initClient(ctx context.Context, logger zerolog.Logger) error {
 	if c.ceClient != nil {
 		return nil
 	}
 
 	ceClient, err := client.NewClient(ctx, client.Config{})
 	if err != nil {
-		c.logger.Error().Err(err).Msg("Failed to initialize Cost Explorer client")
+		logger.Error().Err(err).Msg("Failed to initialize Cost Explorer client")
 		return fmt.Errorf("initializing Cost Explorer client: %w", err)
 	}
 
@@ -179,8 +187,8 @@ func (c *Calculator) GetProjectedCost(_ context.Context, req *pbc.GetProjectedCo
 
 // GetActualCost retrieves actual historical costs from AWS Cost Explorer.
 func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRequest) (*pbc.GetActualCostResponse, error) {
-	// Log operation timing using SDK helper
-	done := pluginsdk.LogOperation(c.logger, "GetActualCost")
+	logger := c.traceLogger(ctx)
+	done := pluginsdk.LogOperation(logger, "GetActualCost")
 	defer done()
 
 	// Validate request using SDK validation helper
@@ -191,8 +199,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 	resourceID := req.GetResourceId()
 	arn := req.GetArn()
 
-	// Contextual logger
-	logEvent := c.logger.Debug().Str("resource_id", resourceID)
+	logEvent := logger.Debug().Str("resource_id", resourceID)
 	if arn != "" {
 		logEvent.Str("arn", arn)
 	}
@@ -204,23 +211,23 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 		return nil, status.Error(codes.InvalidArgument, "start must be before end")
 	}
 
-	plan, err := c.planCostQuery(req)
+	plan, err := c.planCostQuery(logger, req)
 	if err != nil {
 		return nil, err
 	}
 	if err := validateCostLookback(plan, startTime); err != nil {
-		c.logger.Error().Time("start", startTime).Err(err).Msg("Date range exceeds AWS limits")
+		logger.Error().Time("start", startTime).Err(err).Msg("Date range exceeds AWS limits")
 		return nil, err
 	}
 
-	if err := c.initClient(ctx); err != nil {
+	if err := c.initClient(ctx, logger); err != nil {
 		return nil, status.Errorf(codes.Internal, "client initialization failed: %v", err)
 	}
 
 	cacheKey := fmt.Sprintf("cost:%s:%d:%d", plan.cacheID, req.GetStart().GetSeconds(), req.GetEnd().GetSeconds())
 	if c.cache != nil {
 		if results, ok := c.cache.Get(cacheKey); ok {
-			c.logger.Debug().Msg("Cache hit for cost query")
+			logger.Debug().Msg("Cache hit for cost query")
 			return c.buildResponse(results), nil
 		}
 	}
@@ -232,24 +239,24 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 		clientCosts, err = c.ceClient.GetCost(ctx, nil, []string{"SERVICE"}, startTime, endTime, "DAILY")
 	}
 	if err != nil {
-		c.logger.Error().Err(err).Msg("Failed to retrieve costs from AWS")
+		logger.Error().Err(err).Msg("Failed to retrieve costs from AWS")
 		return nil, mapCostError(resourceID, err)
 	}
 
 	costs, err := aggregateCosts(clientCosts)
 	if err != nil {
-		c.logger.Error().Err(err).Msg("Failed to aggregate costs")
+		logger.Error().Err(err).Msg("Failed to aggregate costs")
 		return nil, mapCostError(resourceID, err)
 	}
 	if len(costs) == 0 {
 		return nil, status.Error(codes.NotFound, pluginsdk.NoDataError(resourceID).Error())
 	}
 
-	c.logger.Info().Int("results_count", len(costs)).Msg("Retrieved costs from AWS")
+	logger.Info().Int("results_count", len(costs)).Msg("Retrieved costs from AWS")
 
 	if c.cache != nil {
 		if err := c.cache.Set(cacheKey, costs); err != nil {
-			c.logger.Warn().Err(err).Msg("Failed to cache results")
+			logger.Warn().Err(err).Msg("Failed to cache results")
 		}
 	}
 
@@ -266,7 +273,7 @@ type costQueryPlan struct {
 // ec2InstanceIDPattern is an EC2 instance id: 8 to 17 lowercase hex characters.
 var ec2InstanceIDPattern = regexp.MustCompile(`^i-[0-9a-f]{8,17}$`)
 
-func (c *Calculator) planCostQuery(req *pbc.GetActualCostRequest) (costQueryPlan, error) {
+func (c *Calculator) planCostQuery(logger zerolog.Logger, req *pbc.GetActualCostRequest) (costQueryPlan, error) {
 	resourceID := req.GetResourceId()
 	plan := costQueryPlan{cacheID: resourceID}
 	if id, ok := ec2InstanceID(resourceID); ok {
@@ -284,10 +291,10 @@ func (c *Calculator) planCostQuery(req *pbc.GetActualCostRequest) (costQueryPlan
 			return costQueryPlan{}, status.Error(codes.InvalidArgument, "malformed ARN and empty resource id")
 		}
 		if plan.resourceLevel {
-			c.logger.Warn().Err(err).Str("arn", arn).Str("resource_id", plan.resourceID).
+			logger.Warn().Err(err).Str("arn", arn).Str("resource_id", plan.resourceID).
 				Msg("Malformed ARN; using ResourceId as the EC2 instance id")
 		} else {
-			c.logger.Warn().Err(err).Str("arn", arn).Str("resource_id", resourceID).
+			logger.Warn().Err(err).Str("arn", arn).Str("resource_id", resourceID).
 				Msg("Malformed ARN; ResourceId is not an EC2 instance id, querying service totals")
 		}
 		return plan, nil
@@ -300,7 +307,7 @@ func (c *Calculator) planCostQuery(req *pbc.GetActualCostRequest) (costQueryPlan
 		return costQueryPlan{}, status.Errorf(codes.InvalidArgument, "resource-level cost is not available for service ec2 resource %s", parsed.Resource)
 	}
 	if resourceID != "" && resourceID != instanceID && !strings.HasSuffix(parsed.Resource, resourceID) {
-		c.logger.Warn().
+		logger.Warn().
 			Str("resource_id", resourceID).
 			Str("arn_resource", parsed.Resource).
 			Msg("Identifier mismatch: ResourceId does not match ARN resource component. Using ARN as source of truth.")
@@ -383,7 +390,7 @@ func (c *Calculator) GetServiceActualCost(ctx context.Context, serviceName strin
 	done := pluginsdk.LogOperation(c.logger, "GetServiceActualCost")
 	defer done()
 
-	if err := c.initClient(ctx); err != nil {
+	if err := c.initClient(ctx, c.logger); err != nil {
 		return 0, "", fmt.Errorf("client initialization failed: %w", err)
 	}
 
@@ -418,7 +425,7 @@ func (c *Calculator) GetAccountActualCost(ctx context.Context, startTime, endTim
 	done := pluginsdk.LogOperation(c.logger, "GetAccountActualCost")
 	defer done()
 
-	if err := c.initClient(ctx); err != nil {
+	if err := c.initClient(ctx, c.logger); err != nil {
 		return 0, "", fmt.Errorf("client initialization failed: %w", err)
 	}
 

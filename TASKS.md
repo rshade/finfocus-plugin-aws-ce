@@ -244,6 +244,8 @@ ok      github.com/rshade/finfocus-plugin-aws-ce/test/e2e               0.005s
 
 ### CE-1.4: Implement Trace ID Propagation
 
+**Status:** DONE, `go test -count=1 ./...`, all packages pass (pricing 0.120s); break check: `traceLogger` returned `c.logger` without `WithTrace`, `TestSupports_LogTraceID`, `TestGetPluginInfo_LogTraceID`, `TestGetActualCost_LogTraceID`, and `TestGetActualCost_MalformedARNLogTraceID` failed, then `WithTrace` was restored.
+
 **ID:** CE-1.4  
 **Description:** Extract and log `trace_id` from gRPC metadata to enable distributed tracing. Trace ID should appear in all structured log entries for this request.
 
