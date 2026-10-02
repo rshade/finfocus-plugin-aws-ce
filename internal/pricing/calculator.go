@@ -193,7 +193,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 
 	// Validate request using SDK validation helper
 	if err := pluginsdk.ValidateActualCostRequest(req); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, actualCostRequestError(err)
 	}
 
 	resourceID := req.GetResourceId()
@@ -208,7 +208,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 	startTime := req.GetStart().AsTime().UTC()
 	endTime := req.GetEnd().AsTime().UTC()
 	if !endTime.After(startTime) {
-		return nil, status.Error(codes.InvalidArgument, "start must be before end")
+		return nil, statusWithDetail(codes.InvalidArgument, "start must be before end", pbc.ErrorCode_ERROR_CODE_INVALID_TIME_RANGE)
 	}
 
 	plan, err := c.planCostQuery(logger, req)
@@ -249,7 +249,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 		return nil, mapCostError(resourceID, err)
 	}
 	if len(costs) == 0 {
-		return nil, status.Error(codes.NotFound, pluginsdk.NoDataError(resourceID).Error())
+		return nil, statusWithDetail(codes.NotFound, pluginsdk.NoDataError(resourceID).Error(), pbc.ErrorCode_ERROR_CODE_RESOURCE_NOT_FOUND)
 	}
 
 	logger.Info().Int("results_count", len(costs)).Msg("Retrieved costs from AWS")
@@ -288,7 +288,7 @@ func (c *Calculator) planCostQuery(logger zerolog.Logger, req *pbc.GetActualCost
 	parsed, err := ParseARN(arn)
 	if err != nil {
 		if resourceID == "" {
-			return costQueryPlan{}, status.Error(codes.InvalidArgument, "malformed ARN and empty resource id")
+			return costQueryPlan{}, statusWithDetail(codes.InvalidArgument, "malformed ARN and empty resource id", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
 		}
 		if plan.resourceLevel {
 			logger.Warn().Err(err).Str("arn", arn).Str("resource_id", plan.resourceID).
@@ -300,11 +300,19 @@ func (c *Calculator) planCostQuery(logger zerolog.Logger, req *pbc.GetActualCost
 		return plan, nil
 	}
 	if parsed.Service != "ec2" {
-		return costQueryPlan{}, status.Errorf(codes.InvalidArgument, "resource-level cost is not available for service %s", parsed.Service)
+		return costQueryPlan{}, statusWithDetail(
+			codes.InvalidArgument,
+			fmt.Sprintf("resource-level cost is not available for service %s", parsed.Service),
+			pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE,
+		)
 	}
 	instanceID, ok := ec2InstanceID(parsed.Resource)
 	if !ok {
-		return costQueryPlan{}, status.Errorf(codes.InvalidArgument, "resource-level cost is not available for service ec2 resource %s", parsed.Resource)
+		return costQueryPlan{}, statusWithDetail(
+			codes.InvalidArgument,
+			fmt.Sprintf("resource-level cost is not available for service ec2 resource %s", parsed.Resource),
+			pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE,
+		)
 	}
 	if resourceID != "" && resourceID != instanceID && !strings.HasSuffix(parsed.Resource, resourceID) {
 		logger.Warn().
@@ -331,13 +339,21 @@ func validateCostLookback(plan costQueryPlan, start time.Time) error {
 	now := time.Now().UTC()
 	if plan.resourceLevel {
 		if start.Before(now.AddDate(0, 0, -14)) {
-			return status.Error(codes.InvalidArgument, "resource-level cost data covers the last 14 days only")
+			return statusWithDetail(
+				codes.InvalidArgument,
+				"resource-level cost data covers the last 14 days only",
+				pbc.ErrorCode_ERROR_CODE_INVALID_TIME_RANGE,
+			)
 		}
 		return nil
 	}
 	limit := now.AddDate(0, -14, 0)
 	if start.Before(limit) {
-		return status.Errorf(codes.InvalidArgument, "invalid time range: start time (%s) exceeds 14 months lookback limit", start.Format(time.RFC3339))
+		return statusWithDetail(
+			codes.InvalidArgument,
+			fmt.Sprintf("invalid time range: start time (%s) exceeds 14 months lookback limit", start.Format(time.RFC3339)),
+			pbc.ErrorCode_ERROR_CODE_INVALID_TIME_RANGE,
+		)
 	}
 	return nil
 }
@@ -347,16 +363,49 @@ func mapCostError(resourceID string, err error) error {
 	case err == nil:
 		return nil
 	case errors.Is(err, client.ErrNoCostData):
-		return status.Error(codes.NotFound, pluginsdk.NoDataError(resourceID).Error())
+		return statusWithDetail(
+			codes.NotFound,
+			pluginsdk.NoDataError(resourceID).Error(),
+			pbc.ErrorCode_ERROR_CODE_RESOURCE_NOT_FOUND,
+		)
 	case errors.Is(err, client.ErrMixedCurrency):
+		// No ErrorCode matches mixed currencies. Leave the status without a detail.
 		return status.Error(codes.FailedPrecondition, err.Error())
 	case errors.Is(err, client.ErrAmountMissing), errors.Is(err, client.ErrAmountUnparseable):
 		return status.Error(codes.Internal, err.Error())
 	case errors.Is(err, client.ErrInvalidTimeRange):
-		return status.Error(codes.InvalidArgument, err.Error())
+		return statusWithDetail(codes.InvalidArgument, err.Error(), pbc.ErrorCode_ERROR_CODE_INVALID_TIME_RANGE)
 	default:
 		return status.Error(codes.Internal, err.Error())
 	}
+}
+
+// actualCostRequestError keeps InvalidArgument and attaches a proto code only
+// when the failure is a resource identity or a time range. Other bad input has
+// no matching ErrorCode.
+func actualCostRequestError(err error) error {
+	msg := err.Error()
+	switch {
+	case errors.Is(err, pluginsdk.ErrActualCostResourceIDEmpty):
+		return statusWithDetail(codes.InvalidArgument, msg, pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+	case errors.Is(err, pluginsdk.ErrActualCostTimeRangeInvalid),
+		errors.Is(err, pluginsdk.ErrActualCostStartTimeNil),
+		errors.Is(err, pluginsdk.ErrActualCostEndTimeNil):
+		return statusWithDetail(codes.InvalidArgument, msg, pbc.ErrorCode_ERROR_CODE_INVALID_TIME_RANGE)
+	default:
+		return status.Error(codes.InvalidArgument, msg)
+	}
+}
+
+// statusWithDetail attaches pbc.ErrorDetail without changing the gRPC code or message.
+// WithDetails fails only when the detail type cannot be marshaled; the status is still returned.
+func statusWithDetail(code codes.Code, msg string, errorCode pbc.ErrorCode) error {
+	st := status.New(code, msg)
+	detailed, err := st.WithDetails(&pbc.ErrorDetail{Code: errorCode, Message: msg})
+	if err != nil {
+		return st.Err()
+	}
+	return detailed.Err()
 }
 
 func (c *Calculator) buildResponse(costs []CostEntry) *pbc.GetActualCostResponse {

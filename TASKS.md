@@ -270,6 +270,8 @@ ok      github.com/rshade/finfocus-plugin-aws-ce/test/e2e               0.005s
 
 ### CE-1.5: Use Proto ErrorCode Enum for Standardized Errors
 
+**Status:** DONE, `go test -count=1 ./...`, all packages pass (pricing 0.158s, including TestCEContractFixtures); break check: time-range ErrorDetail set to ERROR_CODE_UNSPECIFIED, TestGetActualCost_ErrorDetails/invalid_time_range failed, then ERROR_CODE_INVALID_TIME_RANGE was restored.
+
 **ID:** CE-1.5  
 **Description:** Replace custom error strings with proto ErrorCode enum values. All errors returned by RPC methods should use the standardized error codes defined in finfocus-spec.
 
