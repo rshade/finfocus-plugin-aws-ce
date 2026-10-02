@@ -701,6 +701,8 @@ mixed currencies as an error, fill `UsageAmount` and its unit from `UsageQuantit
 
 ### CE-6.3: Dates, time zones and the exclusive end
 
+**Status:** DONE, `go test -count=1 ./...`, all packages pass including TestCEContractFixtures; time.Local start format break check failed Pacific/Auckland (`period:2026-09-01..2026-09-02:2` sent 2026-09-02), then UTC was restored.
+
 **ID:** CE-6.3  
 **Description:** `calculator.go:119-120` and `client.go:239-240` format dates in the host's local
 time zone and ignore that the Cost Explorer `End` is exclusive. Use UTC, apply the policy in the
