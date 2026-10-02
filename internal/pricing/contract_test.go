@@ -31,6 +31,7 @@ const (
 	contractCurrencyColumn  = "currency"
 	contractEstimatedColumn = "estimated"
 	contractGroupKeyColumn  = "group_key"
+	contractAmountColumn    = "amount_decimal"
 )
 
 // okPage is a valid Cost Explorer page so request-shape cases can finish the RPC
@@ -485,7 +486,6 @@ func okRow(row contractRow, tc contractCase, resp *pbc.GetActualCostResponse, ca
 	}
 
 	sumGot := new(big.Rat)
-	sumCanon := new(big.Rat)
 	for key, want := range tc.Expect.PerService {
 		res := got[key]
 		if res == nil {
@@ -493,19 +493,18 @@ func okRow(row contractRow, tc contractCase, resp *pbc.GetActualCostResponse, ca
 			verdict = "FAIL"
 			continue
 		}
-		match, precise, bits := floatMatchesDecimal(res.GetCost(), want)
-		if !match {
-			notes = append(notes, fmt.Sprintf("%s cost %v != %s", key, res.GetCost(), want))
+		gotText := resultAmountDecimal(res)
+		gotRat, gok := new(big.Rat).SetString(gotText)
+		wantRat, wok := new(big.Rat).SetString(want)
+		if !gok || !wok || gotRat.Cmp(wantRat) != 0 {
+			notes = append(notes, fmt.Sprintf("%s amount_decimal %q != %s", key, gotText, want))
 			verdict = "FAIL"
-		}
-		sumGot.Add(sumGot, new(big.Rat).SetFloat64(res.GetCost()))
-		r, _ := new(big.Rat).SetString(want)
-		f, _ := r.Float64()
-		sumCanon.Add(sumCanon, new(big.Rat).SetFloat64(f))
-		if !precise {
-			notes = append(notes, fmt.Sprintf("FINDING %s expect %s does not survive float64 bits=%#x", key, want, bits))
-			if verdict == "PASS" {
-				verdict = "FINDING"
+		} else {
+			sumGot.Add(sumGot, gotRat)
+			wire, _ := gotRat.Float64()
+			if math.Float64bits(res.GetCost()) != math.Float64bits(wire) {
+				notes = append(notes, fmt.Sprintf("%s cost bits %#x != %#x", key, math.Float64bits(res.GetCost()), math.Float64bits(wire)))
+				verdict = "FAIL"
 			}
 		}
 		cur := resultCurrency(res)
@@ -521,30 +520,12 @@ func okRow(row contractRow, tc contractCase, resp *pbc.GetActualCostResponse, ca
 
 	if tc.Expect.Total != "" {
 		want, ok := new(big.Rat).SetString(tc.Expect.Total)
-		once, precise := 0.0, false
-		if ok {
-			once, precise = want.Float64()
-		}
-		onceRat := new(big.Rat).SetFloat64(once)
-		switch {
-		case !ok:
-			notes = append(notes, "bad total "+tc.Expect.Total)
-			verdict = "FAIL"
-		case sumGot.Cmp(want) == 0:
-		case sumGot.Cmp(onceRat) == 0 && sumGot.Cmp(sumCanon) == 0:
-			if !precise {
-				notes = append(notes, fmt.Sprintf("FINDING total expect %s does not survive float64 bits=%#x", tc.Expect.Total, math.Float64bits(once)))
-				if verdict == "PASS" {
-					verdict = "FINDING"
-				}
+		if !ok || sumGot.Cmp(want) != 0 {
+			got := ""
+			if sumGot != nil {
+				got = sumGot.FloatString(10)
 			}
-		case sumGot.Cmp(sumCanon) == 0:
-			notes = append(notes, fmt.Sprintf("FINDING total expect %s bits=%#x; sum of per-service float64 bits differs from one conversion of the total", tc.Expect.Total, math.Float64bits(once)))
-			if verdict == "PASS" {
-				verdict = "FINDING"
-			}
-		default:
-			notes = append(notes, fmt.Sprintf("total got %s want %s", sumGot.FloatString(10), tc.Expect.Total))
+			notes = append(notes, fmt.Sprintf("total got %s want %s", got, tc.Expect.Total))
 			verdict = "FAIL"
 		}
 	}
@@ -700,18 +681,12 @@ func usageMatches(tc contractCase, got map[string]*pbc.ActualCostResult) (string
 	return "", false
 }
 
-func floatMatchesDecimal(got float64, expect string) (match bool, precise bool, bits uint64) {
-	r, ok := new(big.Rat).SetString(expect)
-	if !ok {
-		return false, false, 0
+func resultAmountDecimal(res *pbc.ActualCostResult) string {
+	fr := res.GetFocusRecord()
+	if fr == nil {
+		return ""
 	}
-	f, exact := r.Float64()
-	bits = math.Float64bits(f)
-	back := new(big.Rat).SetFloat64(f)
-	precise = exact && back.Cmp(r) == 0
-	gotRat := new(big.Rat).SetFloat64(got)
-	wantRat := new(big.Rat).SetFloat64(f)
-	return gotRat.Cmp(wantRat) == 0, precise, bits
+	return fr.GetExtendedColumns()[contractAmountColumn]
 }
 
 func resultGroupKey(res *pbc.ActualCostResult) string {
@@ -879,6 +854,7 @@ func writeContractResults(rows []contractRow) error {
 		fmt.Fprintf(&b, "| %s | %s | %s | %s |\n", mdCell(row.Case), mdCell(row.Expected), mdCell(row.Actual), mdCell(row.Verdict))
 	}
 	b.WriteString("\n")
+	b.WriteString("ActualCostResult.Cost is float64. The exact decimal is extended_columns[\"amount_decimal\"].\n")
 	return os.WriteFile(path, []byte(b.String()), 0o644)
 }
 

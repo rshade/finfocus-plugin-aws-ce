@@ -27,6 +27,7 @@ type DateRange struct {
 type CostEntry struct {
 	Timestamp        time.Time         `json:"timestamp"`
 	Amount           float64           `json:"amount"` // Single float64 conversion of the decimal sum
+	AmountDecimal    string            `json:"amount_decimal,omitempty"`
 	Currency         string            `json:"currency"`
 	Service          string            `json:"service"`
 	UsageAmount      float64           `json:"usage_amount,omitempty"`

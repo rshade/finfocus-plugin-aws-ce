@@ -657,7 +657,7 @@ first, because its failures decide the order of the rest.*
 
 ### CE-6.1: Contract fixtures gate (run first)
 
-**Status:** DONE, `go test -count=1 ./...`, all packages pass; float64 aggregation break check failed `three_pages_token_chain` then decimal summing was restored.
+**Status:** DONE, `go test -count=1 ./...`, all packages pass; money cases PASS via `amount_decimal`; float64 aggregation break check failed `three_pages_token_chain` then decimal summing was restored.
 
 **ID:** CE-6.1  
 **Description:** `internal/client/testdata/ce-contract/ce-contract.json` holds 26 Cost Explorer

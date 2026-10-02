@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
@@ -20,6 +21,60 @@ func addCost(sum, next *big.Rat) *big.Rat {
 		return new(big.Rat).Set(next)
 	}
 	return new(big.Rat).Add(sum, next)
+}
+
+// ratDecimal is the exact decimal text of r. Cost Explorer amounts are decimal,
+// so the reduced denominator only has factors 2 and 5.
+func ratDecimal(r *big.Rat) string {
+	if r == nil {
+		return ""
+	}
+	n := new(big.Int).Abs(r.Num())
+	d := new(big.Int).Abs(r.Denom())
+	two := big.NewInt(2)
+	five := big.NewInt(5)
+	twos, fives := 0, 0
+	rem := new(big.Int)
+	for rem.Mod(d, two).Sign() == 0 {
+		d.Quo(d, two)
+		twos++
+	}
+	for rem.Mod(d, five).Sign() == 0 {
+		d.Quo(d, five)
+		fives++
+	}
+	if d.Cmp(big.NewInt(1)) != 0 {
+		return r.RatString()
+	}
+	scale := twos
+	if fives > scale {
+		scale = fives
+	}
+	for i := twos; i < scale; i++ {
+		n.Mul(n, two)
+	}
+	for i := fives; i < scale; i++ {
+		n.Mul(n, five)
+	}
+	digits := n.String()
+	var b strings.Builder
+	if r.Sign() < 0 {
+		b.WriteByte('-')
+	}
+	if scale == 0 {
+		b.WriteString(digits)
+		return b.String()
+	}
+	if len(digits) <= scale {
+		b.WriteString("0.")
+		b.WriteString(strings.Repeat("0", scale-len(digits)))
+		b.WriteString(digits)
+		return b.String()
+	}
+	b.WriteString(digits[:len(digits)-scale])
+	b.WriteByte('.')
+	b.WriteString(digits[len(digits)-scale:])
+	return b.String()
 }
 
 func aggregateCosts(rows []client.CostResult) ([]CostEntry, error) {
@@ -81,6 +136,7 @@ func aggregateCosts(rows []client.CostResult) ([]CostEntry, error) {
 	out := make([]CostEntry, 0, len(order))
 	for _, key := range order {
 		a := byKey[key]
+		a.entry.AmountDecimal = ratDecimal(a.cost)
 		cost, _ := a.cost.Float64()
 		a.entry.Amount = cost
 		if a.entry.HasUsage && a.usage != nil {
@@ -121,7 +177,8 @@ func focusFor(entry CostEntry) *pbc.FocusCostRecord {
 		WithFinancials(entry.Amount, entry.Amount, entry.Amount, entry.Currency, "").
 		WithExtension("estimated", estimated).
 		WithExtension("group_key", entry.Service).
-		WithExtension("currency", entry.Currency)
+		WithExtension("currency", entry.Currency).
+		WithExtension("amount_decimal", entry.AmountDecimal)
 	if entry.HasUsage && entry.UsageAmount > 0 {
 		builder = builder.WithUsage(entry.UsageAmount, entry.UsageUnit)
 	}
@@ -129,9 +186,10 @@ func focusFor(entry CostEntry) *pbc.FocusCostRecord {
 	if err != nil {
 		return &pbc.FocusCostRecord{
 			ExtendedColumns: map[string]string{
-				"estimated": estimated,
-				"group_key": entry.Service,
-				"currency":  entry.Currency,
+				"estimated":      estimated,
+				"group_key":      entry.Service,
+				"currency":       entry.Currency,
+				"amount_decimal": entry.AmountDecimal,
 			},
 		}
 	}
