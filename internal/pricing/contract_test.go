@@ -521,11 +521,7 @@ func okRow(row contractRow, tc contractCase, resp *pbc.GetActualCostResponse, ca
 	if tc.Expect.Total != "" {
 		want, ok := new(big.Rat).SetString(tc.Expect.Total)
 		if !ok || sumGot.Cmp(want) != 0 {
-			got := ""
-			if sumGot != nil {
-				got = sumGot.FloatString(10)
-			}
-			notes = append(notes, fmt.Sprintf("total got %s want %s", got, tc.Expect.Total))
+			notes = append(notes, fmt.Sprintf("total got %s want %s", sumGot.FloatString(10), tc.Expect.Total))
 			verdict = "FAIL"
 		}
 	}
