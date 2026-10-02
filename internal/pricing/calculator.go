@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"regexp"
 	"strings"
 	"time"
@@ -446,6 +447,8 @@ func (c *Calculator) buildResponse(costs []CostEntry) *pbc.GetActualCostResponse
 }
 
 // GetServiceActualCost retrieves actual costs for a specific AWS service.
+// The float is one conversion of the decimal sum. A missing amount or mixed
+// currencies is an error, not a zero or a last-currency total.
 func (c *Calculator) GetServiceActualCost(ctx context.Context, serviceName string, startTime, endTime time.Time) (float64, string, error) {
 	// Log operation timing using SDK helper
 	done := pluginsdk.LogOperation(c.logger, "GetServiceActualCost")
@@ -476,19 +479,17 @@ func (c *Calculator) GetServiceActualCost(ctx context.Context, serviceName strin
 		return 0, "", fmt.Errorf("retrieving service costs: %w", err)
 	}
 
-	var totalCost float64
-	currency := "USD"
-	for _, cost := range costs {
-		totalCost += cost.Amount
-		if cost.Currency != "" {
-			currency = cost.Currency
-		}
+	total, currency, err := sumDecimalCosts(costs)
+	if err != nil {
+		c.logger.Error().Err(err).Str("service", serviceName).Msg("Failed to sum service costs")
+		return 0, "", err
 	}
-
-	return totalCost, currency, nil
+	return total, currency, nil
 }
 
 // GetAccountActualCost retrieves total actual costs for the AWS account.
+// The float is one conversion of the decimal sum. A missing amount or mixed
+// currencies is an error, not a zero or a last-currency total.
 func (c *Calculator) GetAccountActualCost(ctx context.Context, startTime, endTime time.Time) (float64, string, error) {
 	// Log operation timing using SDK helper
 	done := pluginsdk.LogOperation(c.logger, "GetAccountActualCost")
@@ -513,14 +514,38 @@ func (c *Calculator) GetAccountActualCost(ctx context.Context, startTime, endTim
 		return 0, "", fmt.Errorf("retrieving account costs: %w", err)
 	}
 
-	var totalCost float64
-	currency := "USD"
-	for _, cost := range costs {
-		totalCost += cost.Amount
-		if cost.Currency != "" {
-			currency = cost.Currency
-		}
+	total, currency, err := sumDecimalCosts(costs)
+	if err != nil {
+		c.logger.Error().Err(err).Msg("Failed to sum account costs")
+		return 0, "", err
 	}
+	return total, currency, nil
+}
 
-	return totalCost, currency, nil
+// sumDecimalCosts adds AmountExact once and converts that rational to float64.
+// A nil amount is an error. Empty currency stays the historical USD default.
+func sumDecimalCosts(rows []client.CostResult) (float64, string, error) {
+	var sum *big.Rat
+	var currency string
+	for _, row := range rows {
+		if row.AmountExact == nil {
+			return 0, "", fmt.Errorf("%w for group %q", client.ErrAmountMissing, row.ServiceName)
+		}
+		if row.Currency != "" {
+			if currency == "" {
+				currency = row.Currency
+			} else if currency != row.Currency {
+				return 0, "", fmt.Errorf("%w: %s and %s", client.ErrMixedCurrency, currency, row.Currency)
+			}
+		}
+		sum = addCost(sum, row.AmountExact)
+	}
+	if currency == "" {
+		currency = "USD"
+	}
+	if sum == nil {
+		return 0, currency, nil
+	}
+	total, _ := sum.Float64()
+	return total, currency, nil
 }

@@ -687,6 +687,8 @@ has none (read the SDK for `BaseEndpoint`). The fixture files are read-only.
 
 ### CE-6.2: Stop silent zeros and panics in the response parser
 
+**Status:** DONE, `go test -count=1 ./...`, all packages pass; ParseFloat break check failed `amount_unparseable` and `precision_small_and_large`, then the decimal parser was restored.
+
 **ID:** CE-6.2  
 **Description:** `client.go:363-365` and `:398-400` drop `Sscanf` errors, so an unparseable amount
 becomes 0, and the amount pointer is dereferenced without a nil check. `calculator.go:270-271` sets
