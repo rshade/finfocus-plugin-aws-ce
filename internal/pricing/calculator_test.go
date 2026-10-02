@@ -55,7 +55,7 @@ func TestGetActualCost_WithArn(t *testing.T) {
 			}, nil
 		},
 	}
-	
+
 	ceClient := client.NewClientWithAPI(mockAPI, "us-east-1")
 	calc := NewCalculatorWithClient(ceClient)
 
@@ -165,11 +165,11 @@ func TestGetActualCost_MismatchIdentifiers(t *testing.T) {
 		End:        end,
 	}
 
-	// This test primarily exercises the code path. 
+	// This test primarily exercises the code path.
 	// Verifying the log message would require hooking the logger, which is complex here.
 	// We assume manual verification or log output inspection during dev.
 	// We verify that it doesn't crash and returns success (using ARN).
-	
+
 	_, err := calc.GetActualCost(context.Background(), req)
 	if err != nil {
 		t.Errorf("GetActualCost failed with mismatched identifiers: %v", err)

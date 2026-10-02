@@ -151,10 +151,10 @@ func TestCalculateDelay(t *testing.T) {
 		minExpected time.Duration
 		maxExpected time.Duration
 	}{
-		{0, 90 * time.Millisecond, 120 * time.Millisecond},   // 100ms * 2^0 * (0.9-1.1 jitter)
-		{1, 180 * time.Millisecond, 240 * time.Millisecond},  // 100ms * 2^1 * (0.9-1.1 jitter)
-		{2, 360 * time.Millisecond, 480 * time.Millisecond},  // 100ms * 2^2 * (0.9-1.1 jitter)
-		{10, maxDelay, maxDelay},                              // Should be capped at maxDelay
+		{0, 90 * time.Millisecond, 120 * time.Millisecond},  // 100ms * 2^0 * (0.9-1.1 jitter)
+		{1, 180 * time.Millisecond, 240 * time.Millisecond}, // 100ms * 2^1 * (0.9-1.1 jitter)
+		{2, 360 * time.Millisecond, 480 * time.Millisecond}, // 100ms * 2^2 * (0.9-1.1 jitter)
+		{10, maxDelay, maxDelay},                            // Should be capped at maxDelay
 	}
 
 	for _, tc := range tests {

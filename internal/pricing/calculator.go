@@ -10,12 +10,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
+	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
+	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
-	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
-	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
 )
 
 // Calculator implements the FinFocus plugin interface for AWS Cost Explorer.
@@ -245,7 +245,7 @@ func (c *Calculator) resolveIdentifier(req *pbc.GetActualCostRequest) string {
 	// parsed.Resource might be "instance/i-12345" or "function:name"
 	// req.ResourceId might be "i-12345"
 	resourceID := req.GetResourceId()
-	
+
 	// Check if the parsed resource ends with the request ResourceId
 	// This handles "instance/i-123" vs "i-123"
 	if !strings.HasSuffix(parsed.Resource, resourceID) {
@@ -261,7 +261,7 @@ func (c *Calculator) resolveIdentifier(req *pbc.GetActualCostRequest) string {
 
 func (c *Calculator) buildResponse(costs []CostEntry) *pbc.GetActualCostResponse {
 	var results []*pbc.ActualCostResult
-	
+
 	for _, cost := range costs {
 		// Create result
 		res := &pbc.ActualCostResult{

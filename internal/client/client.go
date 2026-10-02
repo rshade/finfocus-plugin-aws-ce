@@ -125,9 +125,9 @@ func (c *Client) GetCostForecast(ctx context.Context, filter *types.Expression, 
 			Start: aws.String(startTime.Format("2006-01-02")),
 			End:   aws.String(endTime.Format("2006-01-02")),
 		},
-		Granularity:       types.Granularity(granularity),
-		Metric:            types.MetricUnblendedCost,
-		Filter:            filter,
+		Granularity:             types.Granularity(granularity),
+		Metric:                  types.MetricUnblendedCost,
+		Filter:                  filter,
 		PredictionIntervalLevel: aws.Int32(80), // Default to 80% confidence interval
 	}
 
@@ -282,10 +282,10 @@ func isRetryableError(err error) bool {
 	// Basic check for throttling/rate limiting strings
 	// In production, checking specific error types like types.LimitExceededException is better
 	errMsg := err.Error()
-	return contains(errMsg, "Throttling") || 
-	       contains(errMsg, "RateExceeded") || 
-		   contains(errMsg, "RequestLimitExceeded") ||
-		   contains(errMsg, "LimitExceededException")
+	return contains(errMsg, "Throttling") ||
+		contains(errMsg, "RateExceeded") ||
+		contains(errMsg, "RequestLimitExceeded") ||
+		contains(errMsg, "LimitExceededException")
 }
 
 func contains(s, substr string) bool {
@@ -436,7 +436,7 @@ func (c *Client) GetReservationUtilization(ctx context.Context, startTime, endTi
 		}
 		return out, nil, false
 	})
-	
+
 	return output, err
 }
 

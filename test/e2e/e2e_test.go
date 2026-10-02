@@ -22,15 +22,15 @@ var (
 
 // Feature Toggles - Enable these as features are implemented
 const (
-	FeatureActualCost      = true  // Implemented
-	FeatureForecasting     = false // Issue #25
-	FeatureBudgets         = false // Issue #24
-	FeatureAnomalies       = false // Issue #26
-	FeatureRightsizing     = false // Issue #27
-	FeatureSavingsPlans    = false // Issue #32
-	FeatureReservedInst    = false // Issue #33
-	FeatureEstimateCost    = false // Issue #30
-	FeatureGreenops        = false // Issue #29
+	FeatureActualCost   = true  // Implemented
+	FeatureForecasting  = false // Issue #25
+	FeatureBudgets      = false // Issue #24
+	FeatureAnomalies    = false // Issue #26
+	FeatureRightsizing  = false // Issue #27
+	FeatureSavingsPlans = false // Issue #32
+	FeatureReservedInst = false // Issue #33
+	FeatureEstimateCost = false // Issue #30
+	FeatureGreenops     = false // Issue #29
 )
 
 func TestE2E(t *testing.T) {
@@ -41,7 +41,7 @@ func TestE2E(t *testing.T) {
 	// 1. Setup Plugin Server
 	port := 50055 // Arbitrary test port
 	serverAddr := fmt.Sprintf("127.0.0.1:%d", port)
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -104,7 +104,7 @@ func TestE2E(t *testing.T) {
 // startPluginServer starts the plugin process
 func startPluginServer(t *testing.T, ctx context.Context, port int) func() {
 	var cmd *exec.Cmd
-	
+
 	if *pluginBinary != "" {
 		cmd = exec.CommandContext(ctx, *pluginBinary, "--port", fmt.Sprintf("%d", port))
 	} else {
@@ -112,7 +112,7 @@ func startPluginServer(t *testing.T, ctx context.Context, port int) func() {
 		wd, _ := os.Getwd()
 		projectRoot := filepath.Dir(filepath.Dir(wd)) // assuming test/e2e/e2e_test.go
 		mainPath := filepath.Join(projectRoot, "cmd", "plugin", "main.go")
-		
+
 		cmd = exec.CommandContext(ctx, "go", "run", mainPath, "--port", fmt.Sprintf("%d", port))
 		// Set working dir to project root so it finds .env or other files if needed
 		cmd.Dir = projectRoot
@@ -121,9 +121,9 @@ func startPluginServer(t *testing.T, ctx context.Context, port int) func() {
 	// Capture output for debugging
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	// Set Env vars for testing
-	cmd.Env = append(os.Environ(), 
+	cmd.Env = append(os.Environ(),
 		"finfocus_LOG_LEVEL=debug",
 		"finfocus_TEST_MODE=true",
 	)
@@ -147,7 +147,7 @@ func startPluginServer(t *testing.T, ctx context.Context, port int) func() {
 func testActualCost(t *testing.T, client pbc.CostSourceServiceClient) {
 	ctx := context.Background()
 	now := time.Now()
-	
+
 	// Query last 7 days
 	start := now.AddDate(0, 0, -7)
 	end := now
@@ -182,7 +182,7 @@ func testActualCost(t *testing.T, client pbc.CostSourceServiceClient) {
 func testForecasting(t *testing.T, client pbc.CostSourceServiceClient) {
 	ctx := context.Background()
 	// now := time.Now()
-	
+
 	// Forecast next 30 days
 	// start := now.AddDate(0, 0, 1)
 	// end := now.AddDate(0, 0, 31)
@@ -209,25 +209,25 @@ func testForecasting(t *testing.T, client pbc.CostSourceServiceClient) {
 		t.Error("Received nil response")
 		return
 	}
-	
+
 	t.Logf("Forecasted Cost Per Month: %f %s", resp.CostPerMonth, resp.Currency)
 }
 
 func testBudgets(t *testing.T, client pbc.CostSourceServiceClient) {
 	// Requires RPC definition in newer spec, assume client has it
-	// If method doesn't exist yet in the generated client code in this repo, 
-	// this might fail compile. 
+	// If method doesn't exist yet in the generated client code in this repo,
+	// this might fail compile.
 	// TODO: Uncomment once proto is updated/generated with GetBudgets
-	
+
 	/*
-	ctx := context.Background()
-	req := &pbc.GetBudgetsRequest{}
-	resp, err := client.GetBudgets(ctx, req)
-	if err != nil {
-		t.Errorf("GetBudgets failed: %v", err)
-		return
-	}
-	t.Logf("Budgets Found: %d", len(resp.Budgets))
+		ctx := context.Background()
+		req := &pbc.GetBudgetsRequest{}
+		resp, err := client.GetBudgets(ctx, req)
+		if err != nil {
+			t.Errorf("GetBudgets failed: %v", err)
+			return
+		}
+		t.Logf("Budgets Found: %d", len(resp.Budgets))
 	*/
 	t.Log("GetBudgets test placeholder (proto update required)")
 }
@@ -235,17 +235,17 @@ func testBudgets(t *testing.T, client pbc.CostSourceServiceClient) {
 func testAnomalies(t *testing.T, client pbc.CostSourceServiceClient) {
 	// TODO: Uncomment once proto is updated/generated with GetAnomalies
 	/*
-	ctx := context.Background()
-	req := &pbc.GetAnomaliesRequest{
-		Start: timestamppb.New(time.Now().AddDate(0, 0, -30)),
-		End:   timestamppb.New(time.Now()),
-	}
-	resp, err := client.GetAnomalies(ctx, req)
-	if err != nil {
-		t.Errorf("GetAnomalies failed: %v", err)
-		return
-	}
-	t.Logf("Anomalies Found: %d", len(resp.Anomalies))
+		ctx := context.Background()
+		req := &pbc.GetAnomaliesRequest{
+			Start: timestamppb.New(time.Now().AddDate(0, 0, -30)),
+			End:   timestamppb.New(time.Now()),
+		}
+		resp, err := client.GetAnomalies(ctx, req)
+		if err != nil {
+			t.Errorf("GetAnomalies failed: %v", err)
+			return
+		}
+		t.Logf("Anomalies Found: %d", len(resp.Anomalies))
 	*/
 	t.Log("GetAnomalies test placeholder (proto update required)")
 }
@@ -253,16 +253,16 @@ func testAnomalies(t *testing.T, client pbc.CostSourceServiceClient) {
 func testRecommendations(t *testing.T, client pbc.CostSourceServiceClient) {
 	// TODO: Uncomment once proto is updated/generated with GetRecommendations
 	/*
-	ctx := context.Background()
-	req := &pbc.GetRecommendationsRequest{
-		Category: pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_RIGHTSIZING,
-	}
-	resp, err := client.GetRecommendations(ctx, req)
-	if err != nil {
-		t.Errorf("GetRecommendations failed: %v", err)
-		return
-	}
-	t.Logf("Recommendations Found: %d", len(resp.Recommendations))
+		ctx := context.Background()
+		req := &pbc.GetRecommendationsRequest{
+			Category: pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_RIGHTSIZING,
+		}
+		resp, err := client.GetRecommendations(ctx, req)
+		if err != nil {
+			t.Errorf("GetRecommendations failed: %v", err)
+			return
+		}
+		t.Logf("Recommendations Found: %d", len(resp.Recommendations))
 	*/
 	t.Log("GetRecommendations test placeholder (proto update required)")
 }
@@ -270,22 +270,22 @@ func testRecommendations(t *testing.T, client pbc.CostSourceServiceClient) {
 func testEstimateCost(t *testing.T, client pbc.CostSourceServiceClient) {
 	// TODO: Uncomment once proto is updated/generated with EstimateCost
 	/*
-	ctx := context.Background()
-	req := &pbc.EstimateCostRequest{
-		Resource: &pbc.ResourceDescriptor{
-			ResourceType: "aws:ec2/instance:Instance",
-			Inputs: map[string]string{
-				"instanceType": "t3.micro",
-				"region": "us-east-1",
+		ctx := context.Background()
+		req := &pbc.EstimateCostRequest{
+			Resource: &pbc.ResourceDescriptor{
+				ResourceType: "aws:ec2/instance:Instance",
+				Inputs: map[string]string{
+					"instanceType": "t3.micro",
+					"region": "us-east-1",
+				},
 			},
-		},
-	}
-	resp, err := client.EstimateCost(ctx, req)
-	if err != nil {
-		t.Errorf("EstimateCost failed: %v", err)
-		return
-	}
-	t.Logf("Estimated Cost: %f %s", resp.TotalCost, resp.Currency)
+		}
+		resp, err := client.EstimateCost(ctx, req)
+		if err != nil {
+			t.Errorf("EstimateCost failed: %v", err)
+			return
+		}
+		t.Logf("Estimated Cost: %f %s", resp.TotalCost, resp.Currency)
 	*/
 	t.Log("EstimateCost test placeholder (proto update required)")
 }
