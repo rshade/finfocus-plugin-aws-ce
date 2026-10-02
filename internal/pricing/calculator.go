@@ -26,11 +26,15 @@ type Calculator struct {
 	ceClient *client.Client
 	cache    *CacheManager
 	logger   zerolog.Logger
+	// openClient builds the client for one call that carried credentials.
+	// Nil uses client.NewClient. The result is not stored on ceClient.
+	openClient func(context.Context, client.Config) (*client.Client, error)
 }
 
 var (
-	_ pluginsdk.SupportsProvider   = (*Calculator)(nil)
-	_ pluginsdk.PluginInfoProvider = (*Calculator)(nil)
+	_ pluginsdk.SupportsProvider             = (*Calculator)(nil)
+	_ pluginsdk.PluginInfoProvider           = (*Calculator)(nil)
+	_ pluginsdk.PerRequestCredentialConsumer = (*Calculator)(nil)
 )
 
 const (
@@ -220,12 +224,16 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 		return nil, err
 	}
 
-	if err := c.initClient(ctx, logger); err != nil {
+	ce, perRequest, err := c.clientForCall(ctx, logger)
+	if err != nil {
+		if _, ok := status.FromError(err); ok {
+			return nil, err
+		}
 		return nil, status.Errorf(codes.Internal, "client initialization failed: %v", err)
 	}
 
 	cacheKey := fmt.Sprintf("cost:%s:%d:%d", plan.cacheID, req.GetStart().GetSeconds(), req.GetEnd().GetSeconds())
-	if c.cache != nil {
+	if !perRequest && c.cache != nil {
 		if results, ok := c.cache.Get(cacheKey); ok {
 			logger.Debug().Msg("Cache hit for cost query")
 			return c.buildResponse(results), nil
@@ -234,9 +242,9 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 
 	var clientCosts []client.CostResult
 	if plan.resourceLevel {
-		clientCosts, err = c.ceClient.GetCostWithResources(ctx, plan.resourceID, plan.accountID, startTime, endTime)
+		clientCosts, err = ce.GetCostWithResources(ctx, plan.resourceID, plan.accountID, startTime, endTime)
 	} else {
-		clientCosts, err = c.ceClient.GetCost(ctx, nil, []string{"SERVICE"}, startTime, endTime, "DAILY")
+		clientCosts, err = ce.GetCost(ctx, nil, []string{"SERVICE"}, startTime, endTime, "DAILY")
 	}
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to retrieve costs from AWS")
@@ -254,7 +262,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 
 	logger.Info().Int("results_count", len(costs)).Msg("Retrieved costs from AWS")
 
-	if c.cache != nil {
+	if !perRequest && c.cache != nil {
 		if err := c.cache.Set(cacheKey, costs); err != nil {
 			logger.Warn().Err(err).Msg("Failed to cache results")
 		}
@@ -439,7 +447,11 @@ func (c *Calculator) GetServiceActualCost(ctx context.Context, serviceName strin
 	done := pluginsdk.LogOperation(c.logger, "GetServiceActualCost")
 	defer done()
 
-	if err := c.initClient(ctx, c.logger); err != nil {
+	ce, _, err := c.clientForCall(ctx, c.logger)
+	if err != nil {
+		if _, ok := status.FromError(err); ok {
+			return 0, "", err
+		}
 		return 0, "", fmt.Errorf("client initialization failed: %w", err)
 	}
 
@@ -450,7 +462,7 @@ func (c *Calculator) GetServiceActualCost(ctx context.Context, serviceName strin
 		},
 	}
 	// Group by UsageType to mimic previous GetServiceCost behavior
-	costs, err := c.ceClient.GetCost(ctx, filter, []string{"USAGE_TYPE"}, startTime, endTime, "DAILY")
+	costs, err := ce.GetCost(ctx, filter, []string{"USAGE_TYPE"}, startTime, endTime, "DAILY")
 	if err != nil {
 		c.logger.Error().Err(err).Str("service", serviceName).Msg("Failed to get service costs")
 		return 0, "", fmt.Errorf("retrieving service costs: %w", err)
@@ -474,12 +486,16 @@ func (c *Calculator) GetAccountActualCost(ctx context.Context, startTime, endTim
 	done := pluginsdk.LogOperation(c.logger, "GetAccountActualCost")
 	defer done()
 
-	if err := c.initClient(ctx, c.logger); err != nil {
+	ce, _, err := c.clientForCall(ctx, c.logger)
+	if err != nil {
+		if _, ok := status.FromError(err); ok {
+			return 0, "", err
+		}
 		return 0, "", fmt.Errorf("client initialization failed: %w", err)
 	}
 
 	// Account cost typically aggregates by Service
-	costs, err := c.ceClient.GetCost(ctx, nil, []string{"SERVICE"}, startTime, endTime, "DAILY")
+	costs, err := ce.GetCost(ctx, nil, []string{"SERVICE"}, startTime, endTime, "DAILY")
 	if err != nil {
 		c.logger.Error().Err(err).Msg("Failed to get account costs")
 		return 0, "", fmt.Errorf("retrieving account costs: %w", err)

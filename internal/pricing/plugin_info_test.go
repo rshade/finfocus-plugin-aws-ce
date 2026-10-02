@@ -55,6 +55,9 @@ func TestGetPluginInfo_GRPC(t *testing.T) {
 	if got := resp.GetMetadata()["supported_rpcs"]; got != pluginInfoRPCs {
 		t.Fatalf("supported_rpcs = %q, want %q", got, pluginInfoRPCs)
 	}
+	if got := resp.GetMetadata()[pluginsdk.MetadataSupportsPerRequestCredentials]; got != pluginsdk.ValueTrue {
+		t.Fatalf("supports_per_request_credentials = %q, want %q; metadata=%v", got, pluginsdk.ValueTrue, resp.GetMetadata())
+	}
 }
 
 func assertPluginInfo(t *testing.T, resp *pbc.GetPluginInfoResponse) {
@@ -88,5 +91,8 @@ func assertPluginInfo(t *testing.T, resp *pbc.GetPluginInfoResponse) {
 	}
 	if meta["supported_rpcs"] != pluginInfoRPCs {
 		t.Fatalf("supported_rpcs = %q, want %q", meta["supported_rpcs"], pluginInfoRPCs)
+	}
+	if _, ok := meta[pluginsdk.MetadataSupportsPerRequestCredentials]; ok {
+		t.Fatalf("direct GetPluginInfo metadata includes %s: %v", pluginsdk.MetadataSupportsPerRequestCredentials, meta)
 	}
 }

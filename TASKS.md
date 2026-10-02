@@ -149,7 +149,7 @@ ok      github.com/rshade/finfocus-plugin-aws-ce/test/e2e               0.005s
 
 1. **No Supports() customization** - Falls back to BasePlugin default (fixed by CE-1.2)
 2. **No trace_id propagation** - Logging doesn't capture distributed trace IDs ([#46](https://github.com/rshade/finfocus-plugin-aws-ce/issues/46)) (fixed by CE-1.4)
-3. **No per-request credentials** - Only uses default AWS credential chain (CE-1.6, v0.1.0)
+3. **No per-request credentials** - Only uses default AWS credential chain (fixed by CE-1.6)
 4. **No FOCUS 1.4 billing detail** - Missing invoice_detail_id and commitment columns (CE-1.7, post-v0.1.0)
 5. **No Docker build** - Binary only, no container support ([#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42)) (fixed by CE-3.2)
 6. **No CI/CD workflows** - Manual release process ([#48](https://github.com/rshade/finfocus-plugin-aws-ce/issues/48)) (fixed by CE-3.4)
@@ -296,6 +296,8 @@ ok      github.com/rshade/finfocus-plugin-aws-ce/test/e2e               0.005s
 ---
 
 ### CE-1.6: Implement Per-Request Credentials Support (v0.7.0+)
+
+**Status:** DONE, `go test -count=1 ./...`, all packages pass (pricing 0.107s, including TestCEContractFixtures); break check: second per-request call reused the first client, TestGetActualCost_PerRequestCredentials failed (serving clients = 2 and 0 calls), then a distinct client was restored.
 
 **ID:** CE-1.6  
 **Description:** Implement opt-in per-request AWS credentials support via the `PerRequestCredentialConsumer` interface (new in finfocus-spec v0.7.0). This allows hosts to pass AWS credentials (API keys, STS tokens, role ARNs) per-request via gRPC metadata (`x-finfocus-credential-*` headers), enabling multi-account and multi-credential scenarios without environment variables.

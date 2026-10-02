@@ -146,7 +146,8 @@ func TestPluginName(t *testing.T) {
 Configure the plugin using standard FinFocus environment variables:
 
 ```bash
-# Required: AWS credentials (standard AWS SDK chain)
+# AWS credentials. A request that carries none uses the standard AWS SDK chain.
+# The host may pass credentials on the request instead.
 export AWS_REGION=us-east-1
 export AWS_ACCESS_KEY_ID=your-key
 export AWS_SECRET_ACCESS_KEY=your-secret

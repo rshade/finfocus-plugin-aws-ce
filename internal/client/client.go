@@ -11,8 +11,10 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 // CostExplorerAPI defines the interface for AWS Cost Explorer operations.
@@ -45,6 +47,13 @@ type Config struct {
 	AccessKeyID     string
 	SecretAccessKey string
 	SessionToken    string
+	// RoleARN, when set, is assumed for Cost Explorer calls.
+	// STS is built from the static keys, or the default chain when they are empty.
+	// That STS client does not use the assume-role provider.
+	RoleARN string
+	// httpClient, when set, handles AWS calls. Tests use it to reject a dial
+	// that is not loopback. Nil keeps the SDK client.
+	httpClient aws.HTTPClient
 }
 
 var (
@@ -79,6 +88,34 @@ func (s staticCredentials) Retrieve(context.Context) (aws.Credentials, error) {
 
 // NewClient creates a new AWS Cost Explorer client.
 func NewClient(ctx context.Context, cfg Config) (*Client, error) {
+	awsCfg, err := loadAWSConfig(ctx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("loading AWS config: %w", err)
+	}
+	if cfg.BaseEndpoint != "" {
+		awsCfg.BaseEndpoint = aws.String(cfg.BaseEndpoint)
+	}
+	if cfg.httpClient != nil {
+		awsCfg.HTTPClient = cfg.httpClient
+	}
+
+	ceCfg := awsCfg
+	if cfg.RoleARN != "" {
+		// Snapshot the base credentials into the STS client first. The cost
+		// client then uses the assume-role provider. Sharing that provider
+		// with STS would recurse.
+		stsClient := sts.NewFromConfig(awsCfg)
+		ceCfg = awsCfg.Copy()
+		ceCfg.Credentials = stscreds.NewAssumeRoleProvider(stsClient, cfg.RoleARN)
+	}
+
+	return &Client{
+		ceClient: costexplorer.NewFromConfig(ceCfg),
+		region:   ceCfg.Region,
+	}, nil
+}
+
+func loadAWSConfig(ctx context.Context, cfg Config) (aws.Config, error) {
 	var opts []func(*config.LoadOptions) error
 
 	if cfg.Region != "" {
@@ -96,20 +133,7 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 		}))
 	}
 
-	awsCfg, err := config.LoadDefaultConfig(ctx, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("loading AWS config: %w", err)
-	}
-	if cfg.BaseEndpoint != "" {
-		awsCfg.BaseEndpoint = aws.String(cfg.BaseEndpoint)
-	}
-
-	ceClient := costexplorer.NewFromConfig(awsCfg)
-
-	return &Client{
-		ceClient: ceClient,
-		region:   awsCfg.Region,
-	}, nil
+	return config.LoadDefaultConfig(ctx, opts...)
 }
 
 // NewClientWithAPI creates a new client with a custom Cost Explorer API implementation.
