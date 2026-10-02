@@ -216,6 +216,8 @@ ok      github.com/rshade/finfocus-plugin-aws-ce/test/e2e               0.005s
 
 ### CE-1.3: Implement GetPluginInfo() RPC
 
+**Status:** DONE, `go test -count=1 ./...`, all packages pass (pricing 0.137s); break check: GetPluginInfo name set to not-aws-ce, TestGetPluginInfo and TestGetPluginInfo_GRPC failed, then the name was restored.
+
 **ID:** CE-1.3  
 **Description:** Add `GetPluginInfo()` method to Calculator to return plugin metadata (name, version, supported providers, supported RPCs).
 

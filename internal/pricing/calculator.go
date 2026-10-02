@@ -28,11 +28,22 @@ type Calculator struct {
 	logger   zerolog.Logger
 }
 
-var _ pluginsdk.SupportsProvider = (*Calculator)(nil)
+var (
+	_ pluginsdk.SupportsProvider   = (*Calculator)(nil)
+	_ pluginsdk.PluginInfoProvider = (*Calculator)(nil)
+)
+
+const (
+	pluginName    = "aws-ce"
+	pluginVersion = "0.1.0"
+	// specVersion must keep the leading v. pluginsdk.ValidateSpecVersion rejects "0.7.0".
+	specVersion   = "v0.7.0"
+	supportedRPCs = "GetActualCost,Supports,GetPluginInfo,GetProjectedCost"
+)
 
 // NewCalculator creates a new AWS Cost Explorer cost calculator plugin.
 func NewCalculator() *Calculator {
-	base := pluginsdk.NewBasePlugin("aws-ce")
+	base := pluginsdk.NewBasePlugin(pluginName)
 
 	// Configure supported providers
 	providers := []string{"aws"}
@@ -52,6 +63,27 @@ func NewCalculator() *Calculator {
 		cache:      cm,
 		logger:     logger,
 	}
+}
+
+// GetPluginInfo returns discovery metadata for this plugin.
+// Capabilities lists actual costs only. Leaving it empty would make the server
+// infer projected cost from GetProjectedCost, which still returns an error.
+func (c *Calculator) GetPluginInfo(context.Context, *pbc.GetPluginInfoRequest) (*pbc.GetPluginInfoResponse, error) {
+	done := pluginsdk.LogOperation(c.logger, "GetPluginInfo")
+	defer done()
+
+	return &pbc.GetPluginInfoResponse{
+		Name:        pluginName,
+		Version:     pluginVersion,
+		SpecVersion: specVersion,
+		Providers:   []string{"aws"},
+		Metadata: map[string]string{
+			"supported_rpcs": supportedRPCs,
+		},
+		Capabilities: []pbc.PluginCapability{
+			pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS,
+		},
+	}, nil
 }
 
 // NewCalculatorWithClient creates a calculator with a pre-configured client.
