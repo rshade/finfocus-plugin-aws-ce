@@ -760,6 +760,8 @@ settings fail at start with a clear message.
 
 ### CE-6.7: Per-resource cost the way Cost Explorer really does it
 
+**Status:** DONE, `go test -count=1 ./...`, all packages pass including TestCEContractFixtures (pricing 0.191s); break check sent bare i-0abc123def4567890 to GetCostAndUsage, TestPerResourceCostClassification/bare_i-0abc123def4567890 failed, then GetCostAndUsageWithResources was restored.
+
 **ID:** CE-6.7  
 **Description:** Per-resource cost needs `GetCostAndUsageWithResources` and the `RESOURCE_ID`
 dimension, not `GetCostAndUsage`. Switch resource-level requests to it, map an ARN to the resource

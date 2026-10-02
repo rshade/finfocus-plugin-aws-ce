@@ -8,22 +8,33 @@ This plugin provides cost calculation capabilities for aws resources in FinFocus
 
 **Supported Providers:** aws
 
+## Actual cost
+
+An EC2 instance id (`i-` plus 8 to 17 lowercase hex characters), from an instance ARN or a bare resource id, is queried with `GetCostAndUsageWithResources` and `RESOURCE_ID` set to that id, never the full ARN. Other ids, including `contract-*`, stay on unfiltered `GetCostAndUsage` grouped by service. Resource-level data covers the last 14 days and needs the Cost Explorer resource-level opt-in. A non-EC2 ARN returns an error instead of a guessed id.
+
+Rows labelled "No resource ID" are not a service total.
+
+`GetActualCostRequest.tags` are ignored in v0.1.0.
+
 ## Installation
 
 ### From Source
 
 1. Clone the repository:
+
    ```bash
    git clone <repository-url>
    cd aws-ce
    ```
 
 2. Build the plugin:
+
    ```bash
    make build
    ```
 
 3. Install to local plugin registry:
+
    ```bash
    make install
    ```
