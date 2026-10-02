@@ -195,6 +195,65 @@ func TestCommitmentLineMapsToFocusRecord(t *testing.T) {
 			t.Fatalf("group keys %q %q", records[0].GetExtendedColumns()["group_key"], records[1].GetExtendedColumns()["group_key"])
 		}
 	})
+
+	t.Run("zero_usage_reservation", func(t *testing.T) {
+		rec, _ := oneCommitmentRecord(t, []string{"SERVICE", "RESERVATION_ID"}, []string{"AmazonEC2", reservationKey}, commitmentMetrics("2.50", "3.00", "0"))
+		assertFocusAmount(t, rec, "2.50")
+		if rec.GetCommitmentDiscountId() != reservationKey {
+			t.Fatalf("id = %q", rec.GetCommitmentDiscountId())
+		}
+		if rec.GetCommitmentDiscountType() != "Reserved Instance" {
+			t.Fatalf("type = %q", rec.GetCommitmentDiscountType())
+		}
+		if _, ok := rec.GetExtendedColumns()["reservation_id"]; ok {
+			t.Fatalf("reservation_id = %q", rec.GetExtendedColumns()["reservation_id"])
+		}
+		if err := pluginsdk.ValidateFocusRecord(rec); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("reservation_only", func(t *testing.T) {
+		rec, _ := oneCommitmentRecord(t, []string{"RESERVATION_ID"}, []string{reservationKey}, commitmentMetrics("2.50", "3.00", ""))
+		assertFocusAmount(t, rec, "2.50")
+		if rec.GetCommitmentDiscountId() != reservationKey {
+			t.Fatalf("id = %q", rec.GetCommitmentDiscountId())
+		}
+		if rec.GetCommitmentDiscountType() != "Reserved Instance" {
+			t.Fatalf("type = %q", rec.GetCommitmentDiscountType())
+		}
+		if rec.GetServiceName() != "unknown" {
+			t.Fatalf("service = %q", rec.GetServiceName())
+		}
+		if rec.GetServiceName() == reservationKey {
+			t.Fatal("service name is the reservation ARN")
+		}
+		if rec.GetExtendedColumns()["group_key"] != "" {
+			t.Fatalf("group_key = %q", rec.GetExtendedColumns()["group_key"])
+		}
+		if err := pluginsdk.ValidateFocusRecord(rec); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("resource_and_reservation", func(t *testing.T) {
+		_, records, err := commitmentRows(t, []string{"RESOURCE_ID", "RESERVATION_ID"}, []types.Group{
+			{Keys: []string{"i-0abc", reservationKey}, Metrics: commitmentMetrics("2.50", "3.00", "")},
+			{Keys: []string{"i-0def", reservationKey}, Metrics: commitmentMetrics("4.00", "5.00", "")},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(records) != 2 {
+			t.Fatalf("records = %d", len(records))
+		}
+		if records[0].GetCommitmentDiscountId() != reservationKey || records[1].GetCommitmentDiscountId() != reservationKey {
+			t.Fatalf("ids %q %q", records[0].GetCommitmentDiscountId(), records[1].GetCommitmentDiscountId())
+		}
+		if records[0].GetExtendedColumns()["group_key"] != "i-0abc" || records[1].GetExtendedColumns()["group_key"] != "i-0def" {
+			t.Fatalf("group keys %q %q", records[0].GetExtendedColumns()["group_key"], records[1].GetExtendedColumns()["group_key"])
+		}
+	})
 }
 
 func TestGetActualCost_CommitmentFieldsUnset(t *testing.T) {

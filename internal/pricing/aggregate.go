@@ -172,11 +172,13 @@ func focusFor(entry CostEntry) *pbc.FocusCostRecord {
 	if account == "" {
 		account = "unknown"
 	}
+	// A zero UsageQuantity is not a usage charge. FR-003 keys off this category.
+	usageCharge := entry.HasUsage && entry.UsageAmount > 0
 	category := pbc.FocusChargeCategory_FOCUS_CHARGE_CATEGORY_ADJUSTMENT
 	switch {
 	case entry.Amount < 0:
 		category = pbc.FocusChargeCategory_FOCUS_CHARGE_CATEGORY_CREDIT
-	case entry.HasUsage && entry.UsageAmount > 0:
+	case usageCharge:
 		category = pbc.FocusChargeCategory_FOCUS_CHARGE_CATEGORY_USAGE
 	}
 	estimated := strconv.FormatBool(entry.Estimated)
@@ -184,15 +186,19 @@ func focusFor(entry CostEntry) *pbc.FocusCostRecord {
 	if metric == "" {
 		metric = "UnblendedCost"
 	}
-	description := "Unblended cost for " + entry.Service
-	if metric == "AmortizedCost" {
-		description = "Amortized cost for " + entry.Service
-	}
 	ri := entry.ReservationARN
 	sp := entry.SavingsPlanARN
+	serviceName := entry.Service
+	if serviceName == "" && (ri != "" || sp != "") {
+		serviceName = "unknown"
+	}
+	description := "Unblended cost for " + serviceName
+	if metric == "AmortizedCost" {
+		description = "Amortized cost for " + serviceName
+	}
 	commitmentID := ""
 	commitmentType := ""
-	if ((ri != "") != (sp != "")) && !entry.HasUsage {
+	if ((ri != "") != (sp != "")) && !usageCharge {
 		if ri != "" {
 			commitmentID = ri
 			commitmentType = "Reserved Instance"
@@ -201,7 +207,7 @@ func focusFor(entry CostEntry) *pbc.FocusCostRecord {
 			commitmentType = "Savings Plan"
 		}
 	}
-	copyRawIDs := entry.HasUsage || (ri != "" && sp != "")
+	copyRawIDs := usageCharge || (ri != "" && sp != "")
 	builder := pluginsdk.NewFocusRecordBuilder().
 		WithIdentity("AWS", account, account).
 		WithBillingPeriod(start, end, entry.Currency).
@@ -212,7 +218,7 @@ func focusFor(entry CostEntry) *pbc.FocusCostRecord {
 			description,
 			pbc.FocusChargeFrequency_FOCUS_CHARGE_FREQUENCY_USAGE_BASED,
 		).
-		WithService(pbc.FocusServiceCategory_FOCUS_SERVICE_CATEGORY_OTHER, entry.Service).
+		WithService(pbc.FocusServiceCategory_FOCUS_SERVICE_CATEGORY_OTHER, serviceName).
 		WithFinancials(entry.Amount, entry.Amount, entry.Amount, entry.Currency, "").
 		WithExtension("estimated", estimated).
 		WithExtension("group_key", entry.Service).
@@ -234,7 +240,7 @@ func focusFor(entry CostEntry) *pbc.FocusCostRecord {
 			builder = builder.WithExtension("savings_plan_arn", sp)
 		}
 	}
-	if entry.HasUsage && entry.UsageAmount > 0 {
+	if usageCharge {
 		builder = builder.WithUsage(entry.UsageAmount, entry.UsageUnit)
 	}
 	record, err := builder.Build()

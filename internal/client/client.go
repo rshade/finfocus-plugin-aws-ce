@@ -615,8 +615,9 @@ func rowFromMetrics(metrics map[string]types.MetricValue, start, end time.Time, 
 }
 
 // groupIdentity aligns Keys with the requested dimensions, in GroupBy order.
-// An empty or blank commitment key is not an id. A single non-commitment
-// dimension keeps Keys[0] as the group key on ServiceName.
+// An empty or blank commitment key is not an id. Every other dimension,
+// including RESOURCE_ID beside a reservation id, sets ServiceName.
+// A lone commitment dimension leaves ServiceName empty.
 func groupIdentity(dimensions, keys []string) (service, reservation, savings string) {
 	dims := dimensions
 	if len(dims) == 0 {
@@ -644,12 +645,12 @@ func groupIdentity(dimensions, keys []string) (service, reservation, savings str
 			key = keys[i]
 		}
 		switch dim {
-		case dimService:
-			service = key
 		case dimReservationID:
 			reservation = commitmentID(key)
 		case dimSavingsPlanARN:
 			savings = commitmentID(key)
+		default:
+			service = key
 		}
 	}
 	return service, reservation, savings
