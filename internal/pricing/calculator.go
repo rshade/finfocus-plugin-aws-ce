@@ -28,6 +28,8 @@ type Calculator struct {
 	logger   zerolog.Logger
 }
 
+var _ pluginsdk.SupportsProvider = (*Calculator)(nil)
+
 // NewCalculator creates a new AWS Cost Explorer cost calculator plugin.
 func NewCalculator() *Calculator {
 	base := pluginsdk.NewBasePlugin("aws-ce")
@@ -57,6 +59,58 @@ func NewCalculatorWithClient(ceClient *client.Client) *Calculator {
 	calc := NewCalculator()
 	calc.ceClient = ceClient
 	return calc
+}
+
+// Supports reports whether Cost Explorer can answer for the resource.
+// An unsupported provider or an unusable resource returns Supported false and a
+// reason, never a Go error. Server.Supports replaces plugin errors with
+// codes.Internal, which would hide that reason. CapabilitiesEnum is left empty
+// so the server can fill it. Cost Explorer is global, so region is not checked.
+func (c *Calculator) Supports(_ context.Context, req *pbc.SupportsRequest) (*pbc.SupportsResponse, error) {
+	done := pluginsdk.LogOperation(c.logger, "Supports")
+	defer done()
+
+	resource := req.GetResource()
+	if resource == nil {
+		return &pbc.SupportsResponse{
+			Supported: false,
+			Reason:    invalidResourceReason("resource descriptor is required"),
+		}, nil
+	}
+	if resource.GetProvider() != "aws" {
+		return &pbc.SupportsResponse{
+			Supported: false,
+			Reason: fmt.Sprintf(
+				"provider %q is not supported; aws-ce only supports provider \"aws\"",
+				resource.GetProvider(),
+			),
+		}, nil
+	}
+	if awsResourceIdentified(resource) {
+		return &pbc.SupportsResponse{Supported: true}, nil
+	}
+	return &pbc.SupportsResponse{
+		Supported: false,
+		Reason:    invalidResourceReason("aws resource needs a non-empty id or an ARN ParseARN accepts"),
+	}, nil
+}
+
+func invalidResourceReason(detail string) string {
+	return pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE.String() + ": " + detail
+}
+
+// awsResourceIdentified is true when Arn parses or Id is non-empty.
+// A malformed ARN does not reject a resource that still has an Id.
+func awsResourceIdentified(resource *pbc.ResourceDescriptor) bool {
+	if resource.GetId() != "" {
+		return true
+	}
+	arn := resource.GetArn()
+	if arn == "" {
+		return false
+	}
+	_, err := ParseARN(arn)
+	return err == nil
 }
 
 // initClient initializes the Cost Explorer client if not already done.

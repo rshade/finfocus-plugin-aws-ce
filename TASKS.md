@@ -189,6 +189,8 @@ ok      github.com/rshade/finfocus-plugin-aws-ce/test/e2e               0.005s
 
 ### CE-1.2: Implement Supports() RPC with Custom Logic
 
+**Status:** DONE, `go test -count=1 ./...`, all packages pass (pricing 0.128s); break check: Supports returned true for provider gcp, TestSupports/provider_gcp and TestSupports_GRPC failed, then the provider check was restored.
+
 **ID:** CE-1.2  
 **Description:** Add custom `Supports()` method to Calculator to check if a resource is supported by aws-ce. AWS Cost Explorer only supports AWS resources with proper resource IDs or ARNs, so Supports() must validate request data quality.
 
