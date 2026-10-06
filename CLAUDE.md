@@ -113,6 +113,7 @@ testPlugin.TestActualCost(resourceID, from, to, expectError)
 The `pluginsdk` package (`github.com/rshade/finfocus-spec/sdk/go/pluginsdk`) provides standardized helpers that **MUST** be used.
 
 ### 1. Environment Variables (`env.go`)
+
 - **Usage**: Replace manual `os.Getenv` calls.
 - `GetPort()`: `FINFOCUS_PLUGIN_PORT`
 - `GetLogLevel()`: `FINFOCUS_LOG_LEVEL`
@@ -120,29 +121,34 @@ The `pluginsdk` package (`github.com/rshade/finfocus-spec/sdk/go/pluginsdk`) pro
 - `IsTestMode()`: `FINFOCUS_TEST_MODE == "true"`
 
 ### 2. Validation (`validation.go`)
+
 - **Usage**: Call at the start of RPC handlers.
 - `ValidateProjectedCostRequest(req)`
 - `ValidateActualCostRequest(req)`
 - Returns pre-defined errors (e.g., `ErrActualCostTimeRangeInvalid`).
 
 ### 3. FOCUS 1.2 Builder (`focus_builder.go`)
+
 - **Usage**: Constructing `FocusCostRecord`s for `GetActualCost`.
 - `NewFocusRecordBuilder().WithIdentity(...).WithFinancials(...).Build()`
 - Ensures compliance with FinOps FOCUS 1.2 schema.
 
 ### 4. Logging (`logging.go`)
+
 - **Usage**: Structured Zerolog setup.
 - `NewLogWriter()`: Returns writer for `FINFOCUS_LOG_FILE`.
 - `NewPluginLogger(name, version, level, writer)`: Creates standard logger.
 - `LogOperation(logger, "OperationName")`: returns a done function to defer for timing.
 
 ### 5. Server & Flags (`sdk.go`)
+
 - **Usage**: Main entry point.
 - `ParsePortFlag()`: Parses `--port` (call `flag.Parse()` first).
 - `Serve(ctx, config)`: Starts gRPC server.
 - **Interfaces**: Implement `BudgetsProvider` and `RecommendationsProvider` for new features.
 
 ## Active Technologies
+
 - Go 1.25.5 + finfocus-spec v0.5.2+ (requires upstream change), aws-sdk-go-v2 (002-add-arn-spec)
 - N/A (stateless plugin, optional cache) (002-add-arn-spec)
 - Go 1.25.5 + finfocus-spec v0.5.2, aws-sdk-go-v2, zerolog (003-sdk-compliance-refactor)
@@ -150,4 +156,24 @@ The `pluginsdk` package (`github.com/rshade/finfocus-spec/sdk/go/pluginsdk`) pro
 - Go 1.25.5 + finfocus-spec v0.5.2+ (plugin SDK), aws-sdk-go-v2 (Cost Explorer), zerolog (logging) (004-core-cost-e2e)
 
 ## Recent Changes
+
 - 002-add-arn-spec: Added Go 1.25.5 + finfocus-spec v0.5.2+ (requires upstream change), aws-sdk-go-v2
+
+## Release token ownership
+
+Release Please uses the repository secret `RELEASE_PLEASE_TOKEN`. The owner
+creates a fine-grained personal access token restricted to this repository,
+with Contents, Pull requests and Issues read and write, and Metadata read.
+Events created with this token can trigger the release and PR check workflows.
+
+Set an expiration date under the organization's token policy, record that date
+in the owner's secret inventory, and rotate before expiry. To rotate, create a
+replacement with the same repository access and permissions, update the secret
+in repository Settings, then manually run Release Please and check its result.
+Revoke the previous token after the replacement succeeds. An expired token
+must be replaced; a nonempty expired token does not fall back automatically.
+
+Before the first release PR, the owner confirms the secret exists and that a
+manual Release Please run succeeds without missing-token or authentication
+errors. Agents do not read or set the token. Merge the release PR to create a
+plain `vX.Y.Z` tag and release; the release-created event runs goreleaser.

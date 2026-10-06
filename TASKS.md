@@ -1235,6 +1235,8 @@ pkill finfocus-plugin-aws-ce
 
 ### REL-2: Family release workflows
 
+**Status:** DONE, `go test -count=1 ./internal/test && actionlint .github/workflows/*.yml && markdownlint-cli2 CLAUDE.md TASKS.md`, exit 0; break check: docker action in yml and yaml, tag push, removed flag and wrong organization each failed guard, restored.
+
 **ID:** REL-2  
 **Description:** Copy aws-public Release Please and opencost single-binary release workflow, verify action tags, guard banned publishing paths, document the release token.
 
