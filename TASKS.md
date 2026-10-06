@@ -289,7 +289,7 @@ ok      github.com/rshade/finfocus-plugin-aws-ce/test/e2e               0.005s
 
 ### CE-1.1: Upgrade finfocus-spec to v0.7.0 and Go to 1.27.1
 
-**Status:** DONE, `grep -q 'finfocus-spec v0.7.0' go.mod && grep -q '^go 1.27.1' go.mod && go build ./... && go test -count=1 ./...`, already satisfied (go.mod go 1.27.1, finfocus-spec v0.7.0, ax-go v0.7.0 transitive, `go mod tidy` clean, build+tests pass); break check: same grep for v0.9.9 exits 1.
+**Status:** DONE, `grep -q 'finfocus-spec v0.7.5' go.mod && grep -q '^go 1.27.1' go.mod && go build ./... && go test -count=1 ./...`, exit 0; REL-4 supersedes the historical v0.7.0 baseline; break check: grep for v0.9.9 exits 1.
 
 **ID:** CE-1.1
 **Description:** Update `go.mod` to use finfocus-spec v0.7.0 and Go 1.27.1. This unblocks per-request credentials (new `PerRequestCredentialConsumer` interface), FOCUS 1.4 billing columns (`invoice_detail_id`, `commitment_program_eligibility_details`), and ax-go v0.7.0 integration.
@@ -1304,3 +1304,13 @@ unimplemented projected, pricing, and estimate RPCs.
 
 - Both discovery RPCs advertise only actual costs over real gRPC.
 - Supported and unsupported resource responses preserve their reason/decision.
+
+### CE-R.3: Isolate linked-account queries in the cache
+
+**Status:** DONE, `go test -count=1 ./internal/pricing && golangci-lint run ./... && markdownlint-cli2 README.md TASKS.md`, exit 0; break check: removing linked-account key produces caller-b cost10 instead of20; legacy, descriptor, bare and repeated query guard fails.
+
+**ID:** CE-R.3
+
+**Description:** Correct the account-filter cache collision found in the final
+review of REL-4 and CE-6.8. Test legacy and descriptor identities through gRPC
+and the fake Cost Explorer endpoint. Refresh the CE-1.1 verification for REL-4.

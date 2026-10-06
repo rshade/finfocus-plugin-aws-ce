@@ -89,6 +89,8 @@ are not called. Rows labelled "No resource ID" are not a service total.
 Cost Explorer has a **24-hour data lag** or longer. Resource-level data may lag
 up to 48 hours. Missing data returns an explicit error. Recent or estimated
 results are cached for 15 minutes; closed historical results for 24 hours.
+Cache keys include the linked-account filter, so costs from different account
+queries stay separate.
 Each paginated CE request costs $0.01 in real use.
 
 ## Spec compatibility and FOCUS
