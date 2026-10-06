@@ -485,6 +485,8 @@ FOCUS 1.4 adds invoice-level detail tracking. AWS Cost Explorer's `GetCostAndUsa
 
 ### CE-2.1: Add Integration Tests for gRPC Server
 
+**Status:** DONE, `go test -count=1 -v ./test/integration/... && golangci-lint run ./...`, exit 0; break check: forcing Supports false fails the built-process AWS support assertion.
+
 **ID:** CE-2.1  
 **Description:** Add integration tests that start the gRPC server in a subprocess and make live RPC calls. Tests should verify GetActualCost with mocked Cost Explorer responses and trace ID propagation.
 
