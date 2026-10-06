@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 MD060 -->
 
-**Goal:** Release v0.1.0 as a production-ready actual-cost plugin backed by AWS Cost Explorer, with spec compliance, testing and documentation. Docker packaging is deferred in this run.
+**Goal:** Release v0.1.0 as a production-ready actual-cost plugin backed by AWS Cost Explorer, with spec compliance, testing and documentation. Docker support is removed by owner decision (2026-10-06).
 
 **Roadmap:** Phase-by-phase implementation, skipping PR gates until a working v0.1.0 exists.
 
@@ -122,8 +122,8 @@ now provide the configuration guards, copied family workflows, snapshot archives
 and spec v0.7.5. This run makes local commits only; no tag, release or push.
 
 Run 2 scope: REL-1 to REL-4, CE-6.5, CE-6.6, CE-6.10, CE-6.11,
-CE-2.1 to CE-2.3, CE-3.1 and CE-4.3. CE-3.1 Docker remains blocked on the
-excluded CE-3.2 owner decision. CE-3.2 to CE-3.4, CE-4.1, CE-4.2, CE-5.1,
+CE-2.1 to CE-2.3, CE-3.1 and CE-4.3. The owner removed Docker support, so
+CE-3.2 is SKIPPED and CE-3.1 is complete. CE-3.3, CE-3.4, CE-4.1, CE-4.2, CE-5.1,
 CE-1.7 and Phase 7 are deferred with owner PM. Live CE-6.1 and CE-5.1 are
 blocked on credentials. Registry changes in core and release publication are
 outside the write boundary. See the run report's not-delivered register.
@@ -583,10 +583,10 @@ FOCUS 1.4 adds invoice-level detail tracking. AWS Cost Explorer's `GetCostAndUsa
 
 ### CE-3.1: Add Missing Makefile Targets
 
-**Status:** BLOCKED-ON-INPUT, Docker image build depends on excluded CE-3.2 and an owner decision; develop, test-integration, install-local and PHONY recipes verified by `go test -count=1 ./internal/test -run TestMake`; break check: removing test from PHONY skips the recipe and fails the execution guard.
+**Status:** DONE, `go test -count=1 ./internal/test -run TestMake`, exit 0; Docker removed from requirements by owner decision; break check: removing test from PHONY skips its recipe, and reintroducing Docker fails the absence guard.
 
 **ID:** CE-3.1  
-**Description:** Add Makefile targets for development workflows: `develop`, `test-integration`, `docker`, and `install-local`.
+**Description:** Add Makefile targets for development workflows: `develop`, `test-integration`, and `install-local`.
 
 **Files Modified:**
 
@@ -596,7 +596,7 @@ FOCUS 1.4 adds invoice-level detail tracking. AWS Cost Explorer's `GetCostAndUsa
 
 - `make develop` - Installs dependencies and prepares dev environment
 - `make test-integration` - Runs integration tests
-- `make docker` - Builds Docker image
+- Docker target and help entry are absent (owner decision).
 - `make install-local` - Installs binary to `~/.finfocus/plugins/aws-ce/0.1.0/`
 - All targets have help text (visible in `make help`)
 - `make lint` and `make test` still work
@@ -607,35 +607,23 @@ FOCUS 1.4 adds invoice-level detail tracking. AWS Cost Explorer's `GetCostAndUsa
 
 ---
 
-### CE-3.2: Add Docker Support with Multi-Stage Build
+### CE-3.2: Docker support removed
 
-**ID:** CE-3.2  
-**Description:** Create Dockerfile with multi-stage build (build stage with Go toolchain, runtime stage with minimal image). Docker image should be built as `finfocus-plugin-aws-ce:v0.1.0`.
+**Status:** SKIPPED, owner removed Docker support on 2026-10-06; releases publish binary archives and checksums.
 
-**Files Modified:**
+**ID:** CE-3.2
 
-- `Dockerfile` (new file)
-- `.dockerignore` (new file)
-- `Makefile` - Add docker targets
-
-**Acceptance Criteria:**
-
-- Multi-stage Dockerfile (builder + runtime)
-- Base image for runtime: `alpine:latest` or `gcr.io/distroless/base`
-- Binary size < 50MB
-- Docker build succeeds: `docker build -t finfocus-plugin-aws-ce:v0.1.0 .`
-- Container runs and responds to port probe
-- ENV vars passed through correctly (AWS_REGION, etc.)
-
-**Related Issues:**
-
-- [#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42) - Add Docker support with multi-stage build
+**Description:** Docker support is removed from the product and release scope.
+No Dockerfile, container image or Makefile Docker target is provided. Release
+workflow guards continue to reject container publication. Historical issue
+[#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42) remains
+unchanged on GitHub; this local decision does not close it.
 
 ---
 
 ### CE-3.3: Add HTTP Health Endpoint for Container Orchestration
 
-**Correction (2026-10-01):** the SDK already provides a health endpoint (`WebConfig.EnableHealthEndpoint`, served at `/healthz`) and a `HealthChecker` interface. Wire those: do not hand-roll `/health` and `/ready` unless the SDK cannot do what the Dockerfile needs, and say why in the report.
+**Correction (2026-10-01):** the SDK already provides a health endpoint (`WebConfig.EnableHealthEndpoint`, served at `/healthz`) and a `HealthChecker` interface. Wire those: do not hand-roll `/health` and `/ready` unless the SDK cannot meet the deployment requirements, and say why in the report.
 
 **ID:** CE-3.3  
 **Description:** Add optional HTTP health endpoint (e.g., `/healthz`) for Kubernetes/container orchestration liveness probes. Endpoint should verify gRPC server health without requiring gRPC client.
@@ -696,7 +684,7 @@ FOCUS 1.4 adds invoice-level detail tracking. AWS Cost Explorer's `GetCostAndUsa
 **Files Modified:**
 
 - `docs/API.md` (new file) - Proto API reference
-- `docs/DEPLOYMENT.md` (new file) - Docker, Kubernetes, local setup
+- `docs/DEPLOYMENT.md` (new file) - Binary, Kubernetes, local setup
 - `docs/CONFIGURATION.md` (new file) - Env vars, CLI flags, profiles
 - `docs/TROUBLESHOOTING.md` (new file) - Common errors and fixes
 - `README.md` - Update with links to docs
@@ -705,7 +693,7 @@ FOCUS 1.4 adds invoice-level detail tracking. AWS Cost Explorer's `GetCostAndUsa
 
 - Docs cover: installation, configuration, usage, troubleshooting
 - API reference documents all RPC methods and proto messages
-- Deployment guide covers Docker, Kubernetes, local binary
+- Deployment guide covers binary deployment and local setup
 - Configuration guide lists all env vars with defaults and descriptions
 - README updated with quick-start link
 - Docs pass markdownlint (if available)
@@ -1093,7 +1081,7 @@ validates them. Never default to a wildcard with credentials.
 | [#38](https://github.com/rshade/finfocus-plugin-aws-ce/issues/38) | feat: Implement cost anomaly detection via GetRecommendations | enhancement, roadmap/next | Tier B | CE-7.11 |
 | [#40](https://github.com/rshade/finfocus-plugin-aws-ce/issues/40) | feat: Add GetPluginInfo() RPC implementation | enhancement, roadmap/current | **CE-1.3** | ✅ In scope |
 | [#41](https://github.com/rshade/finfocus-plugin-aws-ce/issues/41) | feat: Add Supports() RPC implementation | enhancement, roadmap/current | **CE-1.2** | ✅ In scope |
-| [#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42) | feat: Add Docker support with multi-stage build | enhancement, roadmap/current | **CE-3.2** | Deferred in run 2; PM |
+| [#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42) | feat: Add Docker support with multi-stage build | enhancement, roadmap/current | **CE-3.2** | Removed by owner decision |
 | [#43](https://github.com/rshade/finfocus-plugin-aws-ce/issues/43) | feat: Add HTTP health endpoint for container orchestration | enhancement, roadmap/current | **CE-3.3** | Deferred in run 2; PM |
 | [#44](https://github.com/rshade/finfocus-plugin-aws-ce/issues/44) | docs: Create documentation directory with API and deployment guides | documentation, roadmap/current | **CE-4.1** | Deferred in run 2; PM |
 | [#45](https://github.com/rshade/finfocus-plugin-aws-ce/issues/45) | test: Add integration tests for gRPC server | enhancement, roadmap/current | **CE-2.1** | ✅ In scope |
@@ -1174,7 +1162,7 @@ The toolchain baseline is now in place. Remaining work:
    - API reference, deployment guides, CONTRIBUTING.md
 
 3. **Build & Release (CE-3.x)**
-   - Makefile targets, Docker support, CI/CD optimization
+   - Makefile targets, archive distribution, CI/CD optimization
    - v0.1.0 release with GitHub Actions automation
 
 ### Files Modified in This Session
@@ -1209,13 +1197,11 @@ The toolchain baseline is now in place. Remaining work:
 
 1. **AWS Credentials for Testing:** E2E tests require live AWS credentials (e.g., `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`). Should e2e_test.go be marked with `BLOCKED-ON-CREDENTIALS`?
 
-2. **Docker Registry:** Where should Docker images be published? Docker Hub (`rshade/finfocus-plugin-aws-ce`), GitHub Container Registry (`ghcr.io/rshade/finfocus-plugin-aws-ce`), or ECR?
+2. **Release Strategy:** Should v0.1.0 be released as a single binary (one region) or multi-region binaries like aws-public? aws-ce uses dynamic region from config, so single binary should suffice.
 
-3. **Release Strategy:** Should v0.1.0 be released as a single binary (one region) or multi-region binaries like aws-public? aws-ce uses dynamic region from config, so single binary should suffice.
+3. **Cost Explorer API Costs:** AWS charges ~$0.01 per GetCostAndUsage API call. Should client-side rate limiting or request deduplication be implemented in v0.1.0, or defer to v0.2+?
 
-4. **Cost Explorer API Costs:** AWS charges ~$0.01 per GetCostAndUsage API call. Should client-side rate limiting or request deduplication be implemented in v0.1.0, or defer to v0.2+?
-
-5. **Multi-Account Support:** Does v0.1.0 need to support cross-account Cost Explorer queries, or focus on single-account setup first?
+4. **Multi-Account Support:** Does v0.1.0 need to support cross-account Cost Explorer queries, or focus on single-account setup first?
 
 ---
 
@@ -1228,13 +1214,10 @@ make build
 # Test
 make test
 make test-integration
-make test-e2e  # Requires AWS credentials and PULUMI_CONFIG_PASSPHRASE set
+FINFOCUS_E2E=true go test -count=1 ./test/e2e/...  # Local fake CE endpoint
 
 # Lint
 make lint
-
-# Docker
-docker build -t finfocus-plugin-aws-ce:v0.1.0 .
 
 # Manual smoke test
 ./bin/finfocus-plugin-aws-ce --port 50051 &
@@ -1249,7 +1232,7 @@ pkill finfocus-plugin-aws-ce
 
 - **Spec Migration:** Upgrading finfocus-spec must happen early (CE-1.1) to unblock later features
 - **Testing First:** Integration tests (CE-2.1) should validate all RPC methods before CI/CD setup
-- **Docker Build:** Deferred CE-3.2 owner decision; the release publishes archives only.
+- **Distribution:** Owner removed Docker support; releases publish archives only.
 - **No PR Blocking:** Tasks should be implemented phase-by-phase without PR approval gates
 - **E2E with Core:** Live/core verification is outside this run and blocked on credentials.
 
@@ -1314,3 +1297,12 @@ unimplemented projected, pricing, and estimate RPCs.
 **Description:** Correct the account-filter cache collision found in the final
 review of REL-4 and CE-6.8. Test legacy and descriptor identities through gRPC
 and the fake Cost Explorer endpoint. Refresh the CE-1.1 verification for REL-4.
+
+### CE-R.4: Remove Docker support by owner decision
+
+**Status:** DONE, `go test -count=1 ./internal/test -run TestMake && golangci-lint run ./... && markdownlint-cli2 README.md ROADMAP.md TASKS.md`, exit 0; break check: restoring a Docker recipe makes TestMakeHasNoDockerTarget fail; removed target and help pass.
+
+**ID:** CE-R.4
+
+**Description:** Remove the Docker Makefile target and support plan, verify
+its absence, and complete CE-3.1 under the revised owner requirements.

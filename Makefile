@@ -1,6 +1,6 @@
 # Makefile for aws-ce plugin
 
-.PHONY: help build test test-coverage clean lint install install-local build-debug fmt deps ensure develop vuln lint-md release-check test-integration docker
+.PHONY: help build test test-coverage clean lint install install-local build-debug fmt deps ensure develop vuln lint-md release-check test-integration
 
 # Variables
 PLUGIN_NAME = aws-ce
@@ -23,7 +23,6 @@ help:
 	@echo "  develop   - Fetch Go dependencies and prepare the build directory"
 	@echo "  test-integration - Run subprocess and protocol conformance tests"
 	@echo "  install-local - Install using the manifest version and FINFOCUS_HOME"
-	@echo "  docker    - Blocked on the CE-3.2 owner decision"
 	@echo "  help      - Show this help"
 
 # Build the plugin binary
@@ -66,11 +65,6 @@ install-local: build
 	@mkdir -p "$(INSTALL_DIR)"
 	@cp "$(BUILD_DIR)/$(BINARY_NAME)" "$(INSTALL_DIR)/"
 	@echo "Plugin installed to $(INSTALL_DIR)/"
-
-# Docker packaging is excluded until the owner resolves CE-3.2.
-docker:
-	@echo "CE-3.2: Docker image builds need an owner decision; releases publish archives only." >&2
-	@exit 1
 
 # Run real process and protocol integration tests.
 test-integration:

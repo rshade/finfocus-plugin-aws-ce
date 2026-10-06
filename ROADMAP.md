@@ -26,7 +26,7 @@ This roadmap outlines the development path for `finfocus-plugin-aws-ce`, priorit
 Release plumbing, actual-cost behavior, integration and conformance tests are
 verified offline. Live CE-6.1 and CE-5.1 remain blocked on credentials.
 The whole-repository Markdown check retains frozen-history errors; vulnerability
-scanning retains the known gRPC finding. Docker packaging remains deferred.
+scanning retains the known gRPC finding. Docker support is removed by owner decision.
 Local delivery labels do not close GitHub issues.
 
 ## Current Focus (v0.1.0 - Foundation & CI/CD)
@@ -46,14 +46,14 @@ Local delivery labels do not close GitHub issues.
 |--------|-------|------------------|-------------------|
 | ✅ Implemented | [#40](https://github.com/rshade/finfocus-plugin-aws-ce/issues/40) | Add GetPluginInfo() RPC | Return plugin metadata for discovery |
 | ✅ Implemented | [#41](https://github.com/rshade/finfocus-plugin-aws-ce/issues/41) | Add Supports() RPC | Validate resource/provider support |
-| 📋 Planned | [#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42) | Docker support with multi-stage build | Container deployment |
+| ⏭️ Removed | [#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42) | Docker support | Owner decision: binary archives only |
 | 📋 Planned | [#43](https://github.com/rshade/finfocus-plugin-aws-ce/issues/43) | HTTP health endpoint | Container orchestration support |
 | 📋 Planned | [#44](https://github.com/rshade/finfocus-plugin-aws-ce/issues/44) | Documentation directory | API and deployment guides |
 | ✅ Implemented | [#45](https://github.com/rshade/finfocus-plugin-aws-ce/issues/45) | Integration tests for gRPC server | Server behavior verification |
 | ✅ Implemented | [#46](https://github.com/rshade/finfocus-plugin-aws-ce/issues/46) | Trace ID propagation | Distributed tracing support |
 | ✅ Implemented | [#47](https://github.com/rshade/finfocus-plugin-aws-ce/issues/47) | Proto ErrorCode enum | Standardized error handling |
 | 📋 Planned | [#48](https://github.com/rshade/finfocus-plugin-aws-ce/issues/48) | Standardize workflow names | CI/CD consistency |
-| 🔄 Partial | [#50](https://github.com/rshade/finfocus-plugin-aws-ce/issues/50) | Makefile targets | Developer experience; Docker awaits owner decision |
+| ✅ Implemented | [#50](https://github.com/rshade/finfocus-plugin-aws-ce/issues/50) | Makefile targets | Developer workflows; binary archives only |
 | ✅ Implemented | [#51](https://github.com/rshade/finfocus-plugin-aws-ce/issues/51) | Config parsing tests | Configuration reliability |
 | 📋 Planned | [#53](https://github.com/rshade/finfocus-plugin-aws-ce/issues/53) | CONTRIBUTING.md | Contributor onboarding |
 

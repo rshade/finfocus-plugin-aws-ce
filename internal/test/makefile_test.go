@@ -83,10 +83,21 @@ func TestMakeInstallLocal(t *testing.T) {
 	}
 }
 
-func TestMakeDockerBlocked(t *testing.T) {
-	command := exec.Command("make", "-C", filepath.Join("..", ".."), "docker")
-	out, err := command.CombinedOutput()
-	if err == nil || !strings.Contains(string(out), "CE-3.2") {
-		t.Fatalf("docker must explain owner dependency: %v\n%s", err, out)
+func TestMakeHasNoDockerTarget(t *testing.T) {
+	root := filepath.Join("..", "..")
+	help := exec.Command("make", "-C", root, "help")
+	out, err := help.CombinedOutput()
+	if err != nil || strings.Contains(strings.ToLower(string(out)), "docker") {
+		t.Fatalf("help must describe archive-only support: %v\n%s", err, out)
+	}
+	makefile, err := filepath.Abs(filepath.Join(root, "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	command := exec.Command("make", "-f", makefile, "-n", "docker")
+	command.Dir = t.TempDir()
+	out, err = command.CombinedOutput()
+	if err == nil || !strings.Contains(string(out), "No rule to make target") {
+		t.Fatalf("docker must have no recipe: %v\n%s", err, out)
 	}
 }

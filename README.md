@@ -131,7 +131,8 @@ make vuln
 `make develop` fetches Go modules and prepares the build directory.
 `make test-integration` runs real plugin processes with local fake CE
 endpoints and verifies protocol conformance. All Go test recipes use `-count=1`.
-`make docker` fails with the deferred CE-3.2 owner decision.
+Releases contain binary archives and checksums. Docker support and its
+Makefile target were removed by owner decision.
 
 Set `FINFOCUS_E2E=true` to run the subprocess E2E test against a local fake CE
 endpoint. Legacy `finfocus_E2E` is a fallback only when the uppercase name is
