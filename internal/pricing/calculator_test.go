@@ -3,6 +3,7 @@ package pricing
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
 	"github.com/rs/zerolog"
 	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
+	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
 	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -361,4 +363,71 @@ func resourceIDs(filter *types.Expression) []string {
 	}
 	walk(filter)
 	return out
+}
+
+func TestActualCostFakeEndpointCacheAndPagination(t *testing.T) {
+	page1 := strings.Replace(okPage, `{"ResultsByTime"`, `{"NextPageToken":"page-two","ResultsByTime"`, 1)
+	f := newFakeCE(t, []json.RawMessage{json.RawMessage(page1), json.RawMessage(okPage)})
+	ce, err := client.NewClient(context.Background(), client.Config{Region: "us-east-1", BaseEndpoint: f.srv.URL, AccessKeyID: "test", SecretAccessKey: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	calc := NewCalculatorWithClient(ce)
+	calc.cache, err = NewCacheManager(t.TempDir(), time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := pluginsdk.NewTestServer(t, calc)
+	defer server.Close()
+	req := serviceCostRequest()
+	req.BillingAccountId = "cache-account-a"
+	for _, account := range []string{"cache-account-a", "cache-account-b", ""} {
+		req.BillingAccountId = account
+		resp, err := server.Client().GetActualCost(context.Background(), req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(resp.GetResults()) != 1 || resp.GetResults()[0].GetCost() != 2 {
+			t.Fatalf("paged total=%v", resp)
+		}
+		record := resp.GetResults()[0].GetFocusRecord()
+		if account == "" && record != nil {
+			t.Fatal("cache invented billing account")
+		}
+		if account != "" && record.GetBillingAccountId() != account {
+			t.Fatalf("cached billing account=%q", record.GetBillingAccountId())
+		}
+	}
+	calls := f.snapshot()
+	if len(calls) != 2 {
+		t.Fatalf("cached request called CE; pages=%d want 2", len(calls))
+	}
+	var second map[string]any
+	if err := json.Unmarshal(calls[1].Body, &second); err != nil {
+		t.Fatal(err)
+	}
+	if second["NextPageToken"] != "page-two" {
+		t.Fatalf("pagination token=%v", second["NextPageToken"])
+	}
+}
+
+func TestActualCostFakeEndpointRejectsPartialPage(t *testing.T) {
+	page1 := strings.Replace(okPage, `{"ResultsByTime"`, `{"NextPageToken":"page-two","ResultsByTime"`, 1)
+	malformed := strings.Replace(okPage, `"1.00"`, `"not-a-number"`, 1)
+	f := newFakeCE(t, []json.RawMessage{json.RawMessage(page1), json.RawMessage(malformed)})
+	ce, err := client.NewClient(context.Background(), client.Config{Region: "us-east-1", BaseEndpoint: f.srv.URL, AccessKeyID: "test", SecretAccessKey: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	calc := NewCalculatorWithClient(ce)
+	calc.cache = nil
+	server := pluginsdk.NewTestServer(t, calc)
+	defer server.Close()
+	resp, err := server.Client().GetActualCost(context.Background(), serviceCostRequest())
+	if status.Code(err) != codes.Internal || resp != nil {
+		t.Fatalf("partial page returned success: %v,%v", resp, err)
+	}
+	if len(f.snapshot()) != 2 {
+		t.Fatal("second page was not fetched")
+	}
 }

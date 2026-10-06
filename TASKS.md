@@ -925,6 +925,8 @@ the spec's NO_COST_DATA style error. This extends CE-1.5.
 
 ### CE-6.10: Capabilities, dead code and test debt
 
+**Status:** DONE, `go test -count=1 ./... && golangci-lint run ./... && markdownlint-cli2 README.md ROADMAP.md TASKS.md`, exit 0; break check: plain projected error, disabled cache read and disabled uppercase gate each failed regression tests, restored; enabled fake E2E passed.
+
 **ID:** CE-6.10  
 **Description:** `GetProjectedCost` returns a plain error after a `Supports` check: return
 `codes.Unimplemented` and declare the actual-cost capability in `GetPluginInfo`. Remove the unused

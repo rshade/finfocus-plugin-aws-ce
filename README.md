@@ -4,7 +4,7 @@ FinFocus plugin for aws-ce cost calculation.
 
 ## Overview
 
-This plugin provides cost calculation capabilities for aws resources in FinFocus. It implements both projected cost estimation and actual cost retrieval functionality.
+This plugin provides cost calculation capabilities for aws resources in FinFocus. It retrieves actual costs from AWS Cost Explorer. Projected cost requests return gRPC `Unimplemented` (CE-6.10).
 
 **Supported Providers:** aws
 
@@ -56,9 +56,6 @@ finfocus plugin list
 # Validate plugin installation
 finfocus plugin validate
 
-# Calculate projected costs
-finfocus cost projected --pulumi-json plan.json
-
 # Get actual costs
 finfocus cost actual --pulumi-json plan.json --from 2025-01-01
 ```
@@ -98,42 +95,6 @@ make install
 - `examples`: Example usage
 - `bin`: Compiled binaries
 
-### Implementing Pricing Logic
-
-Edit `internal/pricing/calculator.go` to implement your pricing logic:
-
-```go
-func (c *Calculator) GetProjectedCost(ctx context.Context, req *pbc.GetProjectedCostRequest) (*pbc.GetProjectedCostResponse, error) {
-    // 1. Check if resource is supported
-    if !c.Matcher().Supports(req.Resource) {
-        return nil, pluginsdk.NotSupportedError(req.Resource)
-    }
-
-    // 2. Extract resource properties
-    resourceType := req.Resource.ResourceType
-    properties := req.Resource.Tags
-
-    // 3. Calculate pricing based on resource type and properties
-    unitPrice := c.calculateResourceCost(resourceType, properties)
-
-    // 4. Return response
-    return c.Calculator().CreateProjectedCostResponse("USD", unitPrice, "description"), nil
-}
-```
-
-#### Actual Cost Retrieval
-
-Edit `internal/client/client.go` to implement cloud provider API integration:
-
-```go
-func (c *Client) GetResourceCost(ctx context.Context, resourceID string, startTime, endTime int64) (float64, error) {
-    // 1. Call cloud provider billing API
-    // 2. Parse response and calculate total cost
-    // 3. Return cost value
-    return totalCost, nil
-}
-```
-
 ### Testing
 
 The project includes testing utilities from the FinFocus SDK:
@@ -145,12 +106,6 @@ func TestPluginName(t *testing.T) {
     testPlugin.TestName("aws-ce")
 }
 ```
-
-### Adding Pricing Data
-
-1. Update pricing data structures in `internal/pricing/data.go`
-2. Implement pricing lookups in `internal/pricing/calculator.go`
-3. Add test cases for new resource types
 
 ### Configuration
 
@@ -271,3 +226,16 @@ Unset or empty values use the defaults. Invalid values stop startup with a
 configuration error naming the variable. Each CE page still consumes the
 configured per-minute request budget. Default client initialization is shared
 safely; initialization failures have a one-second retry delay.
+
+## Data freshness and offline testing
+
+Cost Explorer data lags by 24 hours or more. Resource-level data may lag up to
+48 hours. Recent or estimated results are cached for 15 minutes; historical
+closed results are cached for 24 hours. Each paginated CE request costs $0.01
+in real use. This run verifies local contract fixtures and fake endpoints only.
+
+Set `FINFOCUS_E2E=true` to run the subprocess E2E test with a local fake CE
+endpoint. The legacy `finfocus_E2E` name remains a fallback when the uppercase
+name is unset. An explicit uppercase `false` disables the fallback. The E2E
+test injects synthetic credentials and never queries a live AWS service.
+Real-account and FinFocus core E2E verification remain blocked on credentials.

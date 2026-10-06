@@ -51,7 +51,7 @@ const (
 	pluginVersion = "0.1.0"
 	// specVersion must keep the leading v. pluginsdk.ValidateSpecVersion rejects "0.7.0".
 	specVersion   = "v0.7.5"
-	supportedRPCs = "GetActualCost,Supports,GetPluginInfo,GetProjectedCost"
+	supportedRPCs = "GetActualCost,Supports,GetPluginInfo,BatchCost"
 )
 
 // NewCalculator creates a new AWS Cost Explorer cost calculator plugin.
@@ -193,20 +193,12 @@ func (c *Calculator) initClient(ctx context.Context, logger zerolog.Logger) erro
 	return nil
 }
 
-// GetProjectedCost returns an error as this plugin only provides actual cost data.
-func (c *Calculator) GetProjectedCost(_ context.Context, req *pbc.GetProjectedCostRequest) (*pbc.GetProjectedCostResponse, error) {
-	// Check if we support this resource
-	if !c.Matcher().Supports(req.Resource) {
-		return nil, pluginsdk.NotSupportedError(req.Resource)
-	}
-
-	// ResourceDescriptor in this version does not have Id, using Type/Sku for logging
-	c.logger.Debug().
-		Str("resource_type", req.GetResource().GetResourceType()).
-		Str("sku", req.GetResource().GetSku()).
-		Msg("GetProjectedCost called but not supported")
-
-	return nil, fmt.Errorf("projected cost not supported: aws-ce plugin provides actual cost data only; use aws-public plugin for projected costs")
+// GetProjectedCost explicitly rejects an operation this actual-cost plugin cannot answer.
+func (c *Calculator) GetProjectedCost(ctx context.Context, _ *pbc.GetProjectedCostRequest) (*pbc.GetProjectedCostResponse, error) {
+	logger := c.traceLogger(ctx)
+	done := pluginsdk.LogOperation(logger, "GetProjectedCost")
+	defer done()
+	return nil, status.Error(codes.Unimplemented, "CE-6.10: projected costs are unavailable; use the aws-public plugin")
 }
 
 // GetActualCost retrieves actual historical costs from AWS Cost Explorer.

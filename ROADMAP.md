@@ -68,9 +68,9 @@ This roadmap outlines the development path for `finfocus-plugin-aws-ce`, priorit
 | Status | Issue | Technical Thesis | Boundary Guardrail |
 |--------|-------|------------------|-------------------|
 | 🔬 Research | [#49](https://github.com/rshade/finfocus-plugin-aws-ce/issues/49) | Web/Connect protocol support | Browser client access |
-| 🔬 Research | [#52](https://github.com/rshade/finfocus-plugin-aws-ce/issues/52) | Metadata enrichment | Growth hints, confidence levels |
+| ✅ Done | [#52](https://github.com/rshade/finfocus-plugin-aws-ce/issues/52) | Metadata enrichment | FOCUS source, granularity, metric, estimate and `lookback` columns |
 | 🔬 Research | [#54](https://github.com/rshade/finfocus-plugin-aws-ce/issues/54) | CORS support | Browser-based access |
-| 🔬 Research | [#55](https://github.com/rshade/finfocus-plugin-aws-ce/issues/55) | Batch configuration | Request handling tuning |
+| ✅ Done | [#55](https://github.com/rshade/finfocus-plugin-aws-ce/issues/55) | Batch configuration | Validated SDK batch limits and safe shared client initialization |
 
 ### Optimization Recommendations
 

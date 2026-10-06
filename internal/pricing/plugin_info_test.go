@@ -12,7 +12,7 @@ const (
 	pluginInfoName        = "aws-ce"
 	pluginInfoVersion     = "0.1.0"
 	pluginInfoSpecVersion = "v0.7.5"
-	pluginInfoRPCs        = "GetActualCost,Supports,GetPluginInfo,GetProjectedCost"
+	pluginInfoRPCs        = "GetActualCost,Supports,GetPluginInfo,BatchCost"
 )
 
 func TestGetPluginInfo(t *testing.T) {
