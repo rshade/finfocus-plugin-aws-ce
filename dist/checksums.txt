@@ -1,6 +1,0 @@
-5cb7af4d287605af1dbac6da6dd3232b82e440d4f73b54894b3cf92a5d0e034f  finfocus-plugin-aws-ce_v0.1.0-next_Darwin_arm64.tar.gz
-102945315ef387f155b2dd8dce8eb514994005a1c6e2cee0f564b5b76b75a009  finfocus-plugin-aws-ce_v0.1.0-next_Darwin_x86_64.tar.gz
-ca4c2f153c95c12789c88e48bf08a454f7f64c9208aa7683d6057ac7e00703c7  finfocus-plugin-aws-ce_v0.1.0-next_Linux_arm64.tar.gz
-84a1a3075f58e9627a3bc40ce7b281c0e8d1ad54183c8759023f9e95436a381b  finfocus-plugin-aws-ce_v0.1.0-next_Linux_x86_64.tar.gz
-56ea434660fc60eddeb7301d869ffc58e9d1417976800aa42b4f97ef7a6018d2  finfocus-plugin-aws-ce_v0.1.0-next_Windows_arm64.zip
-2175f1e4b4ad7faf57418e97ca2cbbcedb6ba35033998c4dd0ae400616d7851a  finfocus-plugin-aws-ce_v0.1.0-next_Windows_x86_64.zip
