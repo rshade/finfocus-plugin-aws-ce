@@ -1,0 +1,64 @@
+[tools]
+
+# ---------------------------------------------------------------- build & test
+
+# Keep in sync with the `go` directive in go.mod.
+go = "1.27.1"
+
+# Matches finfocus and finfocus-plugin-aws-public for consistency.
+golangci-lint = "2.14.0"
+
+# Vulnerability scanner for Go dependencies.
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.8.0"
+
+# Release binary building.
+goreleaser = "2.18.2"
+
+# ------------------------------------------------------------------ docs & lint
+
+# Node provides npm backend for markdownlint and commitlint.
+node = "24"
+
+# Markdown linting CLI.
+"npm:markdownlint-cli2" = "0.23.3"
+
+# Lints GitHub workflow YAML files.
+actionlint = "1.7.12"
+
+# Prose linting for documentation.
+vale = "3.20.0"
+
+# Commit message linting.
+"npm:@commitlint/cli" = "20.5.2"
+"npm:@commitlint/config-conventional" = "20.5.3"
+
+# Code review automation via aqua registry.
+"aqua:reviewdog/reviewdog" = "0.21.0"
+
+[tasks.test]
+description = "Run all tests"
+run = "go test ./..."
+
+[tasks.lint]
+description = "Run linters"
+run = "golangci-lint run"
+
+[tasks.lint-md]
+description = "Lint markdown files"
+run = "markdownlint-cli2 '**/*.md'"
+
+[tasks.vuln]
+description = "Check for security vulnerabilities"
+run = "govulncheck ./..."
+
+[tasks.fmt]
+description = "Format code"
+run = "go fmt ./..."
+
+[tasks.build]
+description = "Build plugin binary"
+run = "go build -o bin/finfocus-plugin-aws-ce ./cmd/plugin"
+
+[tasks.release-check]
+description = "Check goreleaser configuration"
+run = "goreleaser check"

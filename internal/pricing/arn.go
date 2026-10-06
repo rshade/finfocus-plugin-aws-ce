@@ -19,7 +19,7 @@ func ParseARN(arn string) (*ParsedARN, error) {
 	if !strings.HasPrefix(arn, "arn:") {
 		return nil, fmt.Errorf("invalid arn: does not start with 'arn:'")
 	}
-	
+
 	// Split into at most 6 parts: arn:partition:service:region:account:resource
 	parts := strings.SplitN(arn, ":", 6)
 	if len(parts) < 6 {

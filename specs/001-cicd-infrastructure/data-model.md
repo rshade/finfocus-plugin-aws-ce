@@ -10,14 +10,14 @@ This feature establishes CI/CD infrastructure and does not introduce new data en
 ## No Data Entities
 
 - **Rationale**: CI/CD setup involves configuration files (.goreleaser.yaml, workflows), build scripts (Makefile), and documentation updates. No runtime data models are affected.
-- **Scope**: Infrastructure-only feature with no impact on the pulumicost-plugin-aws-ce data structures or gRPC protocol.
+- **Scope**: Infrastructure-only feature with no impact on the finfocus-plugin-aws-ce data structures or gRPC protocol.
 
 ## Configuration Schema
 
 ### Goreleaser Configuration
 ```yaml
 # .goreleaser.yaml structure (for reference)
-project_name: pulumicost-plugin-aws-ce
+project_name: finfocus-plugin-aws-ce
 builds:
   - main: ./cmd/plugin
     goos:

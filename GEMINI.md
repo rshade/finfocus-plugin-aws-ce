@@ -1,10 +1,10 @@
 # GEMINI.md
 
-This file provides context and instructions for Gemini agents working on the `pulumicost-plugin-aws-ce` project.
+This file provides context and instructions for Gemini agents working on the `finfocus-plugin-aws-ce` project.
 
 ## Project Overview
 
-`pulumicost-plugin-aws-ce` is a PulumiCost plugin designed to retrieve **actual** and **projected** cloud costs directly from the AWS Cost Explorer API. It integrates with the `pulumicost-core` engine via gRPC, adhering to the `finfocus-spec` interface.
+`finfocus-plugin-aws-ce` is a FinFocus plugin designed to retrieve **actual** and **projected** cloud costs directly from the AWS Cost Explorer API. It integrates with the `finfocus-core` engine via gRPC, adhering to the `finfocus-spec` interface.
 
 **Key Features:**
 - Retrieves actual historical cost data (Cost Explorer API).
@@ -25,10 +25,10 @@ This file provides context and instructions for Gemini agents working on the `pu
 
 | Command | Description |
 | :--- | :--- |
-| `make build` | Compiles the plugin binary to `bin/pulumicost-plugin-aws-ce`. |
+| `make build` | Compiles the plugin binary to `bin/finfocus-plugin-aws-ce`. |
 | `make test` | Runs all unit tests. |
 | `make lint` | Runs `golangci-lint` to ensure code quality. |
-| `make install` | Builds and installs the plugin to `~/.pulumicost/plugins/aws-ce/1.0.0/`. |
+| `make install` | Builds and installs the plugin to `~/.finfocus/plugins/aws-ce/1.0.0/`. |
 | `make ensure` | Updates Go dependencies (alias for `deps`). |
 | `make deps` | Updates Go dependencies (`go mod tidy` + `download`). |
 | `make fmt` | Formats code using `go fmt`. |
@@ -62,7 +62,7 @@ This project is a single-binary gRPC server.
     - Request validation (`pluginsdk/validation`).
     - Logging (`pluginsdk/logging` with `zerolog`).
     - Data construction (`pluginsdk/focus_builder` for FOCUS 1.2 records).
-2.  **Logging**: Structured JSON logging is required. Respect `PULUMICOST_LOG_LEVEL` and `PULUMICOST_LOG_FILE`.
+2.  **Logging**: Structured JSON logging is required. Respect `FINFOCUS_LOG_LEVEL` and `FINFOCUS_LOG_FILE`.
 3.  **Error Handling**: Do not use `os.Exit`. Return errors via gRPC status codes. Use `pluginsdk.NotSupportedError()` where applicable.
 4.  **Testing**:
     - Unit tests for logic.
@@ -75,10 +75,10 @@ The `pluginsdk` package (`github.com/rshade/finfocus-spec/sdk/go/pluginsdk`) pro
 
 ### 1. Environment Variables (`env.go`)
 - **Usage**: Replace manual `os.Getenv` calls.
-- `GetPort()`: `PULUMICOST_PLUGIN_PORT`
-- `GetLogLevel()`: `PULUMICOST_LOG_LEVEL`
-- `GetLogFile()`: `PULUMICOST_LOG_FILE` (Absolute path)
-- `IsTestMode()`: `PULUMICOST_TEST_MODE == "true"`
+- `GetPort()`: `FINFOCUS_PLUGIN_PORT`
+- `GetLogLevel()`: `FINFOCUS_LOG_LEVEL`
+- `GetLogFile()`: `FINFOCUS_LOG_FILE` (Absolute path)
+- `IsTestMode()`: `FINFOCUS_TEST_MODE == "true"`
 
 ### 2. Validation (`validation.go`)
 - **Usage**: Call at the start of RPC handlers.
@@ -93,7 +93,7 @@ The `pluginsdk` package (`github.com/rshade/finfocus-spec/sdk/go/pluginsdk`) pro
 
 ### 4. Logging (`logging.go`)
 - **Usage**: Structured Zerolog setup.
-- `NewLogWriter()`: Returns writer for `PULUMICOST_LOG_FILE`.
+- `NewLogWriter()`: Returns writer for `FINFOCUS_LOG_FILE`.
 - `NewPluginLogger(name, version, level, writer)`: Creates standard logger.
 - `LogOperation(logger, "OperationName")`: returns a done function to defer for timing.
 
@@ -108,7 +108,7 @@ The `pluginsdk` package (`github.com/rshade/finfocus-spec/sdk/go/pluginsdk`) pro
 The project is currently executing against the following milestones and issues:
 
 ### v0.1.0 - Foundation & CI/CD
-- **Issue #6**: Update Dependencies & Refactor for SDK Compliance (Spec v0.5.2, SDK helpers, Zerolog, `PULUMICOST_LOG_FILE`, `--port`).
+- **Issue #6**: Update Dependencies & Refactor for SDK Compliance (Spec v0.5.2, SDK helpers, Zerolog, `FINFOCUS_LOG_FILE`, `--port`).
 - **Issue #7**: Establish CI/CD Infrastructure (Workflows, Goreleaser, release-please).
 - **Issue #11**: Implement Core Cost Plugin (Spec 001) & E2E Testing (AWS Integration, CI Secrets, FOCUS 1.2 Compliance).
 - **Issue #12**: Polish: Installation & Documentation (Makefile version fix, README rewrite, Manifest consolidation).

@@ -5,7 +5,7 @@
 
 ## Summary
 
-Refactor the AWS Cost Explorer plugin to use standardized `pluginsdk` helpers for environment variable reading, logging initialization, request validation, and graceful shutdown. This brings the plugin into full compliance with the PulumiCost SDK patterns, ensuring consistent behavior across all plugins in the ecosystem.
+Refactor the AWS Cost Explorer plugin to use standardized `pluginsdk` helpers for environment variable reading, logging initialization, request validation, and graceful shutdown. This brings the plugin into full compliance with the FinFocus SDK patterns, ensuring consistent behavior across all plugins in the ecosystem.
 
 **Key Changes:**
 

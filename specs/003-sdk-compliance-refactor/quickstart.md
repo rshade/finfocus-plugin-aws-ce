@@ -5,13 +5,13 @@
 
 ## Overview
 
-After this refactoring, the AWS Cost Explorer plugin supports standard PulumiCost configuration via environment variables and CLI flags. This guide documents the new configuration options and usage patterns.
+After this refactoring, the AWS Cost Explorer plugin supports standard FinFocus configuration via environment variables and CLI flags. This guide documents the new configuration options and usage patterns.
 
 ## Configuration
 
 ### Environment Variables
 
-Configure the plugin using standard PulumiCost environment variables:
+Configure the plugin using standard FinFocus environment variables:
 
 ```bash
 # Required: AWS credentials (standard AWS SDK chain)
@@ -20,9 +20,9 @@ export AWS_ACCESS_KEY_ID=your-key
 export AWS_SECRET_ACCESS_KEY=your-secret
 
 # Optional: Plugin configuration
-export PULUMICOST_PLUGIN_PORT=50051        # Specific port (default: auto-assign)
-export PULUMICOST_LOG_FILE=/var/log/pulumicost-aws-ce.log  # Log to file (default: stderr)
-export PULUMICOST_LOG_LEVEL=debug          # Verbosity: debug|info|warn|error (default: info)
+export FINFOCUS_PLUGIN_PORT=50051        # Specific port (default: auto-assign)
+export FINFOCUS_LOG_FILE=/var/log/finfocus-aws-ce.log  # Log to file (default: stderr)
+export FINFOCUS_LOG_LEVEL=debug          # Verbosity: debug|info|warn|error (default: info)
 ```
 
 ### CLI Flags
@@ -31,10 +31,10 @@ The `--port` flag overrides the environment variable:
 
 ```bash
 # Use environment variable port
-./pulumicost-plugin-aws-ce
+./finfocus-plugin-aws-ce
 
 # Override with CLI flag (takes precedence)
-./pulumicost-plugin-aws-ce --port 50052
+./finfocus-plugin-aws-ce --port 50052
 ```
 
 ## Running the Plugin
@@ -43,19 +43,19 @@ The `--port` flag overrides the environment variable:
 
 ```bash
 # Start with default configuration
-./bin/pulumicost-plugin-aws-ce
+./bin/finfocus-plugin-aws-ce
 
 # Start with specific port and debug logging
-PULUMICOST_LOG_LEVEL=debug ./bin/pulumicost-plugin-aws-ce --port 50051
+FINFOCUS_LOG_LEVEL=debug ./bin/finfocus-plugin-aws-ce --port 50051
 ```
 
 ### With Log File
 
 ```bash
 # Log to file for production use
-export PULUMICOST_LOG_FILE=/var/log/pulumicost/aws-ce.log
-export PULUMICOST_LOG_LEVEL=info
-./bin/pulumicost-plugin-aws-ce
+export FINFOCUS_LOG_FILE=/var/log/finfocus/aws-ce.log
+export FINFOCUS_LOG_LEVEL=info
+./bin/finfocus-plugin-aws-ce
 ```
 
 ### Graceful Shutdown
@@ -64,7 +64,7 @@ The plugin now responds cleanly to shutdown signals:
 
 ```bash
 # Start plugin in background
-./bin/pulumicost-plugin-aws-ce &
+./bin/finfocus-plugin-aws-ce &
 PID=$!
 
 # Send SIGTERM for graceful shutdown
@@ -89,7 +89,7 @@ Invalid requests now return standardized SDK error messages:
 Startup failures no longer call `os.Exit`. Instead, errors are logged and the process exits gracefully:
 
 ```text
-{"level":"error","component":"pulumicost-plugin-aws-ce","error":"bind: address already in use","message":"Failed to serve plugin"}
+{"level":"error","component":"finfocus-plugin-aws-ce","error":"bind: address already in use","message":"Failed to serve plugin"}
 ```
 
 ## Log Output Format
@@ -99,7 +99,7 @@ Logs use structured JSON format with standard fields:
 ```json
 {
   "level": "info",
-  "component": "pulumicost-plugin-aws-ce",
+  "component": "finfocus-plugin-aws-ce",
   "plugin_name": "aws-ce",
   "plugin_version": "1.0.0",
   "operation": "GetActualCost",
@@ -117,13 +117,13 @@ All RPC operations are automatically logged with timing:
 {"level":"debug","operation":"GetActualCost","duration_ms":1523,"message":"Operation completed"}
 ```
 
-## Integration with PulumiCost Core
+## Integration with FinFocus Core
 
-The plugin now integrates seamlessly with PulumiCost Core orchestration:
+The plugin now integrates seamlessly with FinFocus Core orchestration:
 
-1. Core sets `PULUMICOST_PLUGIN_PORT` for consistent port assignment
-2. Core sets `PULUMICOST_LOG_FILE` to aggregate plugin logs
-3. Core sets `PULUMICOST_TRACE_ID` for distributed tracing (if enabled)
+1. Core sets `FINFOCUS_PLUGIN_PORT` for consistent port assignment
+2. Core sets `FINFOCUS_LOG_FILE` to aggregate plugin logs
+3. Core sets `FINFOCUS_TRACE_ID` for distributed tracing (if enabled)
 
 ## Testing
 
@@ -143,10 +143,10 @@ grep -r "os.Exit\|log.Fatal" cmd/ internal/
 
 ```bash
 # Start plugin with debug logging
-PULUMICOST_LOG_LEVEL=debug ./bin/pulumicost-plugin-aws-ce --port 50051
+FINFOCUS_LOG_LEVEL=debug ./bin/finfocus-plugin-aws-ce --port 50051
 
 # In another terminal, send test request via grpcurl
-grpcurl -plaintext localhost:50051 pulumicost.v1.CostSourceService/Name
+grpcurl -plaintext localhost:50051 finfocus.v1.CostSourceService/Name
 ```
 
 ## Migration Notes

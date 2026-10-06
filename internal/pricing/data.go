@@ -26,15 +26,22 @@ type DateRange struct {
 // CostEntry represents a single cost data point.
 type CostEntry struct {
 	Timestamp        time.Time         `json:"timestamp"`
-	Amount           float64           `json:"amount"` // Using float64 for simplicity, matching client.CostResult
+	PeriodEnd        time.Time         `json:"period_end,omitempty"`
+	Amount           float64           `json:"amount"` // Single float64 conversion of the decimal sum
+	AmountDecimal    string            `json:"amount_decimal,omitempty"`
 	Currency         string            `json:"currency"`
 	Service          string            `json:"service"`
+	UsageAmount      float64           `json:"usage_amount,omitempty"`
+	UsageUnit        string            `json:"usage_unit,omitempty"`
+	HasUsage         bool              `json:"has_usage,omitempty"`
+	Estimated        bool              `json:"estimated,omitempty"`
 	AccountID        string            `json:"account_id"`
 	Region           string            `json:"region"`
 	AvailabilityZone string            `json:"availability_zone"`
 	Tags             map[string]string `json:"tags"`
 	ReservationARN   string            `json:"reservation_arn,omitempty"`
 	SavingsPlanARN   string            `json:"savings_plan_arn,omitempty"`
+	Metric           string            `json:"metric,omitempty"`
 }
 
 // ReservationData contains information about RI or Savings Plan utilization.

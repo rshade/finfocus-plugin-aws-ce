@@ -20,7 +20,7 @@ cd finfocus-spec
 git checkout -b feat/add-arn-field
 
 # Edit proto file
-# Add to proto/pulumicost/v1/costsource.proto:
+# Add to proto/finfocus/v1/costsource.proto:
 #   string arn = 5;  // in GetActualCostRequest
 
 # Regenerate Go code
@@ -37,7 +37,7 @@ git push origin feat/add-arn-field
 ### Step 2: Update Plugin Dependency
 
 ```bash
-# In pulumicost-plugin-aws-ce repo
+# In finfocus-plugin-aws-ce repo
 go get github.com/rshade/finfocus-spec@v0.5.2  # or new version
 go mod tidy
 ```

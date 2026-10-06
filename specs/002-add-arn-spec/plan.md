@@ -56,10 +56,10 @@ specs/002-add-arn-spec/
 
 ```text
 # Upstream: rshade/finfocus-spec (changes required first)
-proto/pulumicost/v1/
+proto/finfocus/v1/
 └── costsource.proto     # Add arn field to GetActualCostRequest
 
-# This repo: rshade/pulumicost-plugin-aws-ce
+# This repo: rshade/finfocus-plugin-aws-ce
 internal/
 ├── pricing/
 │   ├── calculator.go    # Consume req.GetArn() in GetActualCost

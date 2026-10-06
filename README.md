@@ -1,29 +1,42 @@
 # aws-ce
 
-PulumiCost plugin for aws-ce cost calculation.
+FinFocus plugin for aws-ce cost calculation.
 
 ## Overview
 
-This plugin provides cost calculation capabilities for aws resources in PulumiCost. It implements both projected cost estimation and actual cost retrieval functionality.
+This plugin provides cost calculation capabilities for aws resources in FinFocus. It implements both projected cost estimation and actual cost retrieval functionality.
 
 **Supported Providers:** aws
+
+## Actual cost
+
+An EC2 instance id (`i-` plus 8 to 17 lowercase hex characters), from an instance ARN or a bare resource id, is queried with `GetCostAndUsageWithResources` and `RESOURCE_ID` set to that id, never the full ARN. Other ids, including `contract-*`, stay on unfiltered `GetCostAndUsage` grouped by service. Resource-level data covers the last 14 days and needs the Cost Explorer resource-level opt-in. A non-EC2 ARN returns an error instead of a guessed id.
+
+The query metric is `UnblendedCost`. `AmortizedCost` is used only for a row whose requested group key is a reservation id or a savings plan ARN and that metric is present. `BlendedCost` is never used. `GetActualCost` does not group by reservation or savings plan, so those FOCUS fields stay unset. That is a gap, not a stub. Quantity and status are not invented. `GetReservationUtilization` and `GetSavingsPlansCoverage` are not called.
+
+Rows labelled "No resource ID" are not a service total.
+
+`GetActualCostRequest.tags` are ignored in v0.1.0.
 
 ## Installation
 
 ### From Source
 
 1. Clone the repository:
+
    ```bash
    git clone <repository-url>
    cd aws-ce
    ```
 
 2. Build the plugin:
+
    ```bash
    make build
    ```
 
 3. Install to local plugin registry:
+
    ```bash
    make install
    ```
@@ -34,28 +47,28 @@ The plugin may require cloud provider credentials to function properly. See the 
 
 ## Usage
 
-Once installed, the plugin will be automatically discovered by PulumiCost:
+Once installed, the plugin will be automatically discovered by FinFocus:
 
 ```bash
 # List installed plugins
-pulumicost plugin list
+finfocus plugin list
 
 # Validate plugin installation
-pulumicost plugin validate
+finfocus plugin validate
 
 # Calculate projected costs
-pulumicost cost projected --pulumi-json plan.json
+finfocus cost projected --pulumi-json plan.json
 
 # Get actual costs
-pulumicost cost actual --pulumi-json plan.json --from 2025-01-01
+finfocus cost actual --pulumi-json plan.json --from 2025-01-01
 ```
 
 ## Development
 
 ### Prerequisites
 
-- Go 1.21+
-- PulumiCost Core development environment
+- Go 1.27.1
+- FinFocus Core development environment
 - Cloud provider credentials (for actual cost retrieval)
 
 ### Building
@@ -123,7 +136,7 @@ func (c *Client) GetResourceCost(ctx context.Context, resourceID string, startTi
 
 ### Testing
 
-The project includes testing utilities from the PulumiCost SDK:
+The project includes testing utilities from the FinFocus SDK:
 
 ```go
 func TestPluginName(t *testing.T) {
@@ -143,19 +156,22 @@ func TestPluginName(t *testing.T) {
 
 #### Environment Variables
 
-Configure the plugin using standard PulumiCost environment variables:
+Configure the plugin using standard FinFocus environment variables:
 
 ```bash
-# Required: AWS credentials (standard AWS SDK chain)
+# AWS credentials. A request that carries none uses the standard AWS SDK chain.
+# The host may pass credentials on the request instead.
 export AWS_REGION=us-east-1
 export AWS_ACCESS_KEY_ID=your-key
 export AWS_SECRET_ACCESS_KEY=your-secret
 
 # Optional: Plugin configuration
-export PULUMICOST_PLUGIN_PORT=50051        # Specific port (default: auto-assign)
-export PULUMICOST_LOG_FILE=/var/log/pulumicost-aws-ce.log  # Log to file (default: stderr)
-export PULUMICOST_LOG_LEVEL=debug          # Verbosity: debug|info|warn|error (default: info)
+export FINFOCUS_PLUGIN_PORT=50051        # Specific port (default: auto-assign)
+export FINFOCUS_LOG_FILE=/var/log/finfocus-aws-ce.log  # Log to file (default: stderr)
+export FINFOCUS_LOG_LEVEL=debug          # Verbosity: debug|info|warn|error (default: info)
 ```
+
+`FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` caps Cost Explorer calls per minute, counting each page; unset or `0` means no limit.
 
 #### CLI Flags
 
@@ -163,10 +179,10 @@ The `--port` flag overrides the environment variable:
 
 ```bash
 # Use environment variable port
-./pulumicost-plugin-aws-ce
+./finfocus-plugin-aws-ce
 
 # Override with CLI flag (takes precedence)
-./pulumicost-plugin-aws-ce --port 50052
+./finfocus-plugin-aws-ce --port 50052
 ```
 
 #### Log Output
@@ -176,7 +192,7 @@ Logs use structured JSON format with standard fields:
 ```json
 {
   "level": "info",
-  "component": "pulumicost-plugin-aws-ce",
+  "component": "finfocus-plugin-aws-ce",
   "plugin_name": "aws-ce",
   "plugin_version": "1.0.0",
   "operation": "GetActualCost",
@@ -191,7 +207,7 @@ The plugin responds cleanly to shutdown signals (SIGINT, SIGTERM):
 
 ```bash
 # Start plugin in background
-./bin/pulumicost-plugin-aws-ce &
+./bin/finfocus-plugin-aws-ce &
 PID=$!
 
 # Send SIGTERM for graceful shutdown

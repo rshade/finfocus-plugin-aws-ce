@@ -13,13 +13,13 @@ func TestInspectProto(t *testing.T) {
 
 	t.Logf("--- GetActualCostResponse ---")
 	printFields(t, &pbc.GetActualCostResponse{})
-	
+
 	t.Logf("--- ActualCostResult ---")
 	printFields(t, &pbc.ActualCostResult{})
 
 	t.Logf("--- GetProjectedCostRequest ---")
 	printFields(t, &pbc.GetProjectedCostRequest{})
-	
+
 	t.Logf("--- GetProjectedCostResponse ---")
 	printFields(t, &pbc.GetProjectedCostResponse{})
 }

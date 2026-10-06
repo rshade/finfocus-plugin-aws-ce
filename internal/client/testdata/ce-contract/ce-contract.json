@@ -1,0 +1,1134 @@
+{
+  "cases": [
+    {
+      "body": {
+        "Filter": {
+          "Dimensions": {
+            "Key": "SERVICE",
+            "Values": [
+              "Amazon Simple Storage Service"
+            ]
+          }
+        },
+        "Granularity": "MONTHLY",
+        "GroupBy": [
+          {
+            "Key": "SERVICE",
+            "Type": "DIMENSION"
+          },
+          {
+            "Key": "Environment",
+            "Type": "TAG"
+          }
+        ],
+        "Metrics": [
+          "BlendedCost",
+          "UnblendedCost",
+          "UsageQuantity"
+        ],
+        "TimePeriod": {
+          "End": "2017-10-01",
+          "Start": "2017-09-01"
+        }
+      },
+      "expect": {
+        "note": "a request the plugin builds for this shape must carry the same operation, TimePeriod, Granularity, Metrics and GroupBy keys"
+      },
+      "id": "official_gcu_request",
+      "kind": "official_request",
+      "source": "https://docs.aws.amazon.com/aws-cost-management/latest/APIReference/API_GetCostAndUsage.html"
+    },
+    {
+      "expect": {
+        "currency": "USD",
+        "estimated": false,
+        "outcome": "ok",
+        "page_count": 1,
+        "per_service": {
+          "Amazon Simple Storage Service": "39.2940765264"
+        },
+        "total": "39.2940765264"
+      },
+      "id": "official_gcu_response",
+      "kind": "response",
+      "note": "real AWS shape",
+      "pages": [
+        {
+          "GroupDefinitions": [
+            {
+              "Key": "SERVICE",
+              "Type": "DIMENSION"
+            },
+            {
+              "Key": "Environment",
+              "Type": "TAG"
+            }
+          ],
+          "ResultsByTime": [
+            {
+              "Estimated": false,
+              "Groups": [
+                {
+                  "Keys": [
+                    "Amazon Simple Storage Service",
+                    "Environment$Prod"
+                  ],
+                  "Metrics": {
+                    "BlendedCost": {
+                      "Amount": "39.1603300457",
+                      "Unit": "USD"
+                    },
+                    "UnblendedCost": {
+                      "Amount": "39.1603300457",
+                      "Unit": "USD"
+                    },
+                    "UsageQuantity": {
+                      "Amount": "173842.5440074444",
+                      "Unit": "N/A"
+                    }
+                  }
+                },
+                {
+                  "Keys": [
+                    "Amazon Simple Storage Service",
+                    "Environment$Test"
+                  ],
+                  "Metrics": {
+                    "BlendedCost": {
+                      "Amount": "0.1337464807",
+                      "Unit": "USD"
+                    },
+                    "UnblendedCost": {
+                      "Amount": "0.1337464807",
+                      "Unit": "USD"
+                    },
+                    "UsageQuantity": {
+                      "Amount": "15992.0786663399",
+                      "Unit": "N/A"
+                    }
+                  }
+                }
+              ],
+              "TimePeriod": {
+                "End": "2017-10-01",
+                "Start": "2017-09-01"
+              },
+              "Total": {}
+            }
+          ]
+        }
+      ],
+      "request": {},
+      "source": "https://docs.aws.amazon.com/aws-cost-management/latest/APIReference/API_GetCostAndUsage.html",
+      "why": "verbatim AWS API reference sample"
+    },
+    {
+      "body": {
+        "Filter": {
+          "Dimensions": {
+            "Key": "SERVICE",
+            "Values": [
+              "Amazon Elastic Compute Cloud - Compute"
+            ]
+          }
+        },
+        "Granularity": "DAILY",
+        "GroupBy": [
+          {
+            "Key": "RESOURCE_ID",
+            "Type": "DIMENSION"
+          }
+        ],
+        "Metrics": [
+          "BlendedCost",
+          "UnblendedCost",
+          "UsageQuantity"
+        ],
+        "TimePeriod": {
+          "End": "2018-11-20",
+          "Start": "2018-11-19"
+        }
+      },
+      "expect": {
+        "note": "a request the plugin builds for this shape must carry the same operation, TimePeriod, Granularity, Metrics and GroupBy keys"
+      },
+      "id": "official_gcuwr_request",
+      "kind": "official_request",
+      "source": "https://docs.aws.amazon.com/aws-cost-management/latest/APIReference/API_GetCostAndUsageWithResources.html"
+    },
+    {
+      "expect": {
+        "currency": "USD",
+        "estimated": true,
+        "outcome": "ok",
+        "page_count": 1,
+        "per_service": {
+          "i-00cb32c5f3163": "0.1276",
+          "i-03b49bda9fdef": "0.0116",
+          "i-04a0089019f41": "0.1656",
+          "i-0e56e09d11711": "0.1392"
+        },
+        "total": "0.4440"
+      },
+      "id": "official_gcuwr_response",
+      "kind": "response",
+      "note": "real AWS shape",
+      "pages": [
+        {
+          "GroupDefinitions": [
+            {
+              "Key": "RESOURCE_ID",
+              "Type": "DIMENSION"
+            }
+          ],
+          "ResultsByTime": [
+            {
+              "Estimated": true,
+              "Groups": [
+                {
+                  "Keys": [
+                    "i-00cb32c5f3163"
+                  ],
+                  "Metrics": {
+                    "BlendedCost": {
+                      "Amount": "0.0927335232",
+                      "Unit": "USD"
+                    },
+                    "UnblendedCost": {
+                      "Amount": "0.1276",
+                      "Unit": "USD"
+                    },
+                    "UsageQuantity": {
+                      "Amount": "24.0010557602",
+                      "Unit": "N/A"
+                    }
+                  }
+                },
+                {
+                  "Keys": [
+                    "i-04a0089019f41"
+                  ],
+                  "Metrics": {
+                    "BlendedCost": {
+                      "Amount": "0.1656",
+                      "Unit": "USD"
+                    },
+                    "UnblendedCost": {
+                      "Amount": "0.1656",
+                      "Unit": "USD"
+                    },
+                    "UsageQuantity": {
+                      "Amount": "24.0018044403",
+                      "Unit": "N/A"
+                    }
+                  }
+                },
+                {
+                  "Keys": [
+                    "i-03b49bda9fdef"
+                  ],
+                  "Metrics": {
+                    "BlendedCost": {
+                      "Amount": "0.0927335232",
+                      "Unit": "USD"
+                    },
+                    "UnblendedCost": {
+                      "Amount": "0.0116",
+                      "Unit": "USD"
+                    },
+                    "UsageQuantity": {
+                      "Amount": "24.0009345564",
+                      "Unit": "N/A"
+                    }
+                  }
+                },
+                {
+                  "Keys": [
+                    "i-0e56e09d11711"
+                  ],
+                  "Metrics": {
+                    "BlendedCost": {
+                      "Amount": "0.0927335232",
+                      "Unit": "USD"
+                    },
+                    "UnblendedCost": {
+                      "Amount": "0.1392",
+                      "Unit": "USD"
+                    },
+                    "UsageQuantity": {
+                      "Amount": "24.0011066563",
+                      "Unit": "N/A"
+                    }
+                  }
+                }
+              ],
+              "TimePeriod": {
+                "End": "2018-11-20T00:00:00Z",
+                "Start": "2018-11-19T00:00:00Z"
+              },
+              "Total": {}
+            }
+          ]
+        }
+      ],
+      "request": {},
+      "source": "https://docs.aws.amazon.com/aws-cost-management/latest/APIReference/API_GetCostAndUsageWithResources.html",
+      "why": "verbatim AWS API reference sample"
+    },
+    {
+      "expect": {
+        "currency": "USD",
+        "estimated": false,
+        "outcome": "ok",
+        "page_count": 1,
+        "per_service": {
+          "Amazon Elastic Compute Cloud - Compute": "12.3400000000",
+          "Amazon Relational Database Service": "7.0000000000",
+          "Amazon Simple Storage Service": "0.5600000000"
+        },
+        "total": "19.9000000000"
+      },
+      "id": "single_day_three_services",
+      "kind": "response",
+      "note": null,
+      "pages": [
+        {
+          "DimensionValueAttributes": [],
+          "GroupDefinitions": [
+            {
+              "Key": "SERVICE",
+              "Type": "DIMENSION"
+            }
+          ],
+          "ResultsByTime": [
+            {
+              "Estimated": false,
+              "Groups": [
+                {
+                  "Keys": [
+                    "Amazon Elastic Compute Cloud - Compute"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "12.3400000000",
+                      "Unit": "USD"
+                    }
+                  }
+                },
+                {
+                  "Keys": [
+                    "Amazon Simple Storage Service"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "0.5600000000",
+                      "Unit": "USD"
+                    }
+                  }
+                },
+                {
+                  "Keys": [
+                    "Amazon Relational Database Service"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "7.0000000000",
+                      "Unit": "USD"
+                    }
+                  }
+                }
+              ],
+              "TimePeriod": {
+                "End": "2026-09-02",
+                "Start": "2026-09-01"
+              },
+              "Total": {}
+            }
+          ]
+        }
+      ],
+      "request": {},
+      "source": "synthetic, expectation computed with Decimal",
+      "why": "baseline sum"
+    },
+    {
+      "expect": {
+        "currency": "USD",
+        "estimated": false,
+        "outcome": "ok",
+        "page_count": 3,
+        "per_service": {
+          "Amazon Elastic Compute Cloud - Compute": "6.75",
+          "Amazon Simple Storage Service": "3.30"
+        },
+        "total": "10.05"
+      },
+      "id": "three_pages_token_chain",
+      "kind": "response",
+      "note": "requests after page 1 must carry NextPageToken",
+      "pages": [
+        {
+          "DimensionValueAttributes": [],
+          "GroupDefinitions": [
+            {
+              "Key": "SERVICE",
+              "Type": "DIMENSION"
+            }
+          ],
+          "NextPageToken": "tok-1",
+          "ResultsByTime": [
+            {
+              "Estimated": false,
+              "Groups": [
+                {
+                  "Keys": [
+                    "Amazon Elastic Compute Cloud - Compute"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "1.25",
+                      "Unit": "USD"
+                    }
+                  }
+                },
+                {
+                  "Keys": [
+                    "Amazon Simple Storage Service"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "1.10",
+                      "Unit": "USD"
+                    }
+                  }
+                }
+              ],
+              "TimePeriod": {
+                "End": "2026-09-02",
+                "Start": "2026-09-01"
+              },
+              "Total": {}
+            }
+          ]
+        },
+        {
+          "DimensionValueAttributes": [],
+          "GroupDefinitions": [
+            {
+              "Key": "SERVICE",
+              "Type": "DIMENSION"
+            }
+          ],
+          "NextPageToken": "tok-2",
+          "ResultsByTime": [
+            {
+              "Estimated": false,
+              "Groups": [
+                {
+                  "Keys": [
+                    "Amazon Elastic Compute Cloud - Compute"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "2.25",
+                      "Unit": "USD"
+                    }
+                  }
+                },
+                {
+                  "Keys": [
+                    "Amazon Simple Storage Service"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "1.10",
+                      "Unit": "USD"
+                    }
+                  }
+                }
+              ],
+              "TimePeriod": {
+                "End": "2026-09-03",
+                "Start": "2026-09-02"
+              },
+              "Total": {}
+            }
+          ]
+        },
+        {
+          "DimensionValueAttributes": [],
+          "GroupDefinitions": [
+            {
+              "Key": "SERVICE",
+              "Type": "DIMENSION"
+            }
+          ],
+          "ResultsByTime": [
+            {
+              "Estimated": false,
+              "Groups": [
+                {
+                  "Keys": [
+                    "Amazon Elastic Compute Cloud - Compute"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "3.25",
+                      "Unit": "USD"
+                    }
+                  }
+                },
+                {
+                  "Keys": [
+                    "Amazon Simple Storage Service"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "1.10",
+                      "Unit": "USD"
+                    }
+                  }
+                }
+              ],
+              "TimePeriod": {
+                "End": "2026-09-04",
+                "Start": "2026-09-03"
+              },
+              "Total": {}
+            }
+          ]
+        }
+      ],
+      "request": {},
+      "source": "synthetic, expectation computed with Decimal",
+      "why": "pagination: every page is fetched with identical parameters and the same group is summed across pages"
+    },
+    {
+      "expect": {
+        "currency": "USD",
+        "estimated": true,
+        "outcome": "ok",
+        "page_count": 1,
+        "per_service": {
+          "Amazon Simple Storage Service": "8.50"
+        },
+        "total": "8.50"
+      },
+      "id": "estimated_flag_on_last_day",
+      "kind": "response",
+      "note": null,
+      "pages": [
+        {
+          "DimensionValueAttributes": [],
+          "GroupDefinitions": [
+            {
+              "Key": "SERVICE",
+              "Type": "DIMENSION"
+            }
+          ],
+          "ResultsByTime": [
+            {
+              "Estimated": false,
+              "Groups": [
+                {
+                  "Keys": [
+                    "Amazon Simple Storage Service"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "4.00",
+                      "Unit": "USD"
+                    }
+                  }
+                }
+              ],
+              "TimePeriod": {
+                "End": "2026-09-02",
+                "Start": "2026-09-01"
+              },
+              "Total": {}
+            },
+            {
+              "Estimated": true,
+              "Groups": [
+                {
+                  "Keys": [
+                    "Amazon Simple Storage Service"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "4.50",
+                      "Unit": "USD"
+                    }
+                  }
+                }
+              ],
+              "TimePeriod": {
+                "End": "2026-09-03",
+                "Start": "2026-09-02"
+              },
+              "Total": {}
+            }
+          ]
+        }
+      ],
+      "request": {},
+      "source": "synthetic, expectation computed with Decimal",
+      "why": "Estimated=true on any day means the total is provisional; confidence must be lower and the cache TTL short"
+    },
+    {
+      "expect": {
+        "currency": "USD",
+        "estimated": false,
+        "outcome": "ok",
+        "page_count": 1,
+        "per_service": {
+          "Amazon Elastic Compute Cloud - Compute": "100.00",
+          "Credit": "-25.50"
+        },
+        "total": "74.50"
+      },
+      "id": "credits_and_refunds_negative",
+      "kind": "response",
+      "note": null,
+      "pages": [
+        {
+          "DimensionValueAttributes": [],
+          "GroupDefinitions": [
+            {
+              "Key": "SERVICE",
+              "Type": "DIMENSION"
+            }
+          ],
+          "ResultsByTime": [
+            {
+              "Estimated": false,
+              "Groups": [
+                {
+                  "Keys": [
+                    "Amazon Elastic Compute Cloud - Compute"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "100.00",
+                      "Unit": "USD"
+                    }
+                  }
+                },
+                {
+                  "Keys": [
+                    "Credit"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "-25.50",
+                      "Unit": "USD"
+                    }
+                  }
+                }
+              ],
+              "TimePeriod": {
+                "End": "2026-09-02",
+                "Start": "2026-09-01"
+              },
+              "Total": {}
+            }
+          ]
+        }
+      ],
+      "request": {},
+      "source": "synthetic, expectation computed with Decimal",
+      "why": "negative amounts are real and must be summed, not clamped"
+    },
+    {
+      "expect": {
+        "currency": "USD",
+        "estimated": false,
+        "outcome": "ok",
+        "page_count": 1,
+        "per_service": {
+          "A": "0.0000001234",
+          "B": "1234567.891234567",
+          "C": "0.1",
+          "D": "0.2"
+        },
+        "total": "1234568.1912346904"
+      },
+      "id": "precision_small_and_large",
+      "kind": "response",
+      "note": null,
+      "pages": [
+        {
+          "DimensionValueAttributes": [],
+          "GroupDefinitions": [
+            {
+              "Key": "SERVICE",
+              "Type": "DIMENSION"
+            }
+          ],
+          "ResultsByTime": [
+            {
+              "Estimated": false,
+              "Groups": [
+                {
+                  "Keys": [
+                    "A"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "0.0000001234",
+                      "Unit": "USD"
+                    }
+                  }
+                },
+                {
+                  "Keys": [
+                    "B"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "1234567.891234567",
+                      "Unit": "USD"
+                    }
+                  }
+                },
+                {
+                  "Keys": [
+                    "C"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "0.1",
+                      "Unit": "USD"
+                    }
+                  }
+                },
+                {
+                  "Keys": [
+                    "D"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "0.2",
+                      "Unit": "USD"
+                    }
+                  }
+                }
+              ],
+              "TimePeriod": {
+                "End": "2026-09-02",
+                "Start": "2026-09-01"
+              },
+              "Total": {}
+            }
+          ]
+        }
+      ],
+      "request": {},
+      "source": "synthetic, expectation computed with Decimal",
+      "why": "decimal strings keep full precision; a float64 sum would drift"
+    },
+    {
+      "expect": {
+        "currency": "USD",
+        "estimated": false,
+        "outcome": "ok",
+        "page_count": 1,
+        "per_service": {
+          "AWS Free Tier": "0.0"
+        },
+        "total": "0.0"
+      },
+      "id": "real_zero",
+      "kind": "response",
+      "note": null,
+      "pages": [
+        {
+          "DimensionValueAttributes": [],
+          "GroupDefinitions": [
+            {
+              "Key": "SERVICE",
+              "Type": "DIMENSION"
+            }
+          ],
+          "ResultsByTime": [
+            {
+              "Estimated": false,
+              "Groups": [
+                {
+                  "Keys": [
+                    "AWS Free Tier"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "0.0",
+                      "Unit": "USD"
+                    }
+                  }
+                }
+              ],
+              "TimePeriod": {
+                "End": "2026-09-02",
+                "Start": "2026-09-01"
+              },
+              "Total": {}
+            }
+          ]
+        }
+      ],
+      "request": {},
+      "source": "synthetic, expectation computed with Decimal",
+      "why": "a genuine zero cost is a valid answer and differs from missing data"
+    },
+    {
+      "expect": {
+        "grpc_code": "NotFound or the spec's NO_COST_DATA error code",
+        "never": "a zero cost or a partial total presented as complete",
+        "outcome": "error",
+        "reason": "no data"
+      },
+      "id": "empty_results_by_time",
+      "kind": "response",
+      "note": null,
+      "pages": [
+        {
+          "DimensionValueAttributes": [],
+          "GroupDefinitions": [
+            {
+              "Key": "SERVICE",
+              "Type": "DIMENSION"
+            }
+          ],
+          "ResultsByTime": []
+        }
+      ],
+      "request": {},
+      "source": "synthetic",
+      "why": "no data at all is not $0: expect a NoCostData style error or the fallback hint"
+    },
+    {
+      "expect": {
+        "grpc_code": "Internal or DataLoss, never a panic",
+        "never": "a zero cost or a partial total presented as complete",
+        "outcome": "error",
+        "reason": "missing amount"
+      },
+      "id": "amount_missing",
+      "kind": "response",
+      "note": null,
+      "pages": [
+        {
+          "DimensionValueAttributes": [],
+          "GroupDefinitions": [
+            {
+              "Key": "SERVICE",
+              "Type": "DIMENSION"
+            }
+          ],
+          "ResultsByTime": [
+            {
+              "Estimated": false,
+              "Groups": [
+                {
+                  "Keys": [
+                    "X"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Unit": "USD"
+                    }
+                  }
+                }
+              ],
+              "TimePeriod": {
+                "End": "2026-09-02",
+                "Start": "2026-09-01"
+              },
+              "Total": {}
+            }
+          ]
+        }
+      ],
+      "request": {},
+      "source": "synthetic",
+      "why": "a group with no Amount must fail loudly; the old code dereferenced a nil pointer"
+    },
+    {
+      "expect": {
+        "grpc_code": "Internal or DataLoss",
+        "never": "a zero cost or a partial total presented as complete",
+        "outcome": "error",
+        "reason": "unparseable amount"
+      },
+      "id": "amount_unparseable",
+      "kind": "response",
+      "note": null,
+      "pages": [
+        {
+          "DimensionValueAttributes": [],
+          "GroupDefinitions": [
+            {
+              "Key": "SERVICE",
+              "Type": "DIMENSION"
+            }
+          ],
+          "ResultsByTime": [
+            {
+              "Estimated": false,
+              "Groups": [
+                {
+                  "Keys": [
+                    "X"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "not-a-number",
+                      "Unit": "USD"
+                    }
+                  }
+                }
+              ],
+              "TimePeriod": {
+                "End": "2026-09-02",
+                "Start": "2026-09-01"
+              },
+              "Total": {}
+            }
+          ]
+        }
+      ],
+      "request": {},
+      "source": "synthetic",
+      "why": "unparseable amounts were silently read as 0"
+    },
+    {
+      "expect": {
+        "grpc_code": "FailedPrecondition (the core has ErrMixedCurrencies)",
+        "never": "a zero cost or a partial total presented as complete",
+        "outcome": "error",
+        "reason": "mixed currencies"
+      },
+      "id": "mixed_currencies",
+      "kind": "response",
+      "note": null,
+      "pages": [
+        {
+          "DimensionValueAttributes": [],
+          "GroupDefinitions": [
+            {
+              "Key": "SERVICE",
+              "Type": "DIMENSION"
+            }
+          ],
+          "ResultsByTime": [
+            {
+              "Estimated": false,
+              "Groups": [
+                {
+                  "Keys": [
+                    "X"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "1.00",
+                      "Unit": "USD"
+                    }
+                  }
+                },
+                {
+                  "Keys": [
+                    "Y"
+                  ],
+                  "Metrics": {
+                    "UnblendedCost": {
+                      "Amount": "1.00",
+                      "Unit": "EUR"
+                    }
+                  }
+                }
+              ],
+              "TimePeriod": {
+                "End": "2026-09-02",
+                "Start": "2026-09-01"
+              },
+              "Total": {}
+            }
+          ]
+        }
+      ],
+      "request": {},
+      "source": "synthetic",
+      "why": "never add USD to EUR"
+    },
+    {
+      "confidence": "High for End exclusive and UTC; the policy for partial days is this tool's choice",
+      "end_unix": 1788393600,
+      "expect": {
+        "End": "2026-09-03",
+        "Start": "2026-09-01",
+        "outcome": "ok"
+      },
+      "id": "period:2026-09-01..2026-09-03:0",
+      "input_utc": [
+        "2026-09-01T00:00:00Z",
+        "2026-09-03T00:00:00Z"
+      ],
+      "kind": "request_period",
+      "start_unix": 1788220800
+    },
+    {
+      "confidence": "High for End exclusive and UTC; the policy for partial days is this tool's choice",
+      "end_unix": 1788264000,
+      "expect": {
+        "End": "2026-09-02",
+        "Start": "2026-09-01",
+        "outcome": "ok"
+      },
+      "id": "period:2026-09-01..2026-09-01:1",
+      "input_utc": [
+        "2026-09-01T00:00:00Z",
+        "2026-09-01T12:00:00Z"
+      ],
+      "kind": "request_period",
+      "start_unix": 1788220800
+    },
+    {
+      "confidence": "High for End exclusive and UTC; the policy for partial days is this tool's choice",
+      "end_unix": 1788309000,
+      "expect": {
+        "End": "2026-09-03",
+        "Start": "2026-09-01",
+        "outcome": "ok"
+      },
+      "id": "period:2026-09-01..2026-09-02:2",
+      "input_utc": [
+        "2026-09-01T23:30:00Z",
+        "2026-09-02T00:30:00Z"
+      ],
+      "kind": "request_period",
+      "start_unix": 1788305400
+    },
+    {
+      "confidence": "High for End exclusive and UTC; the policy for partial days is this tool's choice",
+      "end_unix": 1772323200,
+      "expect": {
+        "End": "2026-03-01",
+        "Start": "2026-02-28",
+        "outcome": "ok"
+      },
+      "id": "period:2026-02-28..2026-03-01:3",
+      "input_utc": [
+        "2026-02-28T00:00:00Z",
+        "2026-03-01T00:00:00Z"
+      ],
+      "kind": "request_period",
+      "start_unix": 1772236800
+    },
+    {
+      "confidence": "High for End exclusive and UTC; the policy for partial days is this tool's choice",
+      "end_unix": 1798761600,
+      "expect": {
+        "End": "2027-01-01",
+        "Start": "2026-12-31",
+        "outcome": "ok"
+      },
+      "id": "period:2026-12-31..2027-01-01:4",
+      "input_utc": [
+        "2026-12-31T00:00:00Z",
+        "2027-01-01T00:00:00Z"
+      ],
+      "kind": "request_period",
+      "start_unix": 1798675200
+    },
+    {
+      "confidence": "High for End exclusive and UTC; the policy for partial days is this tool's choice",
+      "end_unix": 1835481600,
+      "expect": {
+        "End": "2028-03-01",
+        "Start": "2028-02-28",
+        "outcome": "ok"
+      },
+      "id": "period:2028-02-28..2028-03-01:5",
+      "input_utc": [
+        "2028-02-28T00:00:00Z",
+        "2028-03-01T00:00:00Z"
+      ],
+      "kind": "request_period",
+      "start_unix": 1835308800
+    },
+    {
+      "end_unix": 1788220800,
+      "expect": {
+        "grpc_code": "InvalidArgument",
+        "outcome": "error"
+      },
+      "id": "period:invalid:0",
+      "input_utc": [
+        "2026-09-01T00:00:00Z",
+        "2026-09-01T00:00:00Z"
+      ],
+      "kind": "request_period",
+      "start_unix": 1788220800
+    },
+    {
+      "end_unix": 1788220800,
+      "expect": {
+        "grpc_code": "InvalidArgument",
+        "outcome": "error"
+      },
+      "id": "period:invalid:1",
+      "input_utc": [
+        "2026-09-02T00:00:00Z",
+        "2026-09-01T00:00:00Z"
+      ],
+      "kind": "request_period",
+      "start_unix": 1788307200
+    },
+    {
+      "confidence": "Medium: the official sample uses an instance id; the format for other services is unverified",
+      "expect": {
+        "dimension": "RESOURCE_ID",
+        "never": "the full ARN as the RESOURCE_ID value for EC2",
+        "operation": "GetCostAndUsageWithResources",
+        "value": "i-0abc123def4567890"
+      },
+      "id": "resource_id:ec2",
+      "input": "arn:aws:ec2:us-east-1:123456789012:instance/i-0abc123def4567890",
+      "kind": "resource_id"
+    },
+    {
+      "confidence": "Unverified",
+      "expect": {
+        "note": "per-resource data for non-EC2 services is unverified; the plugin must either use a documented id form or return an explicit error saying resource-level cost is not available for this service. Never a silent zero",
+        "outcome": "documented_choice"
+      },
+      "id": "resource_id:s3",
+      "input": "arn:aws:s3:::example-bucket",
+      "kind": "resource_id"
+    },
+    {
+      "confidence": "Unverified",
+      "expect": {
+        "note": "same as s3",
+        "outcome": "documented_choice"
+      },
+      "id": "resource_id:rds",
+      "input": "arn:aws:rds:us-east-1:123456789012:db:example-db",
+      "kind": "resource_id"
+    },
+    {
+      "confidence": "High (API reference)",
+      "expect": {
+        "grpc_code": "InvalidArgument or OutOfRange",
+        "note": "resource-level data covers the last 14 days only; the error must say so. Account and service totals reach back 14 months",
+        "outcome": "error"
+      },
+      "id": "resource_id:older_than_14_days",
+      "input": "arn:aws:ec2:us-east-1:123456789012:instance/i-0abc123def4567890",
+      "kind": "resource_id",
+      "request_age_days": 40
+    }
+  ],
+  "generated_at": "2026-10-01T23:34:23Z",
+  "purpose": "contract fixtures with independently computed expectations; see README"
+}

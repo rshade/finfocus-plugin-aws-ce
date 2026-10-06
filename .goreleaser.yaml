@@ -1,6 +1,6 @@
 version: 2
 
-project_name: pulumicost-plugin-aws-ce
+project_name: finfocus-plugin-aws-ce
 
 builds:
   - env:
@@ -13,21 +13,13 @@ builds:
       - amd64
       - arm64
     main: ./cmd/plugin
-    binary: pulumicost-plugin-aws-ce
+    binary: finfocus-plugin-aws-ce
     ldflags:
       - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
 
 archives:
   - format: tar.gz
-    # this name template makes the OS and Arch compatible with the results of uname.
-    name_template: >-
-      {{ .ProjectName }}_
-      {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}
-      {{- if .Arm }}v{{ .Arm }}{{ end }}
-    # use zip for windows archives
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ title .Os }}_{{ if eq .Arch \"amd64\" }}x86_64{{ else }}{{ .Arch }}{{ end }}"
     format_overrides:
       - goos: windows
         format: zip

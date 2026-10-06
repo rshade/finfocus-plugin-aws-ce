@@ -1,13 +1,13 @@
 metadata:
     name: aws-ce
     version: 0.1.0
-    description: PulumiCost plugin for aws-ce
+    description: FinFocus plugin for aws-ce
     author: rshade
     homepage: ""
     repository: ""
     license: Apache-2.0
     keywords:
-        - pulumicost
+        - finfocus
         - cost
         - plugin
         - aws

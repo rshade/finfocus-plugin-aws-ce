@@ -96,7 +96,7 @@ As a plugin developer querying AWS Cost Explorer, I need to extract region and a
 ## Assumptions
 
 - AWS ARN format is well-defined and stable (follows `arn:partition:service:region:account-id:resource` pattern)
-- The calling system (PulumiCost) will populate the ARN field when available from Pulumi state
+- The calling system (FinFocus) will populate the ARN field when available from Pulumi state
 - The `arn` field will use protobuf field number 5 as specified in the original issue
 - ARN parsing logic will be implemented in the plugin, not in the SDK
 

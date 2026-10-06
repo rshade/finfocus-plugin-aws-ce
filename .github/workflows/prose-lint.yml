@@ -1,0 +1,50 @@
+name: Prose
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  vale:
+    name: Vale (Google style)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v2
+        with:
+          install_only: true
+          install_args: vale aqua:reviewdog/reviewdog
+
+      - name: Fetch Vale styles
+        run: vale sync
+
+      - name: Vale -> reviewdog
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          vale . --output=line 2>/dev/null | reviewdog \
+            -efm="%f:%l:%c:%m" \
+            -name="vale" \
+            -reporter=github-pr-review \
+            -filter-mode=added \
+            -level=warning \
+            -fail-level=none
+
+  markdownlint:
+    name: Markdownlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v2
+        with:
+          install_only: true
+          install_args: node npm:markdownlint-cli2
+
+      - name: Run markdownlint
+        run: markdownlint-cli2 "**/*.md"

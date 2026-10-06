@@ -49,7 +49,7 @@ func WithRetry[T any](ctx context.Context, cfg RetryConfig, op RetryableFunc[T])
 		}
 
 		delay := calculateDelay(i, cfg.BaseDelay, cfg.MaxDelay)
-		
+
 		select {
 		case <-ctx.Done():
 			return empty, ctx.Err()
@@ -65,7 +65,7 @@ func WithRetry[T any](ctx context.Context, cfg RetryConfig, op RetryableFunc[T])
 func calculateDelay(attempt int, baseDelay, maxDelay time.Duration) time.Duration {
 	exp := math.Pow(2, float64(attempt))
 	delay := float64(baseDelay) * exp
-	
+
 	// Add jitter (0-20%)
 	jitter := (rand.Float64() * 0.2) + 0.9
 	delay = delay * jitter

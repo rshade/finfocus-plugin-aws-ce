@@ -1,12 +1,16 @@
 package pricing
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
 )
 
 // CacheManager handles hybrid in-memory and disk caching for cost data.
@@ -26,7 +30,7 @@ func NewCacheManager(cacheDir string, ttl time.Duration) (*CacheManager, error) 
 		if err != nil {
 			return nil, fmt.Errorf("getting user home dir: %w", err)
 		}
-		cacheDir = filepath.Join(homeDir, ".pulumicost", "cache", "aws-ce")
+		cacheDir = filepath.Join(homeDir, ".finfocus", "cache", "aws-ce")
 	}
 
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
@@ -48,43 +52,74 @@ func NewCacheManager(cacheDir string, ttl time.Duration) (*CacheManager, error) 
 	return cm, nil
 }
 
+const (
+	closedHistoryTTL   = 24 * time.Hour
+	recentCostTTL      = 15 * time.Minute
+	recentCostHorizon  = 48 * time.Hour
+	cacheGranularity   = "DAILY"
+	cacheMetric        = "UnblendedCost"
+	cacheGroupService  = "SERVICE"
+	cacheGroupResource = "RESOURCE_ID"
+)
+
 // Get retrieves a cache entry by key.
 func (cm *CacheManager) Get(key string) ([]CostEntry, bool) {
+	entry, ok := cm.getEntry(key)
+	if !ok {
+		return nil, false
+	}
+	return entry.Results, true
+}
+
+func (cm *CacheManager) getEntry(key string) (CacheEntry, bool) {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 
 	entry, ok := cm.memoryCache[key]
-	if !ok {
-		return nil, false
+	if !ok || time.Now().After(entry.ExpiresAt) {
+		return CacheEntry{}, false
 	}
-
-	if time.Now().After(entry.ExpiresAt) {
-		return nil, false
-	}
-
-	return entry.Results, true
+	return entry, true
 }
 
-// Set stores a cache entry.
+// Set stores a cache entry for cm.ttl.
 func (cm *CacheManager) Set(key string, results []CostEntry) error {
+	_, err := cm.SetWithTTL(key, results, cm.ttl)
+	return err
+}
+
+// SetWithTTL stores a cache entry that expires after ttl.
+// ttl applies only to this entry. It does not change the manager default.
+func (cm *CacheManager) SetWithTTL(key string, results []CostEntry, ttl time.Duration) (time.Time, error) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	now := time.Now()
+	now := time.Now().UTC()
+	expires := now.Add(ttl)
 	entry := CacheEntry{
 		QueryKey:  key,
 		Results:   results,
 		CreatedAt: now,
-		ExpiresAt: now.Add(cm.ttl),
+		ExpiresAt: expires,
 	}
 
 	cm.memoryCache[key] = entry
-	return cm.saveToDisk(key, entry)
+	if err := cm.saveToDisk(key, entry); err != nil {
+		return expires, err
+	}
+	return expires, nil
+}
+
+// cacheFileName is the SHA-256 hex of the logical key plus ".json".
+// The key can contain '/' and '..', so it is not used as a path segment.
+func cacheFileName(key string) string {
+	sum := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(sum[:]) + ".json"
 }
 
 // saveToDisk writes a single cache entry to disk.
 func (cm *CacheManager) saveToDisk(key string, entry CacheEntry) error {
-	filename := filepath.Join(cm.cacheDir, fmt.Sprintf("%s.json", key))
+	filename := filepath.Join(cm.cacheDir, cacheFileName(key))
 	data, err := json.Marshal(entry)
 	if err != nil {
 		return fmt.Errorf("marshaling cache entry: %w", err)
@@ -144,4 +179,35 @@ func (cm *CacheManager) loadFromDisk() error {
 	}
 
 	return nil
+}
+
+// actualCostCacheKey identifies one GetActualCost answer.
+// Tags are not in the key: GetActualCost ignores them (CE-6.7).
+func actualCostCacheKey(plan costQueryPlan, req *pbc.GetActualCostRequest) string {
+	group := cacheGroupService
+	if plan.resourceLevel {
+		group = cacheGroupResource
+	}
+	return fmt.Sprintf("cost:%s:%d:%d:%s:%s:%s",
+		plan.cacheID,
+		req.GetStart().GetSeconds(),
+		req.GetEnd().GetSeconds(),
+		cacheGranularity,
+		group,
+		cacheMetric,
+	)
+}
+
+// actualCostTTL is 15 minutes when a row is estimated or the request still
+// ends inside the last 48 hours. Closed history with no estimate stays 24 hours.
+func actualCostTTL(end time.Time, rows []CostEntry, now time.Time) time.Duration {
+	for _, row := range rows {
+		if row.Estimated {
+			return recentCostTTL
+		}
+	}
+	if end.After(now.UTC().Add(-recentCostHorizon)) {
+		return recentCostTTL
+	}
+	return closedHistoryTTL
 }

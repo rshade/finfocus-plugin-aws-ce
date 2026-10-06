@@ -48,7 +48,7 @@ Per plan.md, this is a single-binary Go plugin:
 
 **Why Combined**: US1 (Startup Configuration) and US2 (Standardized Logging) both modify `cmd/plugin/main.go` - combining prevents file conflicts
 
-**Independent Test**: Start plugin with `PULUMICOST_PLUGIN_PORT=50051 PULUMICOST_LOG_LEVEL=debug ./bin/pulumicost-plugin-aws-ce --port 50052` and verify:
+**Independent Test**: Start plugin with `FINFOCUS_PLUGIN_PORT=50051 FINFOCUS_LOG_LEVEL=debug ./bin/finfocus-plugin-aws-ce --port 50052` and verify:
 
 1. Plugin binds to port 50052 (CLI flag takes precedence)
 2. Debug-level logs appear with structured JSON format

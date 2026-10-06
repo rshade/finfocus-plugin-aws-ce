@@ -28,7 +28,7 @@ Follow-up TODOs:
   - None
 -->
 
-# PulumiCost Plugin AWS CE Constitution
+# FinFocus Plugin AWS CE Constitution
 
 ## Core Principles
 
@@ -54,7 +54,7 @@ Follow-up TODOs:
 - Large files are acceptable when they serve a single, cohesive purpose
   (e.g., comprehensive test suites, well-structured service implementations)
 
-**Rationale:** This plugin is called as an external gRPC service by PulumiCost
+**Rationale:** This plugin is called as an external gRPC service by FinFocus
 core. Complexity compounds debugging difficulty when troubleshooting RPC
 interactions. Simple, obvious code reduces maintenance burden and makes
 contribution easier.
@@ -98,7 +98,7 @@ refactoring and catch regressions early.
 - **gRPC CostSourceService protocol is sacred:**
   - NEVER log to stdout except PORT announcement
   - Use zerolog for structured JSON logging to stderr
-  - Log entries MUST include `[pulumicost-plugin-aws-ce]` component identifier
+  - Log entries MUST include `[finfocus-plugin-aws-ce]` component identifier
   - Use `pluginsdk.Serve()` for lifecycle management
 - **Error codes MUST use proto ErrorCode enum:**
   - `ERROR_CODE_INVALID_RESOURCE`: Missing required ResourceDescriptor fields
@@ -125,9 +125,9 @@ refactoring and catch regressions early.
 - `GetServiceActualCost()`, `GetAccountActualCost()` → service-level and
   account-level queries
 
-**Rationale:** PulumiCost core depends on predictable gRPC protocol behavior.
+**Rationale:** FinFocus core depends on predictable gRPC protocol behavior.
 Breaking protocol compatibility breaks the integration. Using proto-defined
-types ensures compatibility across all PulumiCost plugins. Consistent error
+types ensures compatibility across all FinFocus plugins. Consistent error
 messages reduce user confusion and support burden.
 
 ### IV. Performance Requirements
@@ -207,7 +207,7 @@ prevents unauthorized network access.
 **Rationale:** Consistent workflow reduces friction in collaboration and code
 review. Conventional commits enable automated changelog generation.
 Constitution compliance checks ensure long-term maintainability. gRPC protocol
-compatibility is critical for integration with PulumiCost core.
+compatibility is critical for integration with FinFocus core.
 
 ## Governance
 

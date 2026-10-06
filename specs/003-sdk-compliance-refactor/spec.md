@@ -15,15 +15,15 @@
 
 ### User Story 1 - Plugin Startup Configuration (Priority: P1)
 
-As an operator deploying the AWS Cost Explorer plugin, I want the plugin to respect standard PulumiCost environment variables and CLI flags so that I can configure it consistently with other plugins in my infrastructure.
+As an operator deploying the AWS Cost Explorer plugin, I want the plugin to respect standard FinFocus environment variables and CLI flags so that I can configure it consistently with other plugins in my infrastructure.
 
-**Why this priority**: Plugin startup configuration is foundational - without proper environment variable and flag handling, the plugin cannot integrate correctly with the PulumiCost Core orchestration system.
+**Why this priority**: Plugin startup configuration is foundational - without proper environment variable and flag handling, the plugin cannot integrate correctly with the FinFocus Core orchestration system.
 
 **Independent Test**: Can be fully tested by starting the plugin with various environment variable combinations and verifying it initializes correctly with the expected configuration.
 
 **Acceptance Scenarios**:
 
-1. **Given** the `PULUMICOST_PLUGIN_PORT` environment variable is set, **When** the plugin starts, **Then** it binds to the specified port.
+1. **Given** the `FINFOCUS_PLUGIN_PORT` environment variable is set, **When** the plugin starts, **Then** it binds to the specified port.
 2. **Given** the `--port` CLI flag is provided, **When** the plugin starts, **Then** it binds to the port specified by the flag (overriding environment variable if both set).
 3. **Given** neither port configuration is provided, **When** the plugin starts, **Then** it binds to an available system-assigned port.
 
@@ -35,13 +35,13 @@ As an operator troubleshooting plugin behavior, I want logs written to a configu
 
 **Why this priority**: Logging is essential for operational visibility and debugging. Without standardized logging, operators cannot effectively diagnose issues in production.
 
-**Independent Test**: Can be fully tested by setting `PULUMICOST_LOG_FILE` and `PULUMICOST_LOG_LEVEL`, then verifying log output appears in the specified file with appropriate detail levels.
+**Independent Test**: Can be fully tested by setting `FINFOCUS_LOG_FILE` and `FINFOCUS_LOG_LEVEL`, then verifying log output appears in the specified file with appropriate detail levels.
 
 **Acceptance Scenarios**:
 
-1. **Given** `PULUMICOST_LOG_FILE` is set to a valid path, **When** the plugin logs messages, **Then** logs are written to that file.
-2. **Given** `PULUMICOST_LOG_LEVEL` is set to "debug", **When** the plugin processes requests, **Then** detailed debug-level messages are logged.
-3. **Given** `PULUMICOST_LOG_LEVEL` is set to "error", **When** the plugin processes requests successfully, **Then** only error-level messages appear (no info/debug noise).
+1. **Given** `FINFOCUS_LOG_FILE` is set to a valid path, **When** the plugin logs messages, **Then** logs are written to that file.
+2. **Given** `FINFOCUS_LOG_LEVEL` is set to "debug", **When** the plugin processes requests, **Then** detailed debug-level messages are logged.
+3. **Given** `FINFOCUS_LOG_LEVEL` is set to "error", **When** the plugin processes requests successfully, **Then** only error-level messages appear (no info/debug noise).
 
 ---
 
@@ -78,7 +78,7 @@ As an operator managing plugin lifecycle, I want the plugin to shut down cleanly
 
 ### Edge Cases
 
-- What happens when `PULUMICOST_LOG_FILE` points to a non-writable path?
+- What happens when `FINFOCUS_LOG_FILE` points to a non-writable path?
   - The plugin logs an error to stderr and continues with console-only logging.
 - What happens when port specified by `--port` is already in use?
   - The plugin returns a clear error and exits gracefully (no panic or os.Exit).
@@ -91,9 +91,9 @@ As an operator managing plugin lifecycle, I want the plugin to shut down cleanly
 
 **Environment Variables**
 
-- **FR-001**: Plugin MUST read port configuration from `PULUMICOST_PLUGIN_PORT` environment variable using SDK helpers.
-- **FR-002**: Plugin MUST read log file path from `PULUMICOST_LOG_FILE` environment variable using SDK helpers.
-- **FR-003**: Plugin MUST read log level from `PULUMICOST_LOG_LEVEL` environment variable using SDK helpers.
+- **FR-001**: Plugin MUST read port configuration from `FINFOCUS_PLUGIN_PORT` environment variable using SDK helpers.
+- **FR-002**: Plugin MUST read log file path from `FINFOCUS_LOG_FILE` environment variable using SDK helpers.
+- **FR-003**: Plugin MUST read log level from `FINFOCUS_LOG_LEVEL` environment variable using SDK helpers.
 
 **CLI Flags**
 
@@ -138,10 +138,10 @@ As an operator managing plugin lifecycle, I want the plugin to shut down cleanly
 
 ### Measurable Outcomes
 
-- **SC-001**: Plugin starts successfully with any combination of `PULUMICOST_PLUGIN_PORT`, `PULUMICOST_LOG_FILE`, and `PULUMICOST_LOG_LEVEL` environment variables.
+- **SC-001**: Plugin starts successfully with any combination of `FINFOCUS_PLUGIN_PORT`, `FINFOCUS_LOG_FILE`, and `FINFOCUS_LOG_LEVEL` environment variables.
 - **SC-002**: All RPC operations are logged with timing information using `LogOperation()` pattern.
 - **SC-003**: No occurrences of `log.Fatal`, `log.Fatalf`, or `os.Exit` exist in the codebase.
-- **SC-004**: Invalid requests return SDK-standard error codes that match other PulumiCost plugins.
+- **SC-004**: Invalid requests return SDK-standard error codes that match other FinFocus plugins.
 - **SC-005**: Plugin passes all existing tests after refactoring without regression.
 - **SC-006**: `go build` completes without errors after dependency updates.
 - **SC-007**: `make lint` passes without warnings related to the refactored code.

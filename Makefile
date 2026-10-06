@@ -4,7 +4,7 @@
 
 # Variables
 PLUGIN_NAME = aws-ce
-BINARY_NAME = pulumicost-plugin-$(PLUGIN_NAME)
+BINARY_NAME = finfocus-plugin-$(PLUGIN_NAME)
 BUILD_DIR = bin
 CMD_DIR = cmd/plugin
 
@@ -53,10 +53,9 @@ lint:
 # Install plugin to local registry
 install: build
 	@echo "Installing plugin to local registry..."
-	@mkdir -p ~/.pulumicost/plugins/$(PLUGIN_NAME)/1.0.0
-	@cp $(BUILD_DIR)/$(BINARY_NAME) ~/.pulumicost/plugins/$(PLUGIN_NAME)/1.0.0/
-	@cp manifest.yaml ~/.pulumicost/plugins/$(PLUGIN_NAME)/1.0.0/plugin.manifest.json
-	@echo "✅ Plugin installed to ~/.pulumicost/plugins/$(PLUGIN_NAME)/1.0.0/"
+	@mkdir -p ~/.finfocus/plugins/aws-ce/0.1.0
+	@cp $(BUILD_DIR)/$(BINARY_NAME) ~/.finfocus/plugins/aws-ce/0.1.0/
+	@echo "✅ Plugin installed to ~/.finfocus/plugins/aws-ce/0.1.0/"
 
 # Development build with debug info
 build-debug:
@@ -82,7 +81,19 @@ deps:
 ensure: deps
 
 # Check for security vulnerabilities
-security:
+vuln:
 	@echo "Checking for security vulnerabilities..."
 	@govulncheck ./...
-	@echo "✅ Security check complete"
+	@echo "✅ Vulnerability check complete"
+
+# Lint markdown files
+lint-md:
+	@echo "Linting markdown..."
+	@markdownlint-cli2 "**/*.md"
+	@echo "✅ Markdown linting complete"
+
+# Release checks (goreleaser validation)
+release-check:
+	@echo "Checking goreleaser configuration..."
+	@goreleaser check
+	@echo "✅ Release configuration valid"

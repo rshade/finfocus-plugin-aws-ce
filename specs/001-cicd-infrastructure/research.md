@@ -12,7 +12,7 @@
 
 **Rationale**:
 - Product.md specifies this exact toolchain for single-binary Go projects
-- Mirrors the standards from pulumicost-plugin-aws-public reference project
+- Mirrors the standards from finfocus-plugin-aws-public reference project
 - GitHub Actions provides native integration with GitHub releases
 - Goreleaser handles cross-platform binary builds efficiently
 - Release-please automates semantic versioning and changelogs

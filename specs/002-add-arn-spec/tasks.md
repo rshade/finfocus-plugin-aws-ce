@@ -28,7 +28,7 @@ This is a Go plugin project with structure:
 **Purpose**: Upstream spec change must be completed and released before plugin work.
 **NOTE**: These tasks are to be executed in the `rshade/finfocus-spec` repository. They cannot be directly executed within this project context.
 
-- [x] T001 Create PR in rshade/finfocus-spec adding `string arn = 5` to GetActualCostRequest in proto/pulumicost/v1/costsource.proto
+- [x] T001 Create PR in rshade/finfocus-spec adding `string arn = 5` to GetActualCostRequest in proto/finfocus/v1/costsource.proto
 - [x] T002 Add documentation comment for arn field describing format and usage
 - [x] T003 Run `make generate` in finfocus-spec to regenerate Go SDK code
 - [x] T004 Merge PR and tag new spec release (e.g., v0.5.2 or v0.5.0)
