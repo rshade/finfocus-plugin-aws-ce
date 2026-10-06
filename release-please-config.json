@@ -4,7 +4,7 @@
     ".": {
       "release-type": "go",
       "bump-minor-pre-major": true,
-      "bump-patch-for-minor-pre-major": false,
+      "bump-patch-for-minor-pre-major": true,
       "changelog-path": "CHANGELOG.md",
       "draft": false,
       "prerelease": false,
@@ -36,6 +36,8 @@
         }
       ],
       "package-name": "finfocus-plugin-aws-ce",
+      "include-component-in-tag": false,
+      "initial-version": "0.1.0",
       "extra-files": [
         "manifest.json",
         "manifest.yaml"

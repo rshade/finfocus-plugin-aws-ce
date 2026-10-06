@@ -1221,3 +1221,35 @@ pkill finfocus-plugin-aws-ce
 - **Docker Build:** Should use region-agnostic binary (vs region-specific as in aws-public)
 - **No PR Blocking:** Tasks should be implemented phase-by-phase without PR approval gates
 - **E2E with Core:** Final verification should test against finfocus core binary, not just plugin isolation
+
+## Phase 8: Release readiness (REL-x)
+
+### REL-1: Release Please configuration and manifest
+
+**Status:** DONE, `go test -count=1 ./internal/test`, exit 0; break check: 15 config and manifest mutations each failed TestReleasePleaseConfiguration, restored.
+
+**ID:** REL-1  
+**Description:** Match aws-public settings, plain tags, initial version 0.1.0 and patch pre-major bumps. Manifest starts at 0.0.0; guard accepts bootstrap and future stable versions at or above 0.1.0. Ignore generated CHANGELOG.md.
+
+**Acceptance Criteria:** See superpowers run requirements; regression guard, deliberate break check and verification pass.
+
+### REL-2: Family release workflows
+
+**ID:** REL-2  
+**Description:** Copy aws-public Release Please and opencost single-binary release workflow, verify action tags, guard banned publishing paths, document the release token.
+
+**Acceptance Criteria:** See superpowers run requirements; regression guard, deliberate break check and verification pass.
+
+### REL-3: GoReleaser archive configuration
+
+**ID:** REL-3  
+**Description:** Use formats, installer-compatible names, archive and checksum assets only; validate and build snapshots for Linux, Darwin and Windows.
+
+**Acceptance Criteria:** See superpowers run requirements; regression guard, deliberate break check and verification pass.
+
+### REL-4: Spec v0.7.5 and resource descriptor compatibility
+
+**ID:** REL-4  
+**Description:** Upgrade spec and tidy; prefer resource descriptor identity with legacy resource_id fallback; preserve parseable manifests as Release Please extra-files.
+
+**Acceptance Criteria:** See superpowers run requirements; regression guard, deliberate break check and verification pass.
