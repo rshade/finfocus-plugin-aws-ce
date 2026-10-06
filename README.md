@@ -41,6 +41,12 @@ Rows labelled "No resource ID" are not a service total.
    make install
    ```
 
+Installation uses the version in `manifest.json`. `make install-local` is the
+same operation as `make install`; set `FINFOCUS_HOME` to choose the registry
+directory. `make develop` fetches Go dependencies, and `make test-integration`
+runs subprocess and protocol tests. `make docker` exits with a CE-3.2 owner
+decision message because container packaging is deferred.
+
 ### Configuration
 
 The plugin may require cloud provider credentials to function properly. See the configuration section for details.

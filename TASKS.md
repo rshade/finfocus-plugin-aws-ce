@@ -570,6 +570,8 @@ FOCUS 1.4 adds invoice-level detail tracking. AWS Cost Explorer's `GetCostAndUsa
 
 ### CE-3.1: Add Missing Makefile Targets
 
+**Status:** BLOCKED-ON-INPUT, Docker image build depends on excluded CE-3.2 and an owner decision; develop, test-integration, install-local and PHONY recipes verified by `go test -count=1 ./internal/test -run TestMake`; break check: removing test from PHONY skips the recipe and fails the execution guard.
+
 **ID:** CE-3.1  
 **Description:** Add Makefile targets for development workflows: `develop`, `test-integration`, `docker`, and `install-local`.
 

@@ -1,12 +1,16 @@
 # Makefile for aws-ce plugin
 
-.PHONY: build test clean lint help install
+.PHONY: help build test test-coverage clean lint install install-local build-debug fmt deps ensure develop vuln lint-md release-check test-integration docker
 
 # Variables
 PLUGIN_NAME = aws-ce
 BINARY_NAME = finfocus-plugin-$(PLUGIN_NAME)
 BUILD_DIR = bin
 CMD_DIR = cmd/plugin
+GO ?= go
+FINFOCUS_HOME ?= $(HOME)/.finfocus
+PLUGIN_VERSION ?= $(shell sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)".*/\1/p' manifest.json)
+INSTALL_DIR = $(FINFOCUS_HOME)/plugins/$(PLUGIN_NAME)/$(PLUGIN_VERSION)
 
 # Default target
 help:
@@ -16,25 +20,29 @@ help:
 	@echo "  clean     - Clean build artifacts"
 	@echo "  lint      - Run linters"
 	@echo "  install   - Install plugin to local registry"
+	@echo "  develop   - Fetch Go dependencies and prepare the build directory"
+	@echo "  test-integration - Run subprocess and protocol conformance tests"
+	@echo "  install-local - Install using the manifest version and FINFOCUS_HOME"
+	@echo "  docker    - Blocked on the CE-3.2 owner decision"
 	@echo "  help      - Show this help"
 
 # Build the plugin binary
 build:
 	@echo "Building $(PLUGIN_NAME) plugin..."
 	@mkdir -p $(BUILD_DIR)
-	@go build -o $(BUILD_DIR)/$(BINARY_NAME) ./$(CMD_DIR)
+	@$(GO) build -o $(BUILD_DIR)/$(BINARY_NAME) ./$(CMD_DIR)
 	@echo "✅ Plugin built: $(BUILD_DIR)/$(BINARY_NAME)"
 
 # Run tests
 test:
 	@echo "Running tests..."
-	@go test -v ./...
+	@$(GO) test -count=1 -v ./...
 
 # Run tests with coverage
 test-coverage:
 	@echo "Running tests with coverage..."
-	@go test -coverprofile=coverage.out ./...
-	@go tool cover -html=coverage.out -o coverage.html
+	@$(GO) test -count=1 -coverprofile=coverage.out ./...
+	@$(GO) tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 
 # Clean build artifacts
@@ -51,30 +59,45 @@ lint:
 	@echo "✅ Linting complete"
 
 # Install plugin to local registry
-install: build
-	@echo "Installing plugin to local registry..."
-	@mkdir -p ~/.finfocus/plugins/aws-ce/0.1.0
-	@cp $(BUILD_DIR)/$(BINARY_NAME) ~/.finfocus/plugins/aws-ce/0.1.0/
-	@echo "✅ Plugin installed to ~/.finfocus/plugins/aws-ce/0.1.0/"
+install: install-local
+
+install-local: build
+	@test -n "$(PLUGIN_VERSION)" || { echo "manifest.json must supply a plugin version" >&2; exit 1; }
+	@mkdir -p "$(INSTALL_DIR)"
+	@cp "$(BUILD_DIR)/$(BINARY_NAME)" "$(INSTALL_DIR)/"
+	@echo "Plugin installed to $(INSTALL_DIR)/"
+
+# Docker packaging is excluded until the owner resolves CE-3.2.
+docker:
+	@echo "CE-3.2: Docker image builds need an owner decision; releases publish archives only." >&2
+	@exit 1
+
+# Run real process and protocol integration tests.
+test-integration:
+	@$(GO) test -count=1 -v ./test/integration/... ./test/conformance/...
+
+# Prepare local development dependencies and build output.
+develop: deps
+	@mkdir -p "$(BUILD_DIR)"
 
 # Development build with debug info
 build-debug:
 	@echo "Building $(PLUGIN_NAME) plugin with debug info..."
 	@mkdir -p $(BUILD_DIR)
-	@go build -gcflags="all=-N -l" -o $(BUILD_DIR)/$(BINARY_NAME) ./$(CMD_DIR)
+	@$(GO) build -gcflags="all=-N -l" -o $(BUILD_DIR)/$(BINARY_NAME) ./$(CMD_DIR)
 	@echo "✅ Debug build complete: $(BUILD_DIR)/$(BINARY_NAME)"
 
 # Format code
 fmt:
 	@echo "Formatting code..."
-	@go fmt ./...
+	@$(GO) fmt ./...
 	@echo "✅ Code formatting complete"
 
 # Update dependencies
 deps:
 	@echo "Updating dependencies..."
-	@go mod tidy
-	@go mod download
+	@$(GO) mod tidy
+	@$(GO) mod download
 	@echo "✅ Dependencies updated"
 
 # Ensure dependencies (alias for deps)
