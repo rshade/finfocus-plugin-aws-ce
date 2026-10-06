@@ -189,7 +189,7 @@ kill -TERM $PID
 
 ## Spec compatibility
 
-The plugin uses finfocus-spec v0.7.5. On actual-cost requests, the id or ARN in a resource
+The plugin uses `finfocus-spec v0.7.5`. On actual-cost requests, the id or ARN in a resource
 descriptor takes precedence over legacy identifiers. When the
 descriptor has neither, the plugin falls back to `resource_id` and `arn`.
 The SDK still requires `resource_id` on every request.
@@ -239,3 +239,18 @@ endpoint. The legacy `finfocus_E2E` name remains a fallback when the uppercase
 name is unset. An explicit uppercase `false` disables the fallback. The E2E
 test injects synthetic credentials and never queries a live AWS service.
 Real-account and FinFocus core E2E verification remain blocked on credentials.
+
+## Per-request AWS credentials
+
+The host may supply `access_key_id` and `secret_access_key` together, an optional
+`session_token` with that pair, and optional `role_arn` to assume an IAM role.
+A role alone uses the default AWS credential chain as its STS source. Names are
+case-insensitive. Unsupported names, incomplete pairs, whitespace-only values
+and malformed role ARNs return `InvalidArgument` with
+`ERROR_CODE_INVALID_CREDENTIALS`. Invalid credentials never fall back to the
+process chain. Credential-bearing requests bypass the shared cache, and their
+values are excluded from logs and returned errors.
+
+See [AWS credentials](docs/CREDENTIALS.md) for permissions, supported shapes
+and error handling. These names belong to this plugin; the spec intentionally
+keeps credential names free-form.

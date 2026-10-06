@@ -939,6 +939,8 @@ dependency: Cost Explorer data lags 24 hours or more, which the docs must say.
 
 ### CE-6.11: Document the AWS per-request credential keys
 
+**Status:** DONE, `go test -count=1 ./... && golangci-lint run ./... && markdownlint-cli2 README.md docs/CREDENTIALS.md TASKS.md`, exit 0; break check: raw client error logging and disabled IAM-role validation each failed redaction/shape tests, restored.
+
 **ID:** CE-6.11  
 **Description:** CE-1.6 already uses the keys `access_key_id`, `secret_access_key`, `session_token` and
 `role_arn`. Document them (README and `docs/`), validate them, and test that none is ever logged. Credential

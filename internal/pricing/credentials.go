@@ -3,7 +3,8 @@ package pricing
 import (
 	"context"
 	"errors"
-	"fmt"
+	"regexp"
+	"strings"
 
 	"github.com/aws/smithy-go"
 	"github.com/rs/zerolog"
@@ -47,8 +48,8 @@ func (c *Calculator) clientForCall(ctx context.Context, logger zerolog.Logger) (
 	}
 	ce, err := open(ctx, cfg)
 	if err != nil {
-		logger.Error().Err(err).Msg("Failed to initialize Cost Explorer client")
-		return nil, true, fmt.Errorf("initializing Cost Explorer client: %w", err)
+		logger.Error().Msg("Failed to initialize per-request Cost Explorer client")
+		return nil, true, status.Error(codes.Internal, "per-request client initialization failed")
 	}
 	return ce, true, nil
 }
@@ -58,15 +59,15 @@ func invalidCredentials(err error) error {
 }
 
 // perRequestAWSFailure is the status and log text for a per-request AWS call.
-// It uses smithy.APIError.ErrorCode only. Error and ErrorMessage can contain
-// the role ARN, so neither is read.
+// API failures use ErrorCode only. Generic failures use fixed text.
+// Error and ErrorMessage may contain credentials, so neither is logged.
 func perRequestAWSFailure(perRequest bool, err error) (string, bool) {
 	if !perRequest {
 		return "", false
 	}
 	code, ok := awsAPIErrorCode(err)
 	if !ok {
-		return "", false
+		return "retrieving costs failed", true
 	}
 	return awsAPIErrorText(code), true
 }
@@ -113,11 +114,28 @@ func mapAWSAPIError(err error) (error, bool) {
 	}
 }
 
+var credentialRoleARNPattern = regexp.MustCompile(`^arn:aws(?:-[a-z0-9-]+)?:iam::[0-9]{12}:role/[^[:space:]]+$`)
+
 func configFromCredentials(creds pluginsdk.Credentials) (client.Config, error) {
+	for _, name := range creds.Names() {
+		switch name {
+		case "access_key_id", "secret_access_key", "session_token", "role_arn":
+		default:
+			return client.Config{}, errors.New("unsupported per-request credential key")
+		}
+		value, _ := creds.Get(name)
+		if strings.TrimSpace(value) == "" {
+			return client.Config{}, errPerRequestCredentialsIncomplete
+		}
+	}
+
 	access, hasAccess := creds.Get("access_key_id")
 	secret, hasSecret := creds.Get("secret_access_key")
 	token, hasToken := creds.Get("session_token")
 	role, _ := creds.Get("role_arn")
+	if role != "" && !credentialRoleARNPattern.MatchString(role) {
+		return client.Config{}, errors.New("per-request credential role ARN is invalid")
+	}
 
 	if hasAccess || hasSecret || hasToken {
 		if !hasAccess || !hasSecret {

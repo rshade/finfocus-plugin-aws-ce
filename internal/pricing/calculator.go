@@ -270,6 +270,14 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 			logger.Error().Int("ce_requests", pages).Msg(status.Convert(mapped).Message())
 			return nil, mapped
 		}
+		if msg, sensitive := perRequestAWSFailure(perRequest, err); sensitive {
+			logger.Error().Int("ce_requests", pages).Msg(msg)
+			mapped := mapCostError(resourceID, err)
+			if status.Code(mapped) == codes.Internal {
+				return nil, status.Error(codes.Internal, msg)
+			}
+			return nil, mapped
+		}
 		logger.Error().Err(err).Int("ce_requests", pages).Msg("Failed to retrieve costs from AWS")
 		return nil, mapCostError(resourceID, err)
 	}
