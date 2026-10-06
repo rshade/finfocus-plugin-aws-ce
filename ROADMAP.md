@@ -8,9 +8,9 @@ This roadmap outlines the development path for `finfocus-plugin-aws-ce`, priorit
 
 | Milestone | Focus | Status |
 |-----------|-------|--------|
-| v0.1.0 | Foundation & CI/CD | 🔄 In Progress (2 open / 3 closed) |
-| v0.2.0 | Core Features | 📋 Planned (13 open / 2 closed) |
-| v0.3.0 | Advanced Features | 🔬 Research (5 open) |
+| v0.1.0 | Foundation & CI/CD | 🔄 Offline readiness verified; release pending |
+| v0.2.0 | Core Features | 📋 Planned |
+| v0.3.0 | Advanced Features | 🔬 Research |
 
 ## Past Milestones (Done)
 
@@ -23,14 +23,20 @@ This roadmap outlines the development path for `finfocus-plugin-aws-ce`, priorit
 | ✅ Done | [#2](https://github.com/rshade/finfocus-plugin-aws-ce/issues/2) | Initial plugin creation for real AWS billing data |
 | ✅ Done | [#7](https://github.com/rshade/finfocus-plugin-aws-ce/issues/7) | Establish CI/CD Infrastructure |
 
+Release plumbing, actual-cost behavior, integration and conformance tests are
+verified offline. Live CE-6.1 and CE-5.1 remain blocked on credentials.
+The whole-repository Markdown check retains frozen-history errors; vulnerability
+scanning retains the known gRPC finding. Docker packaging remains deferred.
+Local delivery labels do not close GitHub issues.
+
 ## Current Focus (v0.1.0 - Foundation & CI/CD)
 
 | Status | Issue | Technical Thesis | Boundary Guardrail |
 |--------|-------|------------------|-------------------|
 | 🔄 In Progress | [#11](https://github.com/rshade/finfocus-plugin-aws-ce/issues/11) | Core Cost Plugin - `GetActualCost` with FOCUS 1.2 records | Use values directly from `GetCostAndUsage` |
-| 📋 Planned | [#12](https://github.com/rshade/finfocus-plugin-aws-ce/issues/12) | Installation & Documentation polish | Out-of-the-box experience |
-| 📋 Planned | [#31](https://github.com/rshade/finfocus-plugin-aws-ce/issues/31) | Plugin Conformance Test Suite integration | Do not modify test suite to pass |
-| 📋 Planned | [#23](https://github.com/rshade/finfocus-plugin-aws-ce/issues/23) | Update finfocus-spec to enable gRPC reflection | Dependency update only |
+| ✅ Implemented | [#12](https://github.com/rshade/finfocus-plugin-aws-ce/issues/12) | Installation & Documentation polish | Out-of-the-box experience |
+| ✅ Implemented | [#31](https://github.com/rshade/finfocus-plugin-aws-ce/issues/31) | Plugin Conformance Test Suite integration | Do not modify test suite to pass |
+| 📋 Planned | [#23](https://github.com/rshade/finfocus-plugin-aws-ce/issues/23) | Use finfocus-spec v0.7.5 | Dependency update only |
 
 ## Near-Term Vision (v0.2.0 - Core Features)
 
@@ -38,17 +44,17 @@ This roadmap outlines the development path for `finfocus-plugin-aws-ce`, priorit
 
 | Status | Issue | Technical Thesis | Boundary Guardrail |
 |--------|-------|------------------|-------------------|
-| 📋 Planned | [#40](https://github.com/rshade/finfocus-plugin-aws-ce/issues/40) | Add GetPluginInfo() RPC | Return plugin metadata for discovery |
-| 📋 Planned | [#41](https://github.com/rshade/finfocus-plugin-aws-ce/issues/41) | Add Supports() RPC | Validate resource/provider support |
+| ✅ Implemented | [#40](https://github.com/rshade/finfocus-plugin-aws-ce/issues/40) | Add GetPluginInfo() RPC | Return plugin metadata for discovery |
+| ✅ Implemented | [#41](https://github.com/rshade/finfocus-plugin-aws-ce/issues/41) | Add Supports() RPC | Validate resource/provider support |
 | 📋 Planned | [#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42) | Docker support with multi-stage build | Container deployment |
 | 📋 Planned | [#43](https://github.com/rshade/finfocus-plugin-aws-ce/issues/43) | HTTP health endpoint | Container orchestration support |
 | 📋 Planned | [#44](https://github.com/rshade/finfocus-plugin-aws-ce/issues/44) | Documentation directory | API and deployment guides |
-| 📋 Planned | [#45](https://github.com/rshade/finfocus-plugin-aws-ce/issues/45) | Integration tests for gRPC server | Server behavior verification |
-| 📋 Planned | [#46](https://github.com/rshade/finfocus-plugin-aws-ce/issues/46) | Trace ID propagation | Distributed tracing support |
-| 📋 Planned | [#47](https://github.com/rshade/finfocus-plugin-aws-ce/issues/47) | Proto ErrorCode enum | Standardized error handling |
+| ✅ Implemented | [#45](https://github.com/rshade/finfocus-plugin-aws-ce/issues/45) | Integration tests for gRPC server | Server behavior verification |
+| ✅ Implemented | [#46](https://github.com/rshade/finfocus-plugin-aws-ce/issues/46) | Trace ID propagation | Distributed tracing support |
+| ✅ Implemented | [#47](https://github.com/rshade/finfocus-plugin-aws-ce/issues/47) | Proto ErrorCode enum | Standardized error handling |
 | 📋 Planned | [#48](https://github.com/rshade/finfocus-plugin-aws-ce/issues/48) | Standardize workflow names | CI/CD consistency |
-| 📋 Planned | [#50](https://github.com/rshade/finfocus-plugin-aws-ce/issues/50) | Makefile targets | Developer experience |
-| 📋 Planned | [#51](https://github.com/rshade/finfocus-plugin-aws-ce/issues/51) | Config parsing tests | Configuration reliability |
+| 🔄 Partial | [#50](https://github.com/rshade/finfocus-plugin-aws-ce/issues/50) | Makefile targets | Developer experience; Docker awaits owner decision |
+| ✅ Implemented | [#51](https://github.com/rshade/finfocus-plugin-aws-ce/issues/51) | Config parsing tests | Configuration reliability |
 | 📋 Planned | [#53](https://github.com/rshade/finfocus-plugin-aws-ce/issues/53) | CONTRIBUTING.md | Contributor onboarding |
 
 ### AWS Cost Features
@@ -125,7 +131,7 @@ This roadmap outlines the development path for `finfocus-plugin-aws-ce`, priorit
 
 | Icon | Status | Description |
 |------|--------|-------------|
-| ✅ | Done | Feature delivered and merged |
+| ✅ | Done | Implemented in the checkout; merging and releasing are separate steps |
 | 🔄 | In Progress | Active development |
 | 📋 | Planned | Spec drafted, ready for implementation |
 | 🔬 | Research | Investigating API capabilities |

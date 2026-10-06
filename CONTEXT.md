@@ -18,10 +18,10 @@ To prevent scope creep and architectural drift, this project adheres to the foll
 
 ## Data Source of Truth
 
-* **Actual Costs:** AWS Cost Explorer API (`GetCostAndUsage`).
-* **Forecasts:** AWS Cost Explorer API (`GetCostForecast`).
+* **Actual Costs:** AWS Cost Explorer API (`GetCostAndUsage` for service totals, `GetCostAndUsageWithResources` for EC2 instances).
+* **Forecasts:** Planned AWS Cost Explorer API (`GetCostForecast`); v0.1.0 serves actual costs only.
 * **Budgets:** AWS Budgets API (Planned).
-* **Metadata:** AWS Tags & Organizations APIs.
+* **Metadata:** Values supplied by Cost Explorer and the caller; AWS Tags and Organizations integration is not implemented.
 
 **Responsibility:** AWS is responsible for the accuracy of the billing data. We are responsible for the accuracy of the **translation** to the FOCUS 1.2 standard.
 
@@ -37,8 +37,8 @@ To prevent scope creep and architectural drift, this project adheres to the foll
 
 | RPC | Status | AWS API |
 |-----|--------|---------|
-| `GetActualCost` | ✅ Full | `GetCostAndUsage` |
-| `GetProjectedCost` | ❌ Blocked | Intentionally returns error (directs to aws-public plugin) |
+| `GetActualCost` | ✅ Offline protocol/contract verified | `GetCostAndUsage`, `GetCostAndUsageWithResources` |
+| `GetProjectedCost` | ❌ Outside v0.1.0 scope | Returns gRPC `Unimplemented` (CE-6.10) |
 
 ### SDK Compliance (v0.7.5)
 
@@ -57,12 +57,18 @@ The plugin uses standardized SDK helpers:
 3. **Filter Expressions** - Cost Explorer query filters
 4. **Cache Configuration** - TTL and storage location customization
 
-### Features Requiring Upstream Spec Work
+### Future work and current limits
 
-* `BudgetsProvider` interface (for AWS Budgets RPC)
-* `RecommendationsProvider` interface (for Rightsizing/RI/SP recommendations)
-* `AnomalyRecord` structure mapping (for Cost Explorer anomalies)
-* FOCUS 1.3 commitment columns (CommitmentDiscountId, etc.)
+The v0.7.5 SDK already provides budgets and recommendations interfaces and
+FOCUS commitment fields. Those features need plugin implementations and
+verification; their presence is not evidence of a protocol gap. Anomaly
+mapping requires separate design work outside this release.
+
+The caller must supply `billing_account_id` for FOCUS output. Without it,
+actual costs are returned with no FOCUS record. Credential keys are plugin
+conventions documented in [AWS credentials](docs/CREDENTIALS.md). Resource
+queries need account opt-in, cover 14 days and can lag 24 to 48 hours.
+Live-account verification is blocked on credentials.
 
 ## Verification Checklist
 

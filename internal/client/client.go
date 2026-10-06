@@ -55,6 +55,8 @@ type Config struct {
 }
 
 var (
+	// ErrRegionMissing is a safe configuration diagnostic with no credential data.
+	ErrRegionMissing = errors.New("missing AWS region; run export AWS_REGION=us-east-1 or configure region in your AWS profile")
 	// ErrAmountMissing is returned when UnblendedCost has no Amount.
 	ErrAmountMissing = errors.New("missing cost amount")
 	// ErrAmountUnparseable is returned when UnblendedCost.Amount is not a decimal.
@@ -111,6 +113,9 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 	awsCfg, err := loadAWSConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("loading AWS config: %w", err)
+	}
+	if awsCfg.Region == "" {
+		return nil, ErrRegionMissing
 	}
 	if cfg.BaseEndpoint != "" {
 		awsCfg.BaseEndpoint = aws.String(cfg.BaseEndpoint)

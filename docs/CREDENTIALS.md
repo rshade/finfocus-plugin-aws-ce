@@ -38,5 +38,7 @@ and an appropriate role trust policy.
 
 AWS access-denied errors return `PermissionDenied`; expired or invalid AWS
 sessions return `Unauthenticated`. Generic per-request client and request
-failures return sanitized errors. Credential values are excluded from logs
+failures return sanitized errors. Missing region configuration returns
+`FailedPrecondition` with an `AWS_REGION=us-east-1` setup action; this known-safe
+configuration hint contains no credential values. Credential values are excluded from logs
 and statuses, including diagnostics that echo keys, tokens or role ARNs.

@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 MD060 -->
 
-**Goal:** Release v0.1.0 as a production-ready actual-cost plugin backed by AWS Cost Explorer, with spec compliance, proper testing, Docker support, and documentation.
+**Goal:** Release v0.1.0 as a production-ready actual-cost plugin backed by AWS Cost Explorer, with spec compliance, testing and documentation. Docker packaging is deferred in this run.
 
 **Roadmap:** Phase-by-phase implementation, skipping PR gates until a working v0.1.0 exists.
 
@@ -114,14 +114,19 @@ Open a pull request to `rshade/finfocus`, modelled on #1697 (azure-public) and #
   Also run `plugin inspect <name> <type>`: opencost failed with "capability discovery not implemented", so record a
   failure as a plugin gap in the PR.
 
-State of this repo on 2026-10-06: not right. Upstream `main` is stale (last commit 2026-01-19, spec v0.5.2):
-`release-please.yml` uses `google-apis/release-please-action@v4` (the org is `googleapis`; that action does not
-exist) with `GITHUB_TOKEN`; `release.yml` uses old actions; the config has `package-name`
-`pulumicost-plugin-aws-ce` and no `include-component-in-tag` or `initial-version`; the manifest says `0.1.0` though
-no release exists; archives use deprecated `format` keys and the old `pulumicost` names. The local run branch
-`run/grok-20261001` (20 unpushed commits) differs in places. Fix: push the branch, copy aws-public's
-`release-please.yml` and opencost's `release.yml`, add the config keys, set the manifest to `0.0.0`, and rename to
-`finfocus-plugin-aws-ce` with `formats` keys.
+State at the start of run 2 (2026-10-06): main was at `77b1c17` with spec
+v0.7.0 and the owner task block. The package name was already `finfocus-plugin-aws-ce`
+and the release manifest was already `0.0.0`. Release config keys, token wiring,
+workflow actions and deprecated archive keys needed correction. REL-1 to REL-4
+now provide the configuration guards, copied family workflows, snapshot archives
+and spec v0.7.5. This run makes local commits only; no tag, release or push.
+
+Run 2 scope: REL-1 to REL-4, CE-6.5, CE-6.6, CE-6.10, CE-6.11,
+CE-2.1 to CE-2.3, CE-3.1 and CE-4.3. CE-3.1 Docker remains blocked on the
+excluded CE-3.2 owner decision. CE-3.2 to CE-3.4, CE-4.1, CE-4.2, CE-5.1,
+CE-1.7 and Phase 7 are deferred with owner PM. Live CE-6.1 and CE-5.1 are
+blocked on credentials. Registry changes in core and release publication are
+outside the write boundary. See the run report's not-delivered register.
 
 ## Scope (decided 2026-10-01)
 
@@ -137,7 +142,7 @@ change is made by this plan. The owner closes or merges them.
 | Duplicates | #19, #20, #28 (of #37), #22 (of #13), #24 (of #8), #25 (of #36), #26 (of #38) | none, see Issue Index |
 | Stale | #3 (cites `pulumicost-spec` and a field that does not exist), #23 (satisfied by spec v0.7.0) | none |
 
-### What the research found that this plan did not know (2026-10-01)
+### Historical research findings (2026-10-01; code fixes tracked below)
 
 Sources and confidence tags are in `finfocus-pm` research notes (`aws-ce-api-facts.md`,
 `aws-ce-issue-reconcile.md`). The ones that change the work:
@@ -146,7 +151,7 @@ Sources and confidence tags are in `finfocus-pm` research notes (`aws-ce-api-fac
   Per-resource cost needs `GetCostAndUsageWithResources`, which needs an opt-in by the management
   account, covers **the last 14 days only**, is daily (hourly for EC2 only), and lags up to 48
   hours. The "14 months" lookback is for account and service totals. Whether it works for non-EC2
-  resources is unverified. The code filters on the **full ARN**, which is probably wrong. See
+  resources is unverified. The old code filtered on the **full ARN**; CE-6.7 now uses the EC2 instance id. See
   CE-6.7.
 - Each paginated request costs **$0.01**, there is no published rate limit, only
   `LimitExceededException`, and AWS recommends a cache layer. See CE-6.8.
@@ -155,7 +160,7 @@ Sources and confidence tags are in `finfocus-pm` research notes (`aws-ce-api-fac
 - The SDK already provides a health endpoint and web/CORS config (`WebConfig`). Do not hand-roll
   #43; wire the SDK's.
 - Spec blockers cited by #36 and #38 (`finfocus-spec` #314, #315) are closed.
-- Silent-failure defects in the current code are listed in CE-6.2 to CE-6.3 with file and line.
+- Silent-failure defects in the original code are listed in CE-6.2 to CE-6.3 with file and line.
 - **No live AWS account exists and no sandbox, test data or free tier was found.** Moto returns
   only canned results; LocalStack Cost Explorer is a paid tier. Verification therefore uses the
   contract fixtures in `internal/client/testdata/ce-contract/` (CE-6.1) and an opt-in live test.
@@ -169,9 +174,9 @@ Sources and confidence tags are in `finfocus-pm` research notes (`aws-ce-api-fac
 | Item | Current | Should Be | Action |
 |------|---------|-----------|--------|
 | Local directory | `finfocus-plugin-aws-ce` | N/A (local dir name doesn't matter) | None |
-| Remote URL | `git@github.com:rshade/finfocus-plugin-aws-ce.git` | `git@github.com:rshade/finfocus-plugin-aws-ce.git` | Rename repo on GitHub or update remote |
-| go.mod module | `github.com/rshade/finfocus-plugin-aws-ce` | `github.com/rshade/finfocus-plugin-aws-ce` | Rename in v0.1.0 migration |
-| Logging component | `finfocus-plugin-aws-ce` | `finfocus-plugin-aws-ce` | Rename in v0.1.0 migration |
+| Remote URL | `git@github.com:rshade/finfocus-plugin-aws-ce.git` | `git@github.com:rshade/finfocus-plugin-aws-ce.git` | None; already named correctly |
+| `go.mod` module | `github.com/rshade/finfocus-plugin-aws-ce` | `github.com/rshade/finfocus-plugin-aws-ce` | None; migration complete |
+| Logging component | `finfocus-plugin-aws-ce` | `finfocus-plugin-aws-ce` | None; migration complete |
 
 **Drift Summary:** GitHub repo is renamed to `finfocus-plugin-aws-ce`, and local checkout, go.mod, and all references have been updated to use the new name.
 
@@ -183,7 +188,7 @@ Sources and confidence tags are in `finfocus-pm` research notes (`aws-ce-api-fac
 |-----------|---------|--------|-------|
 | **Language & Build** | | | |
 | Go | 1.27.1 | ✅ | Updated in go.mod and mise.toml |
-| finfocus-spec | v0.7.5 | ✅ | Unblocks per-request credentials + FOCUS 1.4 |
+| `finfocus-spec` | v0.7.5 | ✅ | Unblocks per-request credentials + FOCUS 1.4 |
 | ax-go | v0.7.0+ | ✅ | Arrives transitively via spec |
 | goreleaser | 2.18.2 | ✅ | Multi-platform release build configuration updated |
 | **Code Quality & Testing** | | | |
@@ -202,7 +207,7 @@ Sources and confidence tags are in `finfocus-pm` research notes (`aws-ce-api-fac
 | mise.toml | Latest | ✅ | Tool versioning pinned to ecosystem baseline |
 | .goreleaser.yaml | Updated | ✅ | Asset naming fixed for plugin installer compatibility |
 | .github/workflows/test.yml | Updated | ✅ | go@1.27.1, golangci-lint@2.14.0, govulncheck@1.8.0 |
-| .github/workflows/release.yml | Updated | ✅ | go@1.27.1, goreleaser@2.18.2 via mise-action |
+| .github/workflows/release.yml | Updated | ✅ | Single-binary family template; release-created and manual-tag triggers |
 | .github/workflows/commitlint.yml | Created | ✅ | Conventional commit validation on PRs |
 | .github/workflows/prose-lint.yml | Created | ✅ | Vale + markdownlint via reviewdog |
 
@@ -215,7 +220,7 @@ Sources and confidence tags are in `finfocus-pm` research notes (`aws-ce-api-fac
 - ✅ Remaining legacy references in tracked files: **0** (all removed)
 - ⚠️ Legacy references in untracked specs/004-core-cost-e2e/: 4 files (intentionally not edited per safety rules)
 
-### Build & Test Results (Latest: 2026-09-30 Post-Toolchain)
+### Historical Build & Test Results (2026-09-30 Post-Toolchain)
 
 ```bash
 $ go build ./...
@@ -233,25 +238,31 @@ ok      github.com/rshade/finfocus-plugin-aws-ce/internal/test          0.004s
 ok      github.com/rshade/finfocus-plugin-aws-ce/test/e2e               0.005s
 ```
 
-### RPC Implementation Status
+### RPC Implementation Status (run 2)
 
 | RPC | Status | Notes |
-|-----|--------|-------|
-| `GetActualCost()` | ✅ Implemented | Calls AWS Cost Explorer `GetCostAndUsage` API |
-| `GetProjectedCost()` | ❌ Not implemented | Returns error "projected cost not supported" |
-| `Supports()` | ⚠️ Inherited only | Uses BasePlugin default; no custom logic |
-| `GetPluginInfo()` | ❌ Not implemented | Missing entirely |
-| `BatchCost` | ❌ Not implemented | The spec upgrade to v0.7.0 is done, so the RPC exists. Post-v0.1.0 unless the run has time. |
-| `GetRecommendations()` | ❌ Not implemented | Future roadmap (issues #22, #26, #27) |
+| --- | --- | --- |
+| `GetActualCost()` | Implemented | Service totals and EC2 resource queries; fake endpoint verification |
+| `GetProjectedCost()` | Outside release scope | Returns `codes.Unimplemented` with CE-6.10 |
+| `Supports()` | Implemented | AWS identity validation, actual-only capabilities |
+| `GetPluginInfo()` | Implemented | Discovery metadata, spec v0.7.5, actual-only capabilities |
+| `BatchCost` | SDK fallback implemented | Validated batch limits and concurrent actual-cost requests |
+| `GetRecommendations()` | Deferred | Phase 7 |
 
 ### AWS Cost Explorer API Usage
 
-- **API Used:** `GetCostAndUsage` (real billing data)
-- **Retry Logic:** Exponential backoff with configurable retry count
-- **Lookback Limit:** account and service totals reach back 14 months; per-resource data only 14 days (see Scope). The code enforces 14 months for everything, which is wrong for resource-level queries
-- **Per-Request Cost:** AWS charges $0.01 per paginated request; there is no client-side metering or request budget (CE-6.8)
-- **Resource Filtering:** the code filters on `RESOURCE_ID` (the full ARN) with `GetCostAndUsage`, which cannot do that; Account ID is supported; `tags` in the request are ignored (CE-6.7)
-- **Caching:** Basic in-memory cache (no TTL/expires_at support)
+- **Operations used:** `GetCostAndUsage` for service totals and
+  `GetCostAndUsageWithResources` for EC2 instances.
+- **Retry logic:** Exponential backoff with configurable retry count.
+- **Lookback limits:** 14 months for service totals; 14 days for resource data.
+- **Request cost:** $0.01 per paginated request; page counting and an optional
+  per-minute request budget are implemented.
+- **Resource filtering:** Bare EC2 id plus the EC2 service filter; no full ARN
+  goes into `RESOURCE_ID`. Request `tags` remain ignored and documented.
+- **Caching:** Memory and disk with hashed file names; recent/estimated TTL
+  15 minutes and closed historical TTL 24 hours; `expires_at` supplied.
+- **Verification:** Offline contract fixtures and local fake HTTP only;
+  live AWS account behavior remains blocked on credentials.
 
 ### Open Issues Summary
 
@@ -260,15 +271,17 @@ ok      github.com/rshade/finfocus-plugin-aws-ce/test/e2e               0.005s
 - **Second run (Tier B):** 13 issues (CE-7)
 - **Duplicates / stale:** 7 and 2, marked in the Issue Index
 
-### Known Limitations (Pre-v0.1.0)
+### Current release limitations
 
-1. **No Supports() customization** - Falls back to BasePlugin default (fixed by CE-1.2)
-2. **No trace_id propagation** - Logging doesn't capture distributed trace IDs ([#46](https://github.com/rshade/finfocus-plugin-aws-ce/issues/46)) (fixed by CE-1.4)
-3. **No per-request credentials** - Only uses default AWS credential chain (fixed by CE-1.6)
-4. **No FOCUS 1.4 billing detail** - Missing invoice_detail_id and commitment columns (CE-1.7, post-v0.1.0)
-5. **No Docker build** - Binary only, no container support ([#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42)) (fixed by CE-3.2)
-6. **No CI/CD workflows** - Manual release process ([#48](https://github.com/rshade/finfocus-plugin-aws-ce/issues/48)) (fixed by CE-3.4)
-7. **Minimal documentation** - No deployment guides or contribution guidelines ([#44](https://github.com/rshade/finfocus-plugin-aws-ce/issues/44), [#53](https://github.com/rshade/finfocus-plugin-aws-ce/issues/53)) (fixed by CE-4.1, CE-4.2)
+1. Live account and core E2E verification remain blocked on credentials.
+2. Resource attribution is implemented for EC2 only, with account opt-in and
+   a 14-day window. Billing data lags by 24 hours or more.
+3. FOCUS requires caller `billing_account_id`; commitment and invoice detail
+   fields not present in queried AWS data remain unset.
+4. Container packaging, health endpoint, full deployment docs and contribution
+   guide are deferred to the PM; release workflows publish archives only.
+5. Whole-repository Markdown lint retains frozen-history errors. Vulnerability
+   scanning retains the known gRPC `GO-2026-6443` finding.
 
 ---
 
@@ -540,7 +553,7 @@ FOCUS 1.4 adds invoice-level detail tracking. AWS Cost Explorer's `GetCostAndUsa
 
 ### CE-2.3: Plugin Conformance Testing
 
-**Status:** DONE, `go test -count=1 -v ./test/conformance/... && golangci-lint run ./...`, exit 0; break check: mapping missing resource to Internal fails InvalidArgument and proto ErrorDetail assertion over the built process.
+**Status:** DONE, `go test -count=1 -v ./test/conformance/... && golangci-lint run ./...`, exit 0; break check: mapping missing resource to Internal fails InvalidArgument and typed `ErrorDetail` assertion over the built process.
 
 **ID:** CE-2.3  
 **Description:** Create test suite to verify plugin conformance with finfocus-spec. Tests should validate proto message structure, error handling, and protocol compliance.
@@ -669,7 +682,7 @@ FOCUS 1.4 adds invoice-level detail tracking. AWS Cost Explorer's `GetCostAndUsa
 
 **Related Issues:**
 
-- [#48](https://github.com/rshade/finfocus-plugin-aws-ce/issues/48) - Standardize workflow names and add missing CI/CD workflows
+- [#48](https://github.com/rshade/finfocus-plugin-aws-ce/issues/48) - Standardize workflow names and add missing `CI/CD` workflows
 
 ---
 
@@ -729,6 +742,8 @@ FOCUS 1.4 adds invoice-level detail tracking. AWS Cost Explorer's `GetCostAndUsa
 ---
 
 ### CE-4.3: Polish Installation & Documentation (Out-of-the-Box Experience)
+
+**Status:** DONE, `go test -count=1 ./... && golangci-lint run ./... && markdownlint-cli2 README.md ROADMAP.md CONTEXT.md TASKS.md docs/CREDENTIALS.md docs/QUICKSTART.md && python3 -m json.tool examples/plan.json`, exit 0; break check: removing region validation or masking its safe per-request error fails setup-action regression tests.
 
 **ID:** CE-4.3  
 **Description:** Ensure first-time user experience is smooth: clear README, quick-start guide, example commands, error messages.
@@ -858,7 +873,7 @@ and fails a test; no commitment data returns the fields unset, not zero.
 
 ### CE-6.5: Metadata enrichment through the right field (#52)
 
-**Status:** DONE, `go test -count=1 ./... && golangci-lint run ./... && markdownlint-cli2 README.md TASKS.md`, exit 0; break check: forced estimated=false; both TestActualCostMetadata lookback cases failed, restored.
+**Status:** DONE, `go test -count=1 ./... && golangci-lint run ./... && markdownlint-cli2 README.md TASKS.md`, exit 0; break check: forced estimated=false; both TestActualCostMetadata `lookback` cases failed, restored.
 
 **ID:** CE-6.5  
 **Description:** The issue's code assumes a `metadata` map on `ActualCostResult`, which does not
@@ -1078,18 +1093,18 @@ validates them. Never default to a wildcard with credentials.
 | [#38](https://github.com/rshade/finfocus-plugin-aws-ce/issues/38) | feat: Implement cost anomaly detection via GetRecommendations | enhancement, roadmap/next | Tier B | CE-7.11 |
 | [#40](https://github.com/rshade/finfocus-plugin-aws-ce/issues/40) | feat: Add GetPluginInfo() RPC implementation | enhancement, roadmap/current | **CE-1.3** | ✅ In scope |
 | [#41](https://github.com/rshade/finfocus-plugin-aws-ce/issues/41) | feat: Add Supports() RPC implementation | enhancement, roadmap/current | **CE-1.2** | ✅ In scope |
-| [#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42) | feat: Add Docker support with multi-stage build | enhancement, roadmap/current | **CE-3.2** | ✅ In scope |
-| [#43](https://github.com/rshade/finfocus-plugin-aws-ce/issues/43) | feat: Add HTTP health endpoint for container orchestration | enhancement, roadmap/current | **CE-3.3** | ✅ In scope |
-| [#44](https://github.com/rshade/finfocus-plugin-aws-ce/issues/44) | docs: Create documentation directory with API and deployment guides | documentation, roadmap/current | **CE-4.1** | ✅ In scope |
+| [#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42) | feat: Add Docker support with multi-stage build | enhancement, roadmap/current | **CE-3.2** | Deferred in run 2; PM |
+| [#43](https://github.com/rshade/finfocus-plugin-aws-ce/issues/43) | feat: Add HTTP health endpoint for container orchestration | enhancement, roadmap/current | **CE-3.3** | Deferred in run 2; PM |
+| [#44](https://github.com/rshade/finfocus-plugin-aws-ce/issues/44) | docs: Create documentation directory with API and deployment guides | documentation, roadmap/current | **CE-4.1** | Deferred in run 2; PM |
 | [#45](https://github.com/rshade/finfocus-plugin-aws-ce/issues/45) | test: Add integration tests for gRPC server | enhancement, roadmap/current | **CE-2.1** | ✅ In scope |
 | [#46](https://github.com/rshade/finfocus-plugin-aws-ce/issues/46) | feat: Implement trace ID propagation for distributed tracing | enhancement, roadmap/current | **CE-1.4** | ✅ In scope |
 | [#47](https://github.com/rshade/finfocus-plugin-aws-ce/issues/47) | feat: Use proto ErrorCode enum for standardized error handling | enhancement, roadmap/current | **CE-1.5** | ✅ In scope |
-| [#48](https://github.com/rshade/finfocus-plugin-aws-ce/issues/48) | ci: Standardize workflow names and add missing CI/CD workflows | enhancement, roadmap/current | **CE-3.4** | ✅ In scope |
+| [#48](https://github.com/rshade/finfocus-plugin-aws-ce/issues/48) | ci: Standardize workflow names and add missing `CI/CD` workflows | enhancement, roadmap/current | **CE-3.4** | Deferred in run 2; PM |
 | [#49](https://github.com/rshade/finfocus-plugin-aws-ce/issues/49) | feat: Add Web/Connect protocol support for browser clients | enhancement, roadmap/next | Tier B | CE-7.12 |
 | [#50](https://github.com/rshade/finfocus-plugin-aws-ce/issues/50) | chore: Add missing Makefile targets | enhancement, roadmap/current | **CE-3.1** | ✅ In scope |
 | [#51](https://github.com/rshade/finfocus-plugin-aws-ce/issues/51) | test: Add config parsing tests for main.go | enhancement, roadmap/next | **CE-2.2** | ✅ In scope |
 | [#52](https://github.com/rshade/finfocus-plugin-aws-ce/issues/52) | feat: Add metadata enrichment to cost responses | enhancement, roadmap/next | **v0.1.0, Tier A** | **CE-6.5** |
-| [#53](https://github.com/rshade/finfocus-plugin-aws-ce/issues/53) | docs: Create CONTRIBUTING.md with development guidelines | documentation, roadmap/current | **CE-4.2** | ✅ In scope |
+| [#53](https://github.com/rshade/finfocus-plugin-aws-ce/issues/53) | docs: Create CONTRIBUTING.md with development guidelines | documentation, roadmap/current | **CE-4.2** | Deferred in run 2; PM |
 | [#54](https://github.com/rshade/finfocus-plugin-aws-ce/issues/54) | feat: Add CORS support for browser-based clients | enhancement, roadmap/future | Tier B | CE-7.13 |
 | [#55](https://github.com/rshade/finfocus-plugin-aws-ce/issues/55) | feat: Add batch configuration options | enhancement, roadmap/future | **v0.1.0, Tier A** | **CE-6.6** |
 
@@ -1234,9 +1249,9 @@ pkill finfocus-plugin-aws-ce
 
 - **Spec Migration:** Upgrading finfocus-spec must happen early (CE-1.1) to unblock later features
 - **Testing First:** Integration tests (CE-2.1) should validate all RPC methods before CI/CD setup
-- **Docker Build:** Should use region-agnostic binary (vs region-specific as in aws-public)
+- **Docker Build:** Deferred CE-3.2 owner decision; the release publishes archives only.
 - **No PR Blocking:** Tasks should be implemented phase-by-phase without PR approval gates
-- **E2E with Core:** Final verification should test against finfocus core binary, not just plugin isolation
+- **E2E with Core:** Live/core verification is outside this run and blocked on credentials.
 
 ## Phase 8: Release readiness (REL-x)
 
@@ -1245,20 +1260,20 @@ pkill finfocus-plugin-aws-ce
 **Status:** DONE, `go test -count=1 ./internal/test`, exit 0; break check: 15 config and manifest mutations each failed TestReleasePleaseConfiguration, restored.
 
 **ID:** REL-1  
-**Description:** Match aws-public settings, plain tags, initial version 0.1.0 and patch pre-major bumps. Manifest starts at 0.0.0; guard accepts bootstrap and future stable versions at or above 0.1.0. Ignore generated CHANGELOG.md.
+**Description:** Match `aws-public` settings, plain tags, initial version 0.1.0 and patch pre-major bumps. Manifest starts at 0.0.0; guard accepts bootstrap and future stable versions at or above 0.1.0. Ignore generated `CHANGELOG.md`.
 
 **Acceptance Criteria:** See superpowers run requirements; regression guard, deliberate break check and verification pass.
 
 ### REL-2: Family release workflows
 
-**Status:** DONE, `go test -count=1 ./internal/test && actionlint .github/workflows/*.yml && markdownlint-cli2 CLAUDE.md TASKS.md`, exit 0; break check: docker action in yml and yaml, tag push, removed flag and wrong organization each failed guard, restored.
+**Status:** DONE, `go test -count=1 ./internal/test && actionlint .github/workflows/*.yml && markdownlint-cli2 CLAUDE.md TASKS.md`, exit 0; break check: docker action in `yml` and `yaml`, tag push, removed flag and wrong organization each failed guard, restored.
 
 **ID:** REL-2  
-**Description:** Copy aws-public Release Please and opencost single-binary release workflow, verify action tags, guard banned publishing paths, document the release token.
+**Description:** Copy `aws-public` Release Please and `opencost` single-binary release workflow, verify action tags, guard banned publishing paths, document the release token.
 
 **Acceptance Criteria:** See superpowers run requirements; regression guard, deliberate break check and verification pass.
 
-### REL-3: GoReleaser archive configuration
+### REL-3: `goreleaser` archive configuration
 
 **Status:** DONE, `go test -count=1 ./internal/test && goreleaser check`, exit 0; break check: 10 banned-section, deprecated-format, naming, template and Windows format mutations failed guards, restored; snapshot built six archives and checksums.
 
@@ -1272,7 +1287,7 @@ pkill finfocus-plugin-aws-ce
 **Status:** DONE, `go test -count=1 ./... && go build ./... && go vet ./... && markdownlint-cli2 README.md ROADMAP.md CONTEXT.md TASKS.md`, exit 0; break check: removed legacy fallback; TestActualCostResourceDescriptor legacy and empty-identity cases failed, restored.
 
 **ID:** REL-4  
-**Description:** Upgrade spec and tidy; prefer resource descriptor identity with legacy resource_id fallback; preserve parseable manifests as Release Please extra-files.
+**Description:** Upgrade spec and tidy; prefer resource descriptor identity with legacy `resource_id` fallback; preserve valid YAML and JSON manifests as Release Please extra-files.
 
 **Acceptance Criteria:** See superpowers run requirements; regression guard, deliberate break check and verification pass.
 

@@ -49,6 +49,9 @@ func (c *Calculator) clientForCall(ctx context.Context, logger zerolog.Logger) (
 	ce, err := open(ctx, cfg)
 	if err != nil {
 		logger.Error().Msg("Failed to initialize per-request Cost Explorer client")
+		if errors.Is(err, client.ErrRegionMissing) {
+			return nil, true, status.Error(codes.FailedPrecondition, client.ErrRegionMissing.Error())
+		}
 		return nil, true, status.Error(codes.Internal, "per-request client initialization failed")
 	}
 	return ce, true, nil
