@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap outlines the development path for `finfocus-plugin-aws-ce`, prioritizing direct API integration, FOCUS standard compliance, and adherence to the `finfocus-spec` v0.5.2+.
+This roadmap outlines the development path for `finfocus-plugin-aws-ce`, prioritizing direct API integration, FOCUS standard compliance, and adherence to the `finfocus-spec` v0.7.5.
 
 > **Constitutional Reference:** All features must comply with [CONTEXT.md](./CONTEXT.md) boundaries. Features violating "Hard No's" are rejected.
 

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestReleasePleaseConfiguration(t *testing.T) {
@@ -53,5 +54,34 @@ func TestReleaseManifestAllowsFutureVersions(t *testing.T) {
 	}
 	for _, version := range []string{"", "0.0.1", "0.1", "v0.1.0", "01.1.0", "0.1.0-rc.1", "broken"} {
 		require.False(t, validReleaseVersion(version), version)
+	}
+}
+
+func TestPluginManifests(t *testing.T) {
+	raw, err := os.ReadFile("../../release-please-config.json")
+	require.NoError(t, err)
+	var config struct {
+		Packages map[string]struct {
+			ExtraFiles []string `json:"extra-files"`
+		} `json:"packages"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &config))
+	require.ElementsMatch(t, []string{"manifest.json", "manifest.yaml"}, config.Packages["."].ExtraFiles)
+	for _, name := range []string{"manifest.json", "manifest.yaml"} {
+		raw, err = os.ReadFile("../../" + name)
+		require.NoError(t, err)
+		require.NotContains(t, string(raw), "pulumicost")
+		var manifest map[string]any
+		if strings.HasSuffix(name, "json") {
+			require.NoError(t, json.Unmarshal(raw, &manifest))
+		} else {
+			require.NoError(t, yaml.Unmarshal(raw, &manifest))
+		}
+		metadata, ok := manifest["metadata"].(map[string]any)
+		require.True(t, ok)
+		require.Equal(t, "aws-ce", metadata["name"])
+		spec, ok := manifest["specification"].(map[string]any)
+		require.True(t, ok)
+		require.Equal(t, []any{"actual_cost"}, spec["capabilities"])
 	}
 }

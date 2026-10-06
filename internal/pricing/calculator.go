@@ -47,7 +47,7 @@ const (
 	pluginName    = "aws-ce"
 	pluginVersion = "0.1.0"
 	// specVersion must keep the leading v. pluginsdk.ValidateSpecVersion rejects "0.7.0".
-	specVersion   = "v0.7.0"
+	specVersion   = "v0.7.5"
 	supportedRPCs = "GetActualCost,Supports,GetPluginInfo,GetProjectedCost"
 )
 
@@ -246,7 +246,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 	if !perRequest && c.cache != nil {
 		if entry, ok := c.cache.getEntry(cacheKey); ok {
 			logger.Info().Int("ce_requests", 0).Msg("Cache hit for cost query")
-			return c.buildResponse(entry.Results, entry.ExpiresAt), nil
+			return c.buildResponse(entry.Results, entry.ExpiresAt, req.GetBillingAccountId()), nil
 		}
 	}
 
@@ -292,7 +292,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 
 	logger.Info().Int("ce_requests", pages).Int("results_count", len(costs)).Msg("Retrieved costs from AWS")
 
-	return c.buildResponse(costs, expires), nil
+	return c.buildResponse(costs, expires, req.GetBillingAccountId()), nil
 }
 
 type costQueryPlan struct {
@@ -306,14 +306,16 @@ type costQueryPlan struct {
 var ec2InstanceIDPattern = regexp.MustCompile(`^i-[0-9a-f]{8,17}$`)
 
 func (c *Calculator) planCostQuery(logger zerolog.Logger, req *pbc.GetActualCostRequest) (costQueryPlan, error) {
-	resourceID := req.GetResourceId()
+	resourceID, arn := actualCostIdentity(req)
+	if resource := req.GetResource(); resource != nil && resource.GetProvider() != "aws" {
+		return costQueryPlan{}, statusWithDetail(codes.InvalidArgument, "aws-ce only supports provider aws", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+	}
 	plan := costQueryPlan{cacheID: resourceID}
 	if id, ok := ec2InstanceID(resourceID); ok {
 		plan.resourceLevel = true
 		plan.resourceID = id
 		plan.cacheID = id
 	}
-	arn := req.GetArn()
 	if arn == "" {
 		return plan, nil
 	}
@@ -440,7 +442,7 @@ func statusWithDetail(code codes.Code, msg string, errorCode pbc.ErrorCode) erro
 	return detailed.Err()
 }
 
-func (c *Calculator) buildResponse(costs []CostEntry, expires time.Time) *pbc.GetActualCostResponse {
+func (c *Calculator) buildResponse(costs []CostEntry, expires time.Time, billingAccountID string) *pbc.GetActualCostResponse {
 	expiresAt := timestamppb.New(expires.UTC())
 	results := make([]*pbc.ActualCostResult, 0, len(costs))
 	for _, cost := range costs {
@@ -450,13 +452,18 @@ func (c *Calculator) buildResponse(costs []CostEntry, expires time.Time) *pbc.Ge
 			usage = cost.UsageAmount
 			unit = cost.UsageUnit
 		}
+		var focus *pbc.FocusCostRecord
+		if billingAccountID != "" {
+			cost.AccountID = billingAccountID
+			focus = focusFor(cost)
+		}
 		results = append(results, &pbc.ActualCostResult{
 			Timestamp:   timestamppb.New(cost.Timestamp.UTC()),
 			Cost:        cost.Amount,
 			UsageAmount: usage,
 			UsageUnit:   unit,
 			Source:      "aws-ce",
-			FocusRecord: focusFor(cost),
+			FocusRecord: focus,
 			ExpiresAt:   expiresAt,
 		})
 	}
@@ -577,4 +584,13 @@ func sumDecimalCosts(rows []client.CostResult) (float64, string, error) {
 	}
 	total, _ := sum.Float64()
 	return total, currency, nil
+}
+
+// actualCostIdentity prefers descriptor identity, then legacy request fields.
+func actualCostIdentity(req *pbc.GetActualCostRequest) (string, string) {
+	resource := req.GetResource()
+	if resource != nil && (resource.GetId() != "" || resource.GetArn() != "") {
+		return resource.GetId(), resource.GetArn()
+	}
+	return req.GetResourceId(), req.GetArn()
 }

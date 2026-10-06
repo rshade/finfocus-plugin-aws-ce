@@ -183,7 +183,7 @@ Sources and confidence tags are in `finfocus-pm` research notes (`aws-ce-api-fac
 |-----------|---------|--------|-------|
 | **Language & Build** | | | |
 | Go | 1.27.1 | ✅ | Updated in go.mod and mise.toml |
-| finfocus-spec | v0.7.0 | ✅ | Unblocks per-request credentials + FOCUS 1.4 |
+| finfocus-spec | v0.7.5 | ✅ | Unblocks per-request credentials + FOCUS 1.4 |
 | ax-go | v0.7.0+ | ✅ | Arrives transitively via spec |
 | goreleaser | 2.18.2 | ✅ | Multi-platform release build configuration updated |
 | **Code Quality & Testing** | | | |
@@ -1252,6 +1252,8 @@ pkill finfocus-plugin-aws-ce
 **Acceptance Criteria:** See superpowers run requirements; regression guard, deliberate break check and verification pass.
 
 ### REL-4: Spec v0.7.5 and resource descriptor compatibility
+
+**Status:** DONE, `go test -count=1 ./... && go build ./... && go vet ./... && markdownlint-cli2 README.md ROADMAP.md CONTEXT.md TASKS.md`, exit 0; break check: removed legacy fallback; TestActualCostResourceDescriptor legacy and empty-identity cases failed, restored.
 
 **ID:** REL-4  
 **Description:** Upgrade spec and tidy; prefer resource descriptor identity with legacy resource_id fallback; preserve parseable manifests as Release Please extra-files.

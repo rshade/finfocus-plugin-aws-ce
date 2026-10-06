@@ -451,10 +451,11 @@ func callActual(t *testing.T, f *fakeCE, id, arn string, start, end time.Time) (
 		}
 	}
 	return ts.Client().GetActualCost(ctx, &pbc.GetActualCostRequest{
-		ResourceId: resourceID,
-		Arn:        arn,
-		Start:      timestamppb.New(start),
-		End:        timestamppb.New(end),
+		ResourceId:       resourceID,
+		BillingAccountId: "contract-billing-account",
+		Arn:              arn,
+		Start:            timestamppb.New(start),
+		End:              timestamppb.New(end),
 	})
 }
 

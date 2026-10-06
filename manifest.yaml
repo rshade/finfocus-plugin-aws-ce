@@ -14,7 +14,7 @@ metadata:
     createdat: null
     updatedat: null
 specification:
-    specversion: "1.0"
+    specversion: "v0.7.5"
     supportedproviders:
         - aws
     supportedresources: {}

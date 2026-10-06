@@ -231,3 +231,14 @@ kill -TERM $PID
 ## Support
 
 [Add support contact information here]
+
+## Spec compatibility
+
+The plugin uses finfocus-spec v0.7.5. On actual-cost requests, the id or ARN in a resource
+descriptor takes precedence over legacy identifiers. When the
+descriptor has neither, the plugin falls back to `resource_id` and `arn`.
+The SDK still requires `resource_id` on every request.
+
+Pass `billing_account_id` to receive FOCUS records. The plugin uses that value
+verbatim for the FOCUS billing account. Without it, costs are returned with
+`focus_record` unset, as required by the spec; no billing account is invented.
