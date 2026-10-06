@@ -224,7 +224,10 @@ func focusFor(entry CostEntry) *pbc.FocusCostRecord {
 		WithExtension("group_key", entry.Service).
 		WithExtension("currency", entry.Currency).
 		WithExtension("amount_decimal", entry.AmountDecimal).
-		WithExtension("metric", metric)
+		WithExtension("metric", metric).
+		WithExtension("data_source", "AWS Cost Explorer").
+		WithExtension("granularity", "DAILY").
+		WithExtension("lookback", entry.Lookback)
 	if commitmentID != "" {
 		builder = builder.WithCommitmentDiscount(
 			pbc.FocusCommitmentDiscountCategory_FOCUS_COMMITMENT_DISCOUNT_CATEGORY_UNSPECIFIED,
@@ -251,6 +254,9 @@ func focusFor(entry CostEntry) *pbc.FocusCostRecord {
 			"currency":       entry.Currency,
 			"amount_decimal": entry.AmountDecimal,
 			"metric":         metric,
+			"data_source":    "AWS Cost Explorer",
+			"granularity":    "DAILY",
+			"lookback":       entry.Lookback,
 		}
 		if copyRawIDs {
 			if ri != "" {

@@ -246,7 +246,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 	if !perRequest && c.cache != nil {
 		if entry, ok := c.cache.getEntry(cacheKey); ok {
 			logger.Info().Int("ce_requests", 0).Msg("Cache hit for cost query")
-			return c.buildResponse(entry.Results, entry.ExpiresAt, req.GetBillingAccountId()), nil
+			return c.buildResponse(entry.Results, entry.ExpiresAt, req.GetBillingAccountId(), plan.resourceLevel), nil
 		}
 	}
 
@@ -292,7 +292,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 
 	logger.Info().Int("ce_requests", pages).Int("results_count", len(costs)).Msg("Retrieved costs from AWS")
 
-	return c.buildResponse(costs, expires, req.GetBillingAccountId()), nil
+	return c.buildResponse(costs, expires, req.GetBillingAccountId(), plan.resourceLevel), nil
 }
 
 type costQueryPlan struct {
@@ -442,7 +442,7 @@ func statusWithDetail(code codes.Code, msg string, errorCode pbc.ErrorCode) erro
 	return detailed.Err()
 }
 
-func (c *Calculator) buildResponse(costs []CostEntry, expires time.Time, billingAccountID string) *pbc.GetActualCostResponse {
+func (c *Calculator) buildResponse(costs []CostEntry, expires time.Time, billingAccountID string, resourceLevel bool) *pbc.GetActualCostResponse {
 	expiresAt := timestamppb.New(expires.UTC())
 	results := make([]*pbc.ActualCostResult, 0, len(costs))
 	for _, cost := range costs {
@@ -455,6 +455,10 @@ func (c *Calculator) buildResponse(costs []CostEntry, expires time.Time, billing
 		var focus *pbc.FocusCostRecord
 		if billingAccountID != "" {
 			cost.AccountID = billingAccountID
+			cost.Lookback = "14_months"
+			if resourceLevel {
+				cost.Lookback = "14_days"
+			}
 			focus = focusFor(cost)
 		}
 		results = append(results, &pbc.ActualCostResult{

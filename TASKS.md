@@ -850,6 +850,8 @@ and fails a test; no commitment data returns the fields unset, not zero.
 
 ### CE-6.5: Metadata enrichment through the right field (#52)
 
+**Status:** DONE, `go test -count=1 ./... && golangci-lint run ./... && markdownlint-cli2 README.md TASKS.md`, exit 0; break check: forced estimated=false; both TestActualCostMetadata lookback cases failed, restored.
+
 **ID:** CE-6.5  
 **Description:** The issue's code assumes a `metadata` map on `ActualCostResult`, which does not
 exist (fields 1 to 9 only). Carry data source, granularity, metric, `Estimated` and lookback through

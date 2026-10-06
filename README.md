@@ -242,3 +242,22 @@ The SDK still requires `resource_id` on every request.
 Pass `billing_account_id` to receive FOCUS records. The plugin uses that value
 verbatim for the FOCUS billing account. Without it, costs are returned with
 `focus_record` unset, as required by the spec; no billing account is invented.
+
+## Actual-cost metadata
+
+When the caller supplies `billing_account_id`, FOCUS `extended_columns` include:
+
+| Key | Value |
+| --- | --- |
+| `data_source` | `AWS Cost Explorer` |
+| `granularity` | `DAILY` |
+| `metric` | The cost metric used, normally `UnblendedCost` |
+| `estimated` | `true` if any contributing AWS period is estimated, otherwise `false` |
+| `lookback` | Query limit: `14_days` for resource data, `14_months` for service totals |
+| `amount_decimal` | Exact decimal sum before conversion to the RPC cost number |
+| `group_key` | Cost Explorer group key |
+| `currency` | Currency reported by Cost Explorer |
+
+Currency also appears in `focus_record.billing_currency`. There is no
+response-level metadata map. Without a billing account, FOCUS and its extended
+columns are absent and the cost remains available.
