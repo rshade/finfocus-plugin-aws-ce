@@ -1244,6 +1244,8 @@ pkill finfocus-plugin-aws-ce
 
 ### REL-3: GoReleaser archive configuration
 
+**Status:** DONE, `go test -count=1 ./internal/test && goreleaser check`, exit 0; break check: 10 banned-section, deprecated-format, naming, template and Windows format mutations failed guards, restored; snapshot built six archives and checksums.
+
 **ID:** REL-3  
 **Description:** Use formats, installer-compatible names, archive and checksum assets only; validate and build snapshots for Linux, Darwin and Windows.
 

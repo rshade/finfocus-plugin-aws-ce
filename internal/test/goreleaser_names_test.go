@@ -34,10 +34,11 @@ func TestGoreleaserAssetNamesMatchInstallerExpectations(t *testing.T) {
 	var config struct {
 		ProjectName string `yaml:"project_name"`
 		Archives    []struct {
-			NameTemplate    string `yaml:"name_template"`
+			NameTemplate    string   `yaml:"name_template"`
+			Formats         []string `yaml:"formats"`
 			FormatOverrides []struct {
-				Goos   string `yaml:"goos"`
-				Format string `yaml:"format"`
+				Goos    string   `yaml:"goos"`
+				Formats []string `yaml:"formats"`
 			} `yaml:"format_overrides"`
 		} `yaml:"archives"`
 	}
@@ -53,7 +54,8 @@ func TestGoreleaserAssetNamesMatchInstallerExpectations(t *testing.T) {
 	// Build format override map
 	formatOverrides := make(map[string]string)
 	for _, override := range archive.FormatOverrides {
-		formatOverrides[override.Goos] = override.Format
+		require.Len(t, override.Formats, 1)
+		formatOverrides[override.Goos] = override.Formats[0]
 	}
 
 	// Define text/template functions (matching goreleaser's template functions)
@@ -102,10 +104,12 @@ func TestGoreleaserAssetNamesMatchInstallerExpectations(t *testing.T) {
 			archiveName := buf.String()
 
 			// Determine extension based on format_overrides
-			ext := ".tar.gz"
-			if format, ok := formatOverrides[tc.goos]; ok && format == "zip" {
-				ext = ".zip"
+			require.Len(t, archive.Formats, 1)
+			format := archive.Formats[0]
+			if override, ok := formatOverrides[tc.goos]; ok {
+				format = override
 			}
+			ext := "." + format
 
 			// Construct full archive name with extension
 			fullName := archiveName + ext
