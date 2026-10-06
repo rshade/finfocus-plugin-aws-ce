@@ -127,8 +127,11 @@ func TestSupports(t *testing.T) {
 			if resp.GetSupported() != tc.supported {
 				t.Fatalf("supported = %v, want %v (reason %q)", resp.GetSupported(), tc.supported, resp.GetReason())
 			}
-			if len(resp.GetCapabilitiesEnum()) != 0 || len(resp.GetCapabilities()) != 0 || len(resp.GetSupportedMetrics()) != 0 {
-				t.Fatalf("plugin filled capabilities or metrics: %#v", resp)
+			if len(resp.GetCapabilitiesEnum()) != 1 || resp.GetCapabilitiesEnum()[0] != pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS {
+				t.Fatalf("typed capabilities = %v, want actual costs", resp.GetCapabilitiesEnum())
+			}
+			if len(resp.GetCapabilities()) != 0 || len(resp.GetSupportedMetrics()) != 0 {
+				t.Fatalf("plugin filled legacy capabilities or metrics: %#v", resp)
 			}
 			switch {
 			case tc.supported:

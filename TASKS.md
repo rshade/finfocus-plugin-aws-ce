@@ -1271,3 +1271,17 @@ pkill finfocus-plugin-aws-ce
 **Description:** Upgrade spec and tidy; prefer resource descriptor identity with legacy resource_id fallback; preserve parseable manifests as Release Please extra-files.
 
 **Acceptance Criteria:** See superpowers run requirements; regression guard, deliberate break check and verification pass.
+
+### CE-R.2: Correct Supports capability inference (CE-6.10)
+
+**Status:** DONE, `go test -count=1 ./internal/pricing && golangci-lint run ./... && markdownlint-cli2 TASKS.md`, exit 0; break check: removing explicit Supports enum reproduces four inferred wire capabilities and fails actual-only guard.
+
+**ID:** CE-R.2
+**Description:** Explicitly advertise actual costs in typed and legacy Supports
+capabilities, consistent with GetPluginInfo. Guard against SDK inference of
+unimplemented projected, pricing, and estimate RPCs.
+
+**Acceptance Criteria:**
+
+- Both discovery RPCs advertise only actual costs over real gRPC.
+- Supported and unsupported resource responses preserve their reason/decision.

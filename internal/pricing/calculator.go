@@ -117,36 +117,25 @@ func NewCalculatorWithClient(ceClient *client.Client) *Calculator {
 // Supports reports whether Cost Explorer can answer for the resource.
 // An unsupported provider or an unusable resource returns Supported false and a
 // reason, never a Go error. Server.Supports replaces plugin errors with
-// codes.Internal, which would hide that reason. CapabilitiesEnum is left empty
-// so the server can fill it. Cost Explorer is global, so region is not checked.
+// codes.Internal, which would hide that reason. Explicit capabilities prevent
+// SDK interface inference from advertising unimplemented RPCs. Region is not checked.
 func (c *Calculator) Supports(ctx context.Context, req *pbc.SupportsRequest) (*pbc.SupportsResponse, error) {
 	logger := c.traceLogger(ctx)
 	done := pluginsdk.LogOperation(logger, "Supports")
 	defer done()
-
+	response := &pbc.SupportsResponse{CapabilitiesEnum: []pbc.PluginCapability{pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS}}
 	resource := req.GetResource()
-	if resource == nil {
-		return &pbc.SupportsResponse{
-			Supported: false,
-			Reason:    invalidResourceReason("resource descriptor is required"),
-		}, nil
+	switch {
+	case resource == nil:
+		response.Reason = invalidResourceReason("resource descriptor is required")
+	case resource.GetProvider() != "aws":
+		response.Reason = fmt.Sprintf("provider %q is not supported; aws-ce only supports provider \"aws\"", resource.GetProvider())
+	case awsResourceIdentified(resource):
+		response.Supported = true
+	default:
+		response.Reason = invalidResourceReason("aws resource needs a non-empty id or an ARN ParseARN accepts")
 	}
-	if resource.GetProvider() != "aws" {
-		return &pbc.SupportsResponse{
-			Supported: false,
-			Reason: fmt.Sprintf(
-				"provider %q is not supported; aws-ce only supports provider \"aws\"",
-				resource.GetProvider(),
-			),
-		}, nil
-	}
-	if awsResourceIdentified(resource) {
-		return &pbc.SupportsResponse{Supported: true}, nil
-	}
-	return &pbc.SupportsResponse{
-		Supported: false,
-		Reason:    invalidResourceReason("aws resource needs a non-empty id or an ARN ParseARN accepts"),
-	}, nil
+	return response, nil
 }
 
 func invalidResourceReason(detail string) string {
