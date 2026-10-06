@@ -2,6 +2,7 @@ package pricing
 
 import (
 	"encoding/json"
+	"os"
 	"testing"
 	"time"
 
@@ -40,19 +41,20 @@ func TestRequestPeriodStaysUTCAcrossHostZones(t *testing.T) {
 
 func assertRequestPeriodInZone(t *testing.T, tc contractCase, zone string) {
 	t.Helper()
+	zoneProcess, _ := os.LookupEnv("FINFOCUS_CE_PERIOD_ZONE")
+	if zoneProcess == "" {
+		timezoneProcess(t, zone, t.Name())
+		return
+	}
 	loc, err := time.LoadLocation(zone)
 	if err != nil {
 		t.Fatalf("load zone: %v", err)
 	}
-	prev := time.Local
-	time.Local = loc
-	t.Cleanup(func() { time.Local = prev })
-	t.Setenv("TZ", zone)
 
 	// This instant is the one Auckland shifts forward. If the wall date ever
 	// matches the UTC start, the case no longer catches a local format.
 	if zone == "Pacific/Auckland" && tc.ID == "period:2026-09-01..2026-09-02:2" {
-		localStart := time.Unix(tc.StartUnix, 0).Format("2006-01-02")
+		localStart := time.Unix(tc.StartUnix, 0).In(loc).Format("2006-01-02")
 		if localStart == tc.Expect.Start {
 			t.Fatalf("Auckland wall date %s equals UTC start %s", localStart, tc.Expect.Start)
 		}

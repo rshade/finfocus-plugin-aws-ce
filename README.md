@@ -261,3 +261,13 @@ When the caller supplies `billing_account_id`, FOCUS `extended_columns` include:
 Currency also appears in `focus_record.billing_currency`. There is no
 response-level metadata map. Without a billing account, FOCUS and its extended
 columns are absent and the cost remains available.
+
+## Batch configuration
+
+The SDK serves `BatchCost` using concurrent per-resource actual-cost calls.
+Set `FINFOCUS_AWS_CE_MAX_BATCH_SIZE` to an integer from 1 to 1000 (default 100)
+and `FINFOCUS_AWS_CE_BATCH_WORKERS` to an integer from 1 to 50 (default 10).
+Unset or empty values use the defaults. Invalid values stop startup with a
+configuration error naming the variable. Each CE page still consumes the
+configured per-minute request budget. Default client initialization is shared
+safely; initialization failures have a one-second retry delay.

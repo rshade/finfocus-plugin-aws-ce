@@ -25,11 +25,14 @@ import (
 // Calculator implements the FinFocus plugin interface for AWS Cost Explorer.
 type Calculator struct {
 	*pluginsdk.BasePlugin
-	ceClient *client.Client
-	cache    *CacheManager
-	logger   zerolog.Logger
-	// openClient builds the client for one call that carried credentials.
-	// Nil uses client.NewClient. The result is not stored on ceClient.
+	ceClient      *client.Client
+	cache         *CacheManager
+	logger        zerolog.Logger
+	clientMu      sync.Mutex
+	clientInitErr error
+	clientRetryAt time.Time
+	// openClient constructs a client. Nil uses client.NewClient.
+	// Only the default credential-chain client is retained on ceClient.
 	openClient func(context.Context, client.Config) (*client.Client, error)
 	// maxRequestsPerMinute is the Cost Explorer page budget. Zero means no limit.
 	maxRequestsPerMinute int
@@ -166,17 +169,27 @@ func awsResourceIdentified(resource *pbc.ResourceDescriptor) bool {
 
 // initClient initializes the Cost Explorer client if not already done.
 func (c *Calculator) initClient(ctx context.Context, logger zerolog.Logger) error {
+	c.clientMu.Lock()
+	defer c.clientMu.Unlock()
 	if c.ceClient != nil {
 		return nil
 	}
-
-	ceClient, err := client.NewClient(ctx, client.Config{})
-	if err != nil {
-		logger.Error().Err(err).Msg("Failed to initialize Cost Explorer client")
-		return fmt.Errorf("initializing Cost Explorer client: %w", err)
+	if c.clientInitErr != nil && time.Now().Before(c.clientRetryAt) {
+		return c.clientInitErr
 	}
-
+	open := c.openClient
+	if open == nil {
+		open = client.NewClient
+	}
+	ceClient, err := open(ctx, client.Config{})
+	if err != nil {
+		logger.Error().Msg("Failed to initialize Cost Explorer client")
+		c.clientInitErr = fmt.Errorf("initializing Cost Explorer client: %w", err)
+		c.clientRetryAt = time.Now().Add(time.Second)
+		return c.clientInitErr
+	}
 	c.ceClient = ceClient
+	c.clientInitErr = nil
 	return nil
 }
 

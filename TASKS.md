@@ -865,6 +865,8 @@ reads the real proto field; no field is invented.
 
 ### CE-6.6: Batch configuration and a race-free client (#55)
 
+**Status:** DONE, `go test -count=1 -race -run "TestConcurrentBatchClientInitialization|TestClientInitializationFailureCooldown" ./internal/pricing && go test -count=1 ./... && golangci-lint run ./... && markdownlint-cli2 README.md CLAUDE.md TASKS.md`, exit 0; break check: removed init lock; concurrent BatchCost initialized 10 clients and race detector failed, restored; full race suite also passed.
+
 **ID:** CE-6.6  
 **Description:** Use `ServeConfig.MaxBatchSize` and `BatchWorkers` (the SDK serves a per-resource
 `BatchCost` fallback). The issue's `GetActualCostBatch` RPC does not exist: do not add it. The env

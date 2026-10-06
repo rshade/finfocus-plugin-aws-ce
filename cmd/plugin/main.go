@@ -28,6 +28,12 @@ func main() {
 		port = pluginsdk.GetPort()
 	}
 
+	maxBatchSize, batchWorkers, err := batchSettingsFromEnv()
+	if err != nil {
+		logger.Error().Err(err).Msg("Invalid batch configuration")
+		os.Exit(1)
+	}
+
 	// Create the plugin implementation
 	plugin := pricing.NewCalculator()
 
@@ -46,8 +52,10 @@ func main() {
 
 	// Start serving the plugin
 	config := pluginsdk.ServeConfig{
-		Plugin: plugin,
-		Port:   port,
+		Plugin:       plugin,
+		Port:         port,
+		MaxBatchSize: maxBatchSize,
+		BatchWorkers: batchWorkers,
 	}
 
 	logger.Info().Str("plugin_name", plugin.Name()).Int("port", port).Msg("Starting plugin")

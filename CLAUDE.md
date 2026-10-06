@@ -82,7 +82,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 
 **Key Patterns:**
 
-- No `log.Fatal` or `os.Exit` calls - use `logger.Error()` + return
+- RPC handlers return errors. The entry point exits nonzero for invalid startup configuration.
 - SDK validation before business logic - returns standardized error messages
 - LogOperation for all RPC methods - provides timing and structured logging
 
