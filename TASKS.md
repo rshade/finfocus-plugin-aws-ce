@@ -514,6 +514,8 @@ FOCUS 1.4 adds invoice-level detail tracking. AWS Cost Explorer's `GetCostAndUsa
 
 ### CE-2.2: Add Config Parsing Tests for main.go
 
+**Status:** DONE, `go test -count=1 ./cmd/... && golangci-lint run ./... && markdownlint-cli2 CLAUDE.md TASKS.md`, exit 0; break check: restoring port-zero environment fallback fails explicit CLI-zero subprocess startup.
+
 **ID:** CE-2.2  
 **Description:** Add unit tests for CLI flag and environment variable parsing in `cmd/plugin/main.go`. Tests should verify port detection, log level parsing, and graceful error handling.
 

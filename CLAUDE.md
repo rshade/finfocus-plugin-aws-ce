@@ -55,14 +55,15 @@ The plugin uses standardized SDK helpers for configuration and logging:
 // Initialize logger using SDK helpers
 logWriter := pluginsdk.NewLogWriter()
 level := parseLogLevel(pluginsdk.GetLogLevel())
-logger := pluginsdk.NewPluginLogger("aws-ce", "1.0.0", level, logWriter)
+logger := pluginsdk.NewPluginLogger("aws-ce", "0.1.0", level, logWriter)
 
-// Determine port: CLI flag takes precedence over environment variable
-port := pluginsdk.ParsePortFlag()
-if port == 0 {
-    port = pluginsdk.GetPort()
-}
+
 ```
+
+CLI port flags take precedence over the environment. The entry point uses
+`flag.Visit` to detect an explicit flag. For `--port 0`, it supplies an
+ephemeral TCP listener to `ServeConfig.Listener` so the SDK does not read the
+environment port again. Invalid ports exit nonzero before serving.
 
 **RPC Handlers (`internal/pricing/calculator.go`):**
 
