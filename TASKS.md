@@ -8,6 +8,121 @@
 
 ---
 
+## Release and tag rules (family standard, updated 2026-10-06)
+
+Everything below was learned the hard way on opencost and azure-public. Follow it for the first release; do not
+rediscover it.
+
+### Release Please settings
+
+Every release-please config needs these on the `.` package, and a test that fails when any is wrong:
+
+1. `"include-component-in-tag": false`. Without it a config that sets `package-name` creates tags like
+   `finfocus-plugin-<name>-v0.1.0`. `release.yml` runs on `release: created`, GoReleaser parses the tag as semver,
+   fails, and the release has no binaries (opencost, 2026-10-06; azure-public sets the key).
+2. `"initial-version": "0.1.0"`. Without it the first release PR can propose 1.0.0 (opencost issue 77).
+3. `"bump-patch-for-minor-pre-major": true`, as in aws-public. With `false`, a `feat:` commit before 1.0 bumps the
+   minor on every release (flexera, 2026-10-06).
+4. Every other key matches aws-public's `release-please-config.json` exactly: `bump-minor-pre-major` true, the same
+   `changelog-sections`, `release-type` go. Only `package-name`, `include-component-in-tag` and `initial-version`
+   are added. Diff the file against aws-public before opening the PR.
+5. `.release-please-manifest.json` keeps `"."` at `0.0.0` until the first release PR merges. A `0.1.0` before then
+   records 0.1.0 as already shipped. After that, release PRs bump it every time, so a test must accept any valid
+   `MAJOR.MINOR.PATCH` at or above 0.1.0 and never pin an exact version.
+6. The generated `CHANGELOG.md` fails markdownlint (MD012, MD004). Put it in `.markdownlintignore`.
+7. Wrap commit bodies to 72 columns: commitlint `body-max-line-length` is 100 and CI checks every commit in the PR.
+
+Use `googleapis/release-please-action@v5.0.0`, not v4.
+
+### GoReleaser settings
+
+The release uploads archives and `checksums.txt` only, as aws-public and azure-public do:
+
+- No `dockers`, `dockers_v2`, `homebrew_casks`, `brews` or `nfpms` section, and no deb or rpm. `release.yml` has
+  no registry login, no `packages: write` and no tap token. opencost's config had all three and its package
+  scripts never existed.
+- No other workflow publishes a container image. vantage kept a tag-triggered `docker.yml` that built a missing
+  Dockerfile, so every release run was red even though GoReleaser succeeded. Add a test that fails on
+  `docker/build-push-action` in any workflow and on those GoReleaser sections.
+- Use only template fields GoReleaser defines. opencost's `{{if .Dirty}}` failed both release runs with
+  `map has no entry for key "Dirty"`; use `{{ .GitTreeState }}`.
+- Use current keys: `goreleaser check` must exit 0, so no deprecated `archives.format`; use `formats`.
+- Names say `finfocus-plugin-<name>`, never `pulumicost`.
+
+Proof before the first tag, on the pinned GoReleaser version, in the repo or a copy:
+
+```bash
+GORELEASER_CURRENT_TAG=v0.1.0 goreleaser release --snapshot --clean --skip=publish
+goreleaser check
+```
+
+Both must succeed, and the build must write archives and `checksums.txt`. A config that was never built is not a
+working config. Add a test that reads the config and the manifest and fails when a setting above is wrong. Break
+check: reintroduce each defect in turn and the test fails.
+
+### Workflow files and the release token (`RELEASE_PLEASE_TOKEN`)
+
+The pattern is aws-public's, from release-please to GoReleaser. Copy the files, do not reinvent them:
+
+- `release-please.yml`: copy aws-public's. `googleapis/release-please-action@v5.0.0` with
+  `token: ${{ secrets.RELEASE_PLEASE_TOKEN }}`, triggers `push` to `main` and `workflow_dispatch`, permissions
+  `contents`, `issues` and `pull-requests` write. azure-public and opencost append `|| secrets.GITHUB_TOKEN`; both
+  shapes are the family pattern. A probe step (as in `finfocus-spec`) is optional hardening, not required.
+- `release.yml` (single-binary plugins): copy opencost's or azure-public's. Triggers `release: types: [created]`
+  and `workflow_dispatch` with a required `tag` input, `permissions: contents: write`, checkout at
+  `ref: ${{ inputs.tag || github.event.release.tag_name }}` with `fetch-depth: 0`, `actions/setup-go@v7` with
+  `go-version-file: go.mod`, `goreleaser/goreleaser-action@v7` with `args: release --clean`, and `GITHUB_TOKEN` only.
+  aws-public's `release.yml` is the multi-region variant and is not the template for a single-binary plugin.
+- Not allowed: a `push: tags` trigger (release-please creates the tag through the API, so it never fires),
+  `--rm-dist` (removed in GoReleaser v2), `actions/checkout` older than v7, `goreleaser-action` older than v7,
+  `release-please-action` v4, and `google-apis/release-please-action` (the org is `googleapis`).
+
+Why the token matters: events created with `GITHUB_TOKEN` do not trigger other workflows, so a release PR opened that
+way never runs `Test` or `Commitlint`, and a published release never fires `release.yml`. The secret is a
+fine-grained token limited to this repo with Contents, Pull requests and Issues read and write, and Metadata read.
+The agent never reads or sets it. The check is a state check, not a decision: before the first release PR the owner
+confirms the secret exists (Settings, Secrets) and that a `workflow_dispatch` run of `Release Please` does not fail
+with `Input required and not supplied: token` or `Bad credentials`. An expired token is a non-empty string, so
+`||` does not rescue it (opencost: 16 of 16 runs failed). Document the token, its scopes, its expiry and how to rotate
+it in the repo's `CLAUDE.md` or `CONTRIBUTING.md`.
+
+### Release steps
+
+- Merge the release PR, then check: the tag is plain `vX.Y.Z`, the GoReleaser run is green, and
+  `gh release view vX.Y.Z --json assets --jq '.assets | length'` is above 0. A merged release PR is not a release.
+- Recovery if the tag or the run is wrong: never hand-create a tag. The owner deletes the bad release and tag,
+  then re-runs `release.yml` with the existing tag (`workflow_dispatch`). To make Release Please create the release
+  again, its docs describe re-triggering with the labels `autorelease: pending` and `release-please:force-run` on
+  the merged release PR (documented for a PR stuck at `autorelease:closed`; not confirmed for `tagged`, so
+  treat it as untested). A tag points at the release PR's merge commit, so fixes merged afterwards ship in the next release.
+- Release tooling (goreleaser, release-please, the release workflow) is ask-first: change it only when the task or
+  the invocation says so. The agent never deletes or moves a tag or release.
+
+### Registry entry (after the release has assets)
+
+Open a pull request to `rshade/finfocus`, modelled on #1697 (azure-public) and #1720 (opencost):
+
+- `internal/registry/registry.json`: one entry. Provider, capabilities from the allowed list in
+  `registry_json_test.go`, `asset_prefix` `finfocus-plugin-<name>` with `version_prefix: false` for plain tags,
+  `min_spec_version` equal to the spec in the release's `go.mod`. Replace a stale entry for the same plugin: the
+  registry has no alias field. Update tests that name the old entry.
+- A docs page `docs/src/content/docs/plugins/<name>.md`, a row in the compatibility matrix, the FAQ plugin table, the
+  docs table of contents, and the `finfocus-install` agent skill references. Only claim what the plugin README and
+  manifest say; do not label a profile or feature experimental unless the owner chose that.
+- Validate with a binary built from the branch and a fresh temporary `FINFOCUS_HOME`: `plugin list --available`
+  shows the entry, `plugin install <name>` prints `Checksum verified (SHA256)`, `plugin list` shows the version.
+  Also run `plugin inspect <name> <type>`: opencost failed with "capability discovery not implemented", so record a
+  failure as a plugin gap in the PR.
+
+State of this repo on 2026-10-06: not right. Upstream `main` is stale (last commit 2026-01-19, spec v0.5.2):
+`release-please.yml` uses `google-apis/release-please-action@v4` (the org is `googleapis`; that action does not
+exist) with `GITHUB_TOKEN`; `release.yml` uses old actions; the config has `package-name`
+`pulumicost-plugin-aws-ce` and no `include-component-in-tag` or `initial-version`; the manifest says `0.1.0` though
+no release exists; archives use deprecated `format` keys and the old `pulumicost` names. The local run branch
+`run/grok-20261001` (20 unpushed commits) differs in places. Fix: push the branch, copy aws-public's
+`release-please.yml` and opencost's `release.yml`, add the config keys, set the manifest to `0.0.0`, and rename to
+`finfocus-plugin-aws-ce` with `formats` keys.
+
 ## Scope (decided 2026-10-01)
 
 **v0.1.0 is a complete, correct actual-cost plugin (Tier A).** Everything else is written up
@@ -739,7 +854,7 @@ and fails a test; no commitment data returns the fields unset, not zero.
 **Description:** The issue's code assumes a `metadata` map on `ActualCostResult`, which does not
 exist (fields 1 to 9 only). Carry data source, granularity, metric, `Estimated` and lookback through
 `FocusCostRecord.extended_columns`, or `lineage` where the spec defines it. If a response-level
-map is wanted, follow section 4b of the prompt and file the spec issue, then keep going.
+map is wanted, that is NOT a spec change today: no other plugin needed one, and currency already reaches the core through `focus_record.billing_currency`. Use the FOCUS record and `extended_columns`, document the keys, and list "no response-level metadata map" in the register. Do not file a spec issue.
 
 **Acceptance Criteria:** an `Estimated=true` fixture produces an extended column saying so; a test
 reads the real proto field; no field is invented.
@@ -816,14 +931,17 @@ dependency: Cost Explorer data lags 24 hours or more, which the docs must say.
 
 **Acceptance Criteria:** the listed items are done and each has a test; no TODO is added.
 
-### CE-6.11: Define the AWS per-request credential keys
+### CE-6.11: Document the AWS per-request credential keys
 
 **ID:** CE-6.11  
-**Description:** The spec has no AWS credential key names (access key id, secret, session token,
-role arn). CE-1.6 needs them. Decide a convention in the plugin, document it, and file one spec
-issue (prompt section 4b) proposing the names, after checking `finfocus-spec` for an existing one.
+**Description:** CE-1.6 already uses the keys `access_key_id`, `secret_access_key`, `session_token` and
+`role_arn`. Document them (README and `docs/`), validate them, and test that none is ever logged. Credential
+names are free-form in the spec by design and every other plugin uses its own convention, so this is plugin
+documentation, not a spec change: do not file a spec issue. Write a short docs-only draft in
+`.superpowers/issue-drafts/spec-docs-credentials.md` (an optional row in the SDK README listing the names
+plugins use) and list its path in the report. The owner files it.
 
-**Acceptance Criteria:** the keys are documented and tested; the spec issue URL is recorded.
+**Acceptance Criteria:** the keys are documented and tested; the draft path is in the report.
 
 ---
 
