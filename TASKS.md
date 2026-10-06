@@ -540,6 +540,8 @@ FOCUS 1.4 adds invoice-level detail tracking. AWS Cost Explorer's `GetCostAndUsa
 
 ### CE-2.3: Plugin Conformance Testing
 
+**Status:** DONE, `go test -count=1 -v ./test/conformance/... && golangci-lint run ./...`, exit 0; break check: mapping missing resource to Internal fails InvalidArgument and proto ErrorDetail assertion over the built process.
+
 **ID:** CE-2.3  
 **Description:** Create test suite to verify plugin conformance with finfocus-spec. Tests should validate proto message structure, error handling, and protocol compliance.
 
