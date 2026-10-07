@@ -1,233 +1,156 @@
-# aws-ce
+# FinFocus AWS Cost Explorer plugin
 
-FinFocus plugin for aws-ce cost calculation.
+`finfocus-plugin-aws-ce` retrieves actual AWS costs through Cost Explorer for
+FinFocus. The plugin name is `aws-ce`, and its protocol dependency is
+`finfocus-spec v0.7.5`. It advertises actual costs only. Projected cost requests
+return gRPC `Unimplemented` with task reference CE-6.10.
 
-## Overview
+## Quick start
 
-This plugin provides cost calculation capabilities for aws resources in FinFocus. It implements both projected cost estimation and actual cost retrieval functionality.
-
-**Supported Providers:** aws
-
-## Actual cost
-
-An EC2 instance id (`i-` plus 8 to 17 lowercase hex characters), from an instance ARN or a bare resource id, is queried with `GetCostAndUsageWithResources` and `RESOURCE_ID` set to that id, never the full ARN. Other ids, including `contract-*`, stay on unfiltered `GetCostAndUsage` grouped by service. Resource-level data covers the last 14 days and needs the Cost Explorer resource-level opt-in. A non-EC2 ARN returns an error instead of a guessed id.
-
-The query metric is `UnblendedCost`. `AmortizedCost` is used only for a row whose requested group key is a reservation id or a savings plan ARN and that metric is present. `BlendedCost` is never used. `GetActualCost` does not group by reservation or savings plan, so those FOCUS fields stay unset. That is a gap, not a stub. Quantity and status are not invented. `GetReservationUtilization` and `GetSavingsPlansCoverage` are not called.
-
-Rows labelled "No resource ID" are not a service total.
-
-`GetActualCostRequest.tags` are ignored in v0.1.0.
-
-## Installation
-
-### From Source
-
-1. Clone the repository:
-
-   ```bash
-   git clone <repository-url>
-   cd aws-ce
-   ```
-
-2. Build the plugin:
-
-   ```bash
-   make build
-   ```
-
-3. Install to local plugin registry:
-
-   ```bash
-   make install
-   ```
-
-### Configuration
-
-The plugin may require cloud provider credentials to function properly. See the configuration section for details.
-
-## Usage
-
-Once installed, the plugin will be automatically discovered by FinFocus:
+Install Go 1.27.1 and use an AWS identity with Cost Explorer read permissions.
+Build and install from source:
 
 ```bash
-# List installed plugins
-finfocus plugin list
-
-# Validate plugin installation
-finfocus plugin validate
-
-# Calculate projected costs
-finfocus cost projected --pulumi-json plan.json
-
-# Get actual costs
-finfocus cost actual --pulumi-json plan.json --from 2025-01-01
-```
-
-## Development
-
-### Prerequisites
-
-- Go 1.27.1
-- FinFocus Core development environment
-- Cloud provider credentials (for actual cost retrieval)
-
-### Building
-
-```bash
-# Build the plugin
+git clone https://github.com/rshade/finfocus-plugin-aws-ce.git
+cd finfocus-plugin-aws-ce
 make build
-
-# Run tests
-make test
-
-# Run linters
-make lint
-
-# Update dependencies
-make ensure
-
-# Install to local registry
-make install
-```
-
-### Project Structure
-
-- `cmd/plugin`: Plugin entry point
-- `internal/pricing`: Pricing logic and calculators
-- `internal/client`: Cloud provider client implementation
-- `examples`: Example usage
-- `bin`: Compiled binaries
-
-### Implementing Pricing Logic
-
-Edit `internal/pricing/calculator.go` to implement your pricing logic:
-
-```go
-func (c *Calculator) GetProjectedCost(ctx context.Context, req *pbc.GetProjectedCostRequest) (*pbc.GetProjectedCostResponse, error) {
-    // 1. Check if resource is supported
-    if !c.Matcher().Supports(req.Resource) {
-        return nil, pluginsdk.NotSupportedError(req.Resource)
-    }
-
-    // 2. Extract resource properties
-    resourceType := req.Resource.ResourceType
-    properties := req.Resource.Tags
-
-    // 3. Calculate pricing based on resource type and properties
-    unitPrice := c.calculateResourceCost(resourceType, properties)
-
-    // 4. Return response
-    return c.Calculator().CreateProjectedCostResponse("USD", unitPrice, "description"), nil
-}
-```
-
-#### Actual Cost Retrieval
-
-Edit `internal/client/client.go` to implement cloud provider API integration:
-
-```go
-func (c *Client) GetResourceCost(ctx context.Context, resourceID string, startTime, endTime int64) (float64, error) {
-    // 1. Call cloud provider billing API
-    // 2. Parse response and calculate total cost
-    // 3. Return cost value
-    return totalCost, nil
-}
-```
-
-### Testing
-
-The project includes testing utilities from the FinFocus SDK:
-
-```go
-func TestPluginName(t *testing.T) {
-    plugin := pricing.NewCalculator()
-    testPlugin := pluginsdk.NewTestPlugin(t, plugin)
-    testPlugin.TestName("aws-ce")
-}
-```
-
-### Adding Pricing Data
-
-1. Update pricing data structures in `internal/pricing/data.go`
-2. Implement pricing lookups in `internal/pricing/calculator.go`
-3. Add test cases for new resource types
-
-### Configuration
-
-#### Environment Variables
-
-Configure the plugin using standard FinFocus environment variables:
-
-```bash
-# AWS credentials. A request that carries none uses the standard AWS SDK chain.
-# The host may pass credentials on the request instead.
+make install-local
+export AWS_PROFILE=default
 export AWS_REGION=us-east-1
-export AWS_ACCESS_KEY_ID=your-key
-export AWS_SECRET_ACCESS_KEY=your-secret
-
-# Optional: Plugin configuration
-export FINFOCUS_PLUGIN_PORT=50051        # Specific port (default: auto-assign)
-export FINFOCUS_LOG_FILE=/var/log/finfocus-aws-ce.log  # Log to file (default: stderr)
-export FINFOCUS_LOG_LEVEL=debug          # Verbosity: debug|info|warn|error (default: info)
+./bin/finfocus-plugin-aws-ce --port 0
 ```
 
-`FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` caps Cost Explorer calls per minute, counting each page; unset or `0` means no limit.
+Startup prints `PORT=<assigned-port>` to standard output. The plugin writes structured JSON logs
+to standard error. Stop the process with Ctrl+C. The `--port` flag overrides the environment,
+including an explicit `--port 0` for an automatic port. Invalid command-line ports and batch
+settings stop startup with a nonzero exit code.
 
-#### CLI Flags
+`make install-local` copies the binary to
+`~/.finfocus/plugins/aws-ce/<manifest-version>/`. `make install` is an alias.
+Set `FINFOCUS_HOME` to choose another registry directory. Releases contain
+Linux, Darwin, and Windows archives plus `checksums.txt`. Releases omit container images. See the [quick-start guide](docs/QUICKSTART.md) for authentication,
+core commands, and troubleshooting.
 
-The `--port` flag overrides the environment variable:
+## Credentials and configuration
+
+A request with no host-supplied credentials uses the AWS SDK default credential
+chain, including AWS profiles, environment variables, and workload credentials.
+Set `AWS_REGION`, for example `us-east-1`, or configure a region in your profile.
+Cost Explorer uses a global billing endpoint. This setting doesn't choose a
+separate regional billing dataset.
+
+For temporary credentials, supply `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
+and `AWS_SESSION_TOKEN` through your normal credential manager. Don't paste
+credential values into source files or logs.
+
+| Setting | Purpose | Default |
+| --- | --- | --- |
+| `FINFOCUS_PLUGIN_PORT` | TCP port, unless overridden by `--port` | Automatic |
+| `FINFOCUS_LOG_LEVEL` | `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `panic` | `info` |
+| `FINFOCUS_LOG_FILE` | Absolute log filename. Unset uses stderr | Unset |
+| `FINFOCUS_AWS_CE_MAX_BATCH_SIZE` | Batch limit, integer from 1 to 1000 | 100 |
+| `FINFOCUS_AWS_CE_BATCH_WORKERS` | Concurrent batch workers, integer from 1 to 50 | 10 |
+| `FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` | CE custom attempt budget per minute | Unlimited when unset or `0` |
+
+For a log file in the current directory, set
+`FINFOCUS_LOG_FILE="$(pwd)/aws-ce.log"`. Empty batch settings use defaults.
+Invalid values stop startup and name the setting. Each custom request attempt,
+including retries, counts toward the request budget. AWS SDK transport retries
+are separate. Set `AWS_MAX_ATTEMPTS=1` to turn off those retries. Requests
+safely share default client initialization. A failed initialization has a
+one-second retry delay.
+
+The host may supply `access_key_id` and `secret_access_key` together, optional
+`session_token` with that pair, and optional `role_arn` to assume an IAM role.
+A role alone uses the default AWS chain for its STS source. Names are
+case-insensitive. Unsupported names, incomplete pairs, whitespace-only values
+and malformed role ARNs return `InvalidArgument` with
+`ERROR_CODE_INVALID_CREDENTIALS`. Invalid credentials never fall back to process
+credentials. Credential-bearing requests bypass the shared cache, and the plugin
+excludes their values from logs and returned errors. See [AWS credentials](docs/CREDENTIALS.md).
+
+## Actual cost behavior
+
+An EC2 instance id consists of `i-` plus 8 to 17 lowercase hex characters.
+An instance id supplied as a bare id or instance ARN uses `GetCostAndUsageWithResources` and filters
+`RESOURCE_ID` by the bare id. This requires the account's resource-level
+Cost Explorer opt-in and covers the last 14 days. A non-EC2 ARN returns an
+explicit unsupported-resource error. Other ids, including `contract-*`, use
+unfiltered `GetCostAndUsage` grouped by service. Those are service totals,
+not attributed resource costs. Service queries cover the last 14 months.
+
+Queries use Coordinated Universal Time dates, `DAILY` granularity, and an exclusive end date. The metric
+is `UnblendedCost`. The plugin uses `AmortizedCost` only when a returned group key names
+a reservation or Savings Plan and that metric exists. The actual-cost remote
+procedure call doesn't request those groups, so commitment fields stay unset.
+The plugin doesn't invent quantity or status or call reservation-utilization
+and Savings Plan coverage operations. Rows labelled "No resource ID" aren't
+a service total. The plugin ignores `GetActualCostRequest.tags` in v0.1.0.
+
+Cost Explorer has a **24-hour data lag** or longer. Resource-level data may lag
+up to 48 hours. Missing data returns an explicit error. Recent or estimated
+results stay in the cache for 15 minutes. Closed historical results stay for 24 hours.
+Cache keys include the linked-account filter, so costs from different account
+queries stay separate.
+Each paginated CE request costs $0.01 in real use.
+
+## Spec compatibility and FOCUS
+
+On actual-cost requests, the descriptor identity takes precedence over legacy
+identifiers. The identity can be an id or ARN. A descriptor without either identity falls back to `resource_id`
+and `arn`. The SDK still requires `resource_id` on every request.
+
+Pass `billing_account_id` to receive FOCUS records. The plugin copies that
+caller value verbatim. Without it, costs remain available with `focus_record`
+unset. The plugin never invents an account. Currency appears in `focus_record.billing_currency`.
+When a FOCUS record is present, its `extended_columns` include:
+
+| Key | Value |
+| --- | --- |
+| `data_source` | `AWS Cost Explorer` |
+| `granularity` | `DAILY` |
+| `metric` | Metric used, normally `UnblendedCost` |
+| `estimated` | `true` if AWS marks any contributing period as an estimate |
+| `lookback` | Query limit: `14_days` or `14_months` |
+| `amount_decimal` | Exact decimal sum before protocol number conversion |
+| `group_key` | Cost Explorer group key |
+| `currency` | Currency reported by Cost Explorer |
+
+There is no response-level metadata map. FOCUS and these columns are absent
+without a billing account.
+
+## Development and offline testing
 
 ```bash
-# Use environment variable port
-./finfocus-plugin-aws-ce
-
-# Override with CLI flag (takes precedence)
-./finfocus-plugin-aws-ce --port 50052
+make develop
+make test
+make test-integration
+make lint
+make vuln
 ```
 
-#### Log Output
+`make develop` fetches Go modules and prepares the build directory.
+`make test-integration` runs real plugin processes with local fake CE
+endpoints and verifies protocol conformance. All Go test recipes use `-count=1`.
+Releases contain binary archives and checksums. The owner removed Docker support and its
+Makefile target.
 
-Logs use structured JSON format with standard fields:
+Set `FINFOCUS_E2E=true` to run the subprocess E2E test against a local fake CE
+endpoint. Legacy `finfocus_E2E` is a fallback only when the uppercase name is
+unset. Explicit uppercase `false` turns off the fallback. Tests inject synthetic
+credentials and use local fake endpoints. The ordinary suite never queries
+a live AWS service. Contract fixtures prove parsing,
+paging, totals, dates, and failure handling. [Live AWS checks](docs/AWS-VERIFICATION.md)
+require an explicit build tag and environment flag, and a Pulumi environment
+with Cost Explorer read permission. FinFocus core E2E remains outside this run.
 
-```json
-{
-  "level": "info",
-  "component": "finfocus-plugin-aws-ce",
-  "plugin_name": "aws-ce",
-  "plugin_version": "1.0.0",
-  "operation": "GetActualCost",
-  "duration_ms": 1234,
-  "message": "Operation completed"
-}
-```
+The vulnerability check reports the known `GO-2026-6443` finding in
+gRPC v1.84.0. The plugin retains the stable dependency. This verification environment
+has no fixed stable release. The frozen `specs/` history also has pre-existing
+Markdown lint errors. Documentation checks cover changed files separately.
 
-#### Graceful Shutdown
+## License and support
 
-The plugin responds cleanly to shutdown signals (SIGINT, SIGTERM):
-
-```bash
-# Start plugin in background
-./bin/finfocus-plugin-aws-ce &
-PID=$!
-
-# Send SIGTERM for graceful shutdown
-kill -TERM $PID
-# Plugin completes in-flight requests before exiting
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Run `make lint test`
-6. Submit a pull request
-
-## License
-
-[Add your license information here]
-
-## Support
-
-[Add support contact information here]
+Licensed under [Apache 2.0](LICENSE). Report problems in the
+[repository issue tracker](https://github.com/rshade/finfocus-plugin-aws-ce/issues).
+Release-token maintenance and development rules are in [CLAUDE.md](CLAUDE.md).

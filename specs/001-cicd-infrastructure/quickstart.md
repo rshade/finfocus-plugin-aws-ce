@@ -27,6 +27,7 @@ make ensure
 ## Continuous Integration (CI)
 
 On every push to the `main` branch or pull request:
+
 1. **Test Workflow** (`.github/workflows/test.yml`): Runs `golangci-lint` and `go test`. Must pass for merge.
 
 ## Release Process

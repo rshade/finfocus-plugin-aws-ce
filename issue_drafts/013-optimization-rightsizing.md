@@ -1,26 +1,31 @@
-# Issue: Feature - Rightsizing Recommendations (#13)
+# Rightsizing recommendations, issue 13
 
-**Status:** Researching
-**Type:** Feature
-**Priority:** Medium
+**Status:** researching
+**Type:** feature
+**Priority:** medium
 
-## User Story
-As a cloud architect, I want to identify underutilized EC2 instances so I can downsize them and reduce waste.
+## User story
 
-## Technical Thesis
-Implement the `GetRecommendations` RPC (scoped to `RightSizing`) by proxying `costexplorer.GetRightsizingRecommendation`.
+A cloud architect needs to identify EC2 instances with low utilization to downsize them and reduce waste.
 
-### API Mapping
-*   **RPC:** `GetRecommendations` (Filter: `RECOMMENDATION_TYPE_RIGHTSIZING`)
-*   **AWS API:** `costexplorer.GetRightsizingRecommendation`
-*   **Supported Services:** EC2, RDS (if supported by AWS API in region).
+## Technical approach
 
-## Boundary Guardrails
-1.  **No Logic:** We do not calculate utilization percentages. We only report what AWS flags as "Idle" or "Underutilized".
-2.  **Filtering:** Support basic filtering (Service, Region) as mapped from the Core request.
-3.  **Output:** Map AWS `TerminateRecommendationDetail` and `ModifyRecommendationDetail` to the FOCUS Recommendation structure.
+Implement the `GetRecommendations` remote procedure call for `RightSizing` as a proxy for `costexplorer.GetRightsizingRecommendation`.
 
-## Acceptance Criteria
-- [ ] Returns EC2 rightsizing recommendations.
-- [ ] Correctly distinguishes between "Terminate" and "Modify" actions.
-- [ ] Populates "Potential Savings" based on AWS estimation.
+### API mapping
+
+- **Remote procedure call:** `GetRecommendations`, with the `RECOMMENDATION_TYPE_RIGHTSIZING` filter.
+- **AWS API:** `costexplorer.GetRightsizingRecommendation`.
+- **Services:** EC2 and RDS, where the AWS API supports them in the region.
+
+## Constraints
+
+1. Report instances that AWS flags as idle or underutilized. Don't calculate utilization percentages.
+2. Map service and region filters from the core request.
+3. Map `TerminateRecommendationDetail` and `ModifyRecommendationDetail` to the FOCUS recommendation structure.
+
+## Acceptance criteria
+
+- [ ] Return EC2 rightsizing recommendations.
+- [ ] Distinguish `Terminate` actions from `Modify` actions.
+- [ ] Populate potential savings from AWS estimates.

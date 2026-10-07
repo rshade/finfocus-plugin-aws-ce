@@ -188,8 +188,9 @@ func actualCostCacheKey(plan costQueryPlan, req *pbc.GetActualCostRequest) strin
 	if plan.resourceLevel {
 		group = cacheGroupResource
 	}
-	return fmt.Sprintf("cost:%s:%d:%d:%s:%s:%s",
+	return fmt.Sprintf("cost:%s:%s:%d:%d:%s:%s:%s",
 		plan.cacheID,
+		plan.accountID,
 		req.GetStart().GetSeconds(),
 		req.GetEnd().GetSeconds(),
 		cacheGranularity,

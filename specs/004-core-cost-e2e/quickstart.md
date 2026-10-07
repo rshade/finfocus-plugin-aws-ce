@@ -155,6 +155,7 @@ FINFOCUS_E2E=true FINFOCUS_CACHE_BYPASS=true go test -v ./test/e2e/
 ### Expected Output
 
 **Successful run:**
+
 ```
 === RUN   TestE2E
 === RUN   TestE2E/GetActualCost
@@ -225,6 +226,7 @@ time FINFOCUS_E2E=true FINFOCUS_CACHE_BYPASS=true go test -v -run TestE2E_GetAct
 ### E2E Tests Skipped
 
 **Symptom:**
+
 ```
 === RUN   TestE2E
     e2e_test.go:89: Skipping E2E tests. Set FINFOCUS_E2E=true to run.
@@ -232,6 +234,7 @@ time FINFOCUS_E2E=true FINFOCUS_CACHE_BYPASS=true go test -v -run TestE2E_GetAct
 ```
 
 **Solution:**
+
 ```bash
 # Ensure environment variable is set
 export FINFOCUS_E2E=true
@@ -243,6 +246,7 @@ FINFOCUS_E2E=true go test ./test/e2e/
 ### AWS Credentials Not Found
 
 **Symptom:**
+
 ```
 Error: NoCredentialProviders: no valid providers in chain
 ```
@@ -250,21 +254,25 @@ Error: NoCredentialProviders: no valid providers in chain
 **Solutions:**
 
 1. **Check AWS CLI configuration:**
+
    ```bash
    aws configure list
    ```
 
 2. **Verify credentials file:**
+
    ```bash
    cat ~/.aws/credentials
    ```
 
 3. **Test credentials:**
+
    ```bash
    aws sts get-caller-identity
    ```
 
 4. **Set environment variables:**
+
    ```bash
    export AWS_PROFILE=your-profile
    # OR
@@ -275,6 +283,7 @@ Error: NoCredentialProviders: no valid providers in chain
 ### Permission Denied Errors
 
 **Symptom:**
+
 ```
 AccessDeniedException: User: arn:aws:iam::123456789012:user/test is not authorized to perform: ce:GetCostAndUsage
 ```
@@ -282,16 +291,19 @@ AccessDeniedException: User: arn:aws:iam::123456789012:user/test is not authoriz
 **Solution:**
 
 1. **Check IAM permissions:**
+
    ```bash
    aws iam get-user-policy --user-name test --policy-name CostExplorer
    ```
 
 2. **Attach required policy:**
+
    ```bash
    aws iam put-user-policy --user-name test --policy-name CostExplorerAccess --policy-document file://cost-explorer-policy.json
    ```
 
 3. **Verify permissions:**
+
    ```bash
    aws ce get-cost-and-usage --time-period Start=2024-01-01,End=2024-01-31 --granularity MONTHLY --metrics UnblendedCost
    ```
@@ -299,11 +311,13 @@ AccessDeniedException: User: arn:aws:iam::123456789012:user/test is not authoriz
 ### No Cost Data Available
 
 **Symptom:**
+
 ```
 Test returned empty results (no cost data found)
 ```
 
 **Causes:**
+
 - AWS account has no cost data for queried period
 - Free tier usage (no billable costs)
 - Resource created very recently (< 8 hours ago)
@@ -324,6 +338,7 @@ Test returned empty results (no cost data found)
 ### E2E Tests Timeout
 
 **Symptom:**
+
 ```
 panic: test timed out after 2m0s
 ```
@@ -331,11 +346,13 @@ panic: test timed out after 2m0s
 **Solutions:**
 
 1. **Increase timeout:**
+
    ```bash
    FINFOCUS_E2E=true go test -v -timeout 5m ./test/e2e/
    ```
 
 2. **Check network connectivity:**
+
    ```bash
    curl -I https://ce.us-east-1.amazonaws.com
    ```
@@ -346,11 +363,13 @@ panic: test timed out after 2m0s
 ### Build Failures
 
 **Symptom:**
+
 ```
 go: github.com/rshade/finfocus-spec@v0.5.2: no matching versions for query "v0.5.2"
 ```
 
 **Solution:**
+
 ```bash
 # Update dependencies
 go get -u github.com/rshade/finfocus-spec@latest

@@ -1,26 +1,31 @@
-# Issue: Research - FOCUS 1.3 Transition (#104)
+# FOCUS 1.3 transition, issue 104
 
-**Status:** Researching
-**Type:** Chore / Compliance
-**Priority:** Medium
+**Status:** researching
+**Type:** chore and compliance
+**Priority:** medium
 
-## User Story
-As a FinOps practitioner, I want my data to include "Commitment" details (FOCUS 1.3) so I can analyze my Reserved Instance and Savings Plan effective rates.
+## User story
 
-## Technical Thesis
+A FinOps practitioner needs FOCUS 1.3 commitment details to analyze effective rates for Reserved Instances and Savings Plans.
+
+## Technical approach
+
 Audit the `finfocus-spec` FOCUS 1.3 columns against AWS Cost Explorer data availability.
 
 ### Scope
-*   **New Columns:** `CommitmentDiscountCategory`, `CommitmentDiscountId`, `CommitmentDiscountName`, `CommitmentDiscountType`.
-*   **AWS Mapping:**
-    *   `ReservationARN` -> `CommitmentDiscountId` (for RI)
-    *   `SavingsPlanARN` -> `CommitmentDiscountId` (for SP)
-    *   `"Savings Plan"` / `"Reserved Instance"` -> `CommitmentDiscountType`
 
-## Boundary Guardrails
-1.  **Strict Mapping:** Only populate these fields if `GetCostAndUsage` returns them (e.g., in `GroupByKey` or `ResultsByTime`).
-2.  **No Inference:** Do not assume a discount is an RI based on price. Must rely on the `ReservationARN` field presence.
+- **New columns:** `CommitmentDiscountCategory`, `CommitmentDiscountId`, `CommitmentDiscountName`, and `CommitmentDiscountType`.
+- **AWS mapping:**
+  - `ReservationARN` to `CommitmentDiscountId` for Reserved Instances.
+  - `SavingsPlanARN` to `CommitmentDiscountId` for Savings Plans.
+  - `Savings Plan` or `Reserved Instance` to `CommitmentDiscountType`.
 
-## Research Tasks
-- [ ] Verify if `GetCostAndUsage` returns `ReservationARN` and `SavingsPlanARN` when grouping by `Service`. (Likely requires grouping by `RESERVATION_ID` or similar).
-- [ ] Check if enabling these groupings explodes the cardinality of the response (row count).
+## Constraints
+
+1. Populate fields only when `GetCostAndUsage` returns them, such as in `GroupByKey` or `ResultsByTime`.
+2. Rely on the presence of `ReservationARN` to identify a Reserved Instance discount. Don't infer it from the price.
+
+## Research tasks
+
+- [ ] Check whether `GetCostAndUsage` returns `ReservationARN` and `SavingsPlanARN` when grouping by `Service`. Grouping by `RESERVATION_ID` or a similar field might be necessary.
+- [ ] Check how these groupings affect the number of response rows.

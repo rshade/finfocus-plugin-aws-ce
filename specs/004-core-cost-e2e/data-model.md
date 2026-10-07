@@ -22,6 +22,7 @@ This document defines the data structures for caching, retry logic, and AWS Cost
 **Purpose**: In-memory and disk-persisted representation of cached cost data.
 
 **Structure:**
+
 ```go
 type CacheEntry struct {
     // Results from AWS Cost Explorer API
@@ -55,12 +56,14 @@ type CacheQueryMeta struct {
 ```
 
 **Validation rules:**
+
 - `Results` may be empty (no cost data available)
 - `ExpiresAt` must be > `CachedAt`
 - `CachedAt` must be <= current time
 - `QueryMeta.StartTime` must be < `QueryMeta.EndTime`
 
 **State transitions:**
+
 ```
 [Fresh] → (time > ExpiresAt) → [Expired]
 [Expired] → (lazy eviction) → [Deleted]
@@ -72,6 +75,7 @@ type CacheQueryMeta struct {
 **Purpose**: Structured cache key for multi-dimensional cost queries.
 
 **Structure:**
+
 ```go
 type CacheKeyComponents struct {
     ResourceID  string
@@ -100,10 +104,12 @@ func valueOrEmpty(s string) string {
 ```
 
 **Key format examples:**
+
 - `cost:v1:i-12345:_:_:1704067200:1705276800` (no filters)
 - `cost:v1:i-12345:AmazonEC2:us-east-1:1704067200:1705276800` (service + region)
 
 **Collision prevention:**
+
 - Version prefix (`v1`) enables schema evolution
 - Underscore (`_`) distinguishes empty from set values
 - Unix timestamps ensure deterministic ordering
@@ -111,6 +117,7 @@ func valueOrEmpty(s string) string {
 ### 1.3 Cache File Structure
 
 **Disk layout:**
+
 ```
 ~/.cache/finfocus/aws-ce/
 ├── cost_v1_i-12345___1704067200_1705276800.json
@@ -119,11 +126,13 @@ func valueOrEmpty(s string) string {
 ```
 
 **File naming:**
+
 - Derived from `CacheKeyComponents.String()`
 - Replace `:` with `_` for filesystem compatibility
 - Extension: `.json`
 
 **JSON format example:**
+
 ```json
 {
   "results": [
@@ -198,6 +207,7 @@ Plugin Calculator
 ### 2.2 AWS Cost Explorer Filter Expressions
 
 **By ResourceId:**
+
 ```go
 filter := &types.Expression{
     Dimensions: &types.DimensionValues{
@@ -208,6 +218,7 @@ filter := &types.Expression{
 ```
 
 **By ARN (when available):**
+
 ```go
 // Parse ARN to extract Resource ID
 parsed, _ := arn.Parse(req.GetArn())
@@ -215,6 +226,7 @@ resourceID := parsed.Resource  // "instance/i-12345" → "i-12345"
 ```
 
 **By Service + Region:**
+
 ```go
 filter := &types.Expression{
     And: []*types.Expression{
@@ -237,6 +249,7 @@ filter := &types.Expression{
 ### 2.3 Transformation: AWS CE → FOCUS 1.2
 
 **AWS Cost Explorer Output:**
+
 ```go
 type ResultByTime struct {
     TimePeriod struct {
@@ -252,6 +265,7 @@ type ResultByTime struct {
 ```
 
 **FOCUS 1.2 Record (via pluginsdk):**
+
 ```go
 record := pluginsdk.NewFocusRecordBuilder().
     WithIdentity(&pbc.Identity{
@@ -268,6 +282,7 @@ record := pluginsdk.NewFocusRecordBuilder().
 ```
 
 **Mapping rules:**
+
 | AWS Field | FOCUS Field | Transformation |
 |-----------|-------------|----------------|
 | `ResultByTime.Total["UnblendedCost"].Amount` | `Financials.NetAmortizedCost.Value` | `strconv.ParseFloat()` |
@@ -284,6 +299,7 @@ record := pluginsdk.NewFocusRecordBuilder().
 **Purpose**: Configuration for exponential backoff retry strategy.
 
 **Structure:**
+
 ```go
 type RetryConfig struct {
     MaxRetries int           // Maximum retry attempts (default: 3)
@@ -319,6 +335,7 @@ func DefaultRetryConfig() RetryConfig {
 ```
 
 **State definitions:**
+
 - **Initial**: First attempt, no delay
 - **Delay**: Exponential backoff sleep before next attempt
 - **Complete**: Operation succeeded
@@ -328,6 +345,7 @@ func DefaultRetryConfig() RetryConfig {
 ### 3.3 Error Classification
 
 **Retryable errors:**
+
 | Category | Examples | Rationale |
 |----------|----------|-----------|
 | Throttling | `ThrottlingException`, `LimitExceededException` | Rate limit, will clear |
@@ -336,6 +354,7 @@ func DefaultRetryConfig() RetryConfig {
 | Timeout | `RequestTimeout`, `context deadline exceeded` | May succeed if retried |
 
 **Non-retryable errors:**
+
 | Category | Examples | Rationale |
 |----------|----------|-----------|
 | Validation | `ValidationException`, `InvalidParameterException` | Request malformed |
@@ -350,6 +369,7 @@ func DefaultRetryConfig() RetryConfig {
 **Jitter:** Uniform random [0.9, 1.1] (10% variation)
 
 **Example progression:**
+
 | Attempt | Base Delay | With Jitter (Min-Max) | Actual |
 |---------|------------|-----------------------|--------|
 | 1 | 100ms | 90ms - 110ms | ~100ms |
@@ -366,6 +386,7 @@ func DefaultRetryConfig() RetryConfig {
 **Purpose**: Structured logging for non-fatal issues that don't warrant gRPC errors.
 
 **Warning taxonomy:**
+
 ```go
 const (
     WarningTypeNoDataFound         = "no_data_found"
@@ -379,6 +400,7 @@ const (
 ### 4.2 Structured Log Format
 
 **Schema:**
+
 ```go
 type WarningLog struct {
     Level         string            // "warn"
@@ -393,6 +415,7 @@ type WarningLog struct {
 ```
 
 **Example JSON output:**
+
 ```json
 {
   "level": "warn",
@@ -411,7 +434,8 @@ type WarningLog struct {
 
 ### 4.3 Warning Scenarios
 
-**Scenario 1: No data found**
+#### Scenario 1: no data found
+
 ```go
 c.logger.Warn().
     Str(pluginsdk.FieldOperation, "GetActualCost").
@@ -428,7 +452,8 @@ return &pbc.GetActualCostResponse{
 }, nil
 ```
 
-**Scenario 2: Identifier mismatch**
+#### Scenario 2: identifier mismatch
+
 ```go
 c.logger.Warn().
     Str(pluginsdk.FieldOperation, "GetActualCost").
@@ -441,7 +466,8 @@ c.logger.Warn().
 // Continue with ARN-based resource ID
 ```
 
-**Scenario 3: Cache write failure**
+#### Scenario 3: cache write failure
+
 ```go
 if err := c.cache.Set(cacheKey, costs); err != nil {
     c.logger.Warn().
@@ -457,6 +483,7 @@ if err := c.cache.Set(cacheKey, costs); err != nil {
 ### 4.4 FallbackHint Usage
 
 **When to use fallback hints:**
+
 | Hint | Scenario | User Impact |
 |------|----------|-------------|
 | `FALLBACK_HINT_NONE` | Normal successful response | None - data complete |
@@ -464,6 +491,7 @@ if err := c.cache.Set(cacheKey, costs); err != nil {
 | `FALLBACK_HINT_REQUIRED` | (Not used by this plugin) | Reserved for critical failures |
 
 **Response pattern:**
+
 ```go
 // Empty results (no cost data available)
 return &pbc.GetActualCostResponse{
@@ -506,6 +534,7 @@ GetActualCostRequest
 ## Summary
 
 All data structures maintain **backward compatibility** with existing gRPC protocol while adding:
+
 - **Robust caching** with TTL and manual invalidation
 - **Resilient retries** with error classification
 - **Observability** through structured warning metadata

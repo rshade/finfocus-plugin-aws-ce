@@ -46,7 +46,7 @@ JSON
 Kubecost
 Lambda
 liveness
-Lookback
+lookback
 lookups
 Makefile
 markdownlint
@@ -79,3 +79,4 @@ untracked
 Vantage
 VPC
 vuln
+interquartile

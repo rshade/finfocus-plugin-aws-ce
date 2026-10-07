@@ -1,12 +1,18 @@
 package e2e
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -16,276 +22,112 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-var (
-	pluginBinary = flag.String("plugin-binary", "", "Path to the plugin binary. If empty, runs 'go run cmd/plugin/main.go'")
-)
+var pluginBinary = flag.String("plugin-binary", "", "Plugin binary; empty builds cmd/plugin")
 
-// Feature Toggles - Enable these as features are implemented
-const (
-	FeatureActualCost   = true  // Implemented
-	FeatureForecasting  = false // Issue #25
-	FeatureBudgets      = false // Issue #24
-	FeatureAnomalies    = false // Issue #26
-	FeatureRightsizing  = false // Issue #27
-	FeatureSavingsPlans = false // Issue #32
-	FeatureReservedInst = false // Issue #33
-	FeatureEstimateCost = false // Issue #30
-	FeatureGreenops     = false // Issue #29
-)
+func e2eEnabled() bool {
+	if value, set := os.LookupEnv("FINFOCUS_E2E"); set {
+		return value == "true"
+	}
+	value, _ := os.LookupEnv("finfocus_E2E")
+	return value == "true"
+}
+
+func TestE2EGate(t *testing.T) {
+	for _, tc := range []struct {
+		name, value, legacy string
+		unset, want         bool
+	}{
+		{name: "uppercase", value: "true", want: true},
+		{name: "legacy fallback", legacy: "true", unset: true, want: true},
+		{name: "explicit false overrides legacy", value: "false", legacy: "true"},
+		{name: "disabled", unset: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("FINFOCUS_E2E", tc.value)
+			t.Setenv("finfocus_E2E", tc.legacy)
+			if tc.unset {
+				if err := os.Unsetenv("FINFOCUS_E2E"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if got := e2eEnabled(); got != tc.want {
+				t.Fatalf("enabled=%v want=%v", got, tc.want)
+			}
+		})
+	}
+}
 
 func TestE2E(t *testing.T) {
-	if os.Getenv("finfocus_E2E") != "true" {
-		t.Skip("Skipping E2E tests. Set finfocus_E2E=true to run.")
+	if !e2eEnabled() {
+		t.Skip("Set FINFOCUS_E2E=true for subprocess E2E against a local fake CE endpoint")
 	}
-
-	// 1. Setup Plugin Server
-	port := 50055 // Arbitrary test port
-	serverAddr := fmt.Sprintf("127.0.0.1:%d", port)
-
-	ctx, cancel := context.WithCancel(context.Background())
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Amz-Target") != "AWSInsightsIndexService.GetCostAndUsage" {
+			t.Errorf("unexpected AWS operation %s", r.Header.Get("X-Amz-Target"))
+		}
+		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		_, _ = w.Write([]byte(`{"ResultsByTime":[{"Estimated":false,"TimePeriod":{"Start":"2026-09-20","End":"2026-09-21"},"Groups":[{"Keys":["Amazon Simple Storage Service"],"Metrics":{"UnblendedCost":{"Amount":"1.25","Unit":"USD"}}}]}]}`))
+	}))
+	defer fake.Close()
+	binary := *pluginBinary
+	if binary == "" {
+		binary = filepath.Join(t.TempDir(), "plugin")
+		cmd := exec.Command("go", "build", "-o", binary, "./cmd/plugin")
+		cmd.Dir = filepath.Join("..", "..")
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("build: %v\n%s", err, output)
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-
-	cleanup := startPluginServer(t, ctx, port)
-	defer cleanup()
-
-	// 2. Connect Client
-	conn, err := grpc.NewClient(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	cmd := exec.CommandContext(ctx, binary, "--port", "0")
+	cmd.Env = append(os.Environ(), "AWS_ENDPOINT_URL_COST_EXPLORER="+fake.URL, "AWS_ENDPOINT_URL="+fake.URL, "AWS_IGNORE_CONFIGURED_ENDPOINT_URLS=false", "AWS_REGION=us-east-1", "AWS_ACCESS_KEY_ID=test", "AWS_SECRET_ACCESS_KEY=test", "AWS_SESSION_TOKEN=", "AWS_PROFILE=", "AWS_EC2_METADATA_DISABLED=true", "FINFOCUS_PLUGIN_PORT=0", "FINFOCUS_LOG_FILE=")
+	cmd.Stderr = os.Stderr
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		t.Fatalf("Failed to connect to plugin: %v", err)
+		t.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = cmd.Process.Signal(syscall.SIGTERM)
+		if err := cmd.Wait(); err != nil && ctx.Err() == nil {
+			t.Errorf("plugin exit: %v", err)
+		}
+	}()
+	ports := make(chan string, 1)
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			if line := scanner.Text(); strings.HasPrefix(line, "PORT=") {
+				ports <- strings.TrimPrefix(line, "PORT=")
+				return
+			}
+		}
+		ports <- ""
+	}()
+	var port string
+	select {
+	case port = <-ports:
+	case <-ctx.Done():
+		t.Fatal("plugin startup timed out")
+	}
+	if number, err := strconv.Atoi(port); err != nil || number < 1 {
+		t.Fatalf("invalid port announcement %q", port)
+	}
+	conn, err := grpc.NewClient(fmt.Sprintf("127.0.0.1:%s", port), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatal(err)
 	}
 	defer func() { _ = conn.Close() }()
-
-	client := pbc.NewCostSourceServiceClient(conn)
-
-	// 3. Run Test Suites
-	t.Run("GetActualCost", func(t *testing.T) {
-		if !FeatureActualCost {
-			t.Skip("Feature toggle disabled")
-		}
-		testActualCost(t, client)
-	})
-
-	t.Run("GetProjectedCost", func(t *testing.T) {
-		if !FeatureForecasting {
-			t.Skip("Feature toggle disabled")
-		}
-		testForecasting(t, client)
-	})
-
-	t.Run("GetBudgets", func(t *testing.T) {
-		if !FeatureBudgets {
-			t.Skip("Feature toggle disabled")
-		}
-		testBudgets(t, client)
-	})
-
-	t.Run("GetAnomalies", func(t *testing.T) {
-		if !FeatureAnomalies {
-			t.Skip("Feature toggle disabled")
-		}
-		testAnomalies(t, client)
-	})
-
-	t.Run("GetRecommendations", func(t *testing.T) {
-		if !FeatureRightsizing && !FeatureSavingsPlans && !FeatureReservedInst {
-			t.Skip("All recommendation features disabled")
-		}
-		testRecommendations(t, client)
-	})
-
-	t.Run("EstimateCost", func(t *testing.T) {
-		if !FeatureEstimateCost {
-			t.Skip("Feature toggle disabled")
-		}
-		testEstimateCost(t, client)
-	})
-}
-
-// startPluginServer starts the plugin process
-func startPluginServer(t *testing.T, ctx context.Context, port int) func() {
-	var cmd *exec.Cmd
-
-	if *pluginBinary != "" {
-		cmd = exec.CommandContext(ctx, *pluginBinary, "--port", fmt.Sprintf("%d", port))
-	} else {
-		// locate project root
-		wd, _ := os.Getwd()
-		projectRoot := filepath.Dir(filepath.Dir(wd)) // assuming test/e2e/e2e_test.go
-		mainPath := filepath.Join(projectRoot, "cmd", "plugin", "main.go")
-
-		cmd = exec.CommandContext(ctx, "go", "run", mainPath, "--port", fmt.Sprintf("%d", port))
-		// Set working dir to project root so it finds .env or other files if needed
-		cmd.Dir = projectRoot
-	}
-
-	// Capture output for debugging
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	// Set Env vars for testing
-	cmd.Env = append(os.Environ(),
-		"finfocus_LOG_LEVEL=debug",
-		"finfocus_TEST_MODE=true",
-	)
-
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("Failed to start plugin server: %v", err)
-	}
-
-	// Give it a moment to start
-	time.Sleep(2 * time.Second)
-
-	return func() {
-		if cmd.Process != nil {
-			_ = cmd.Process.Kill()
-		}
-	}
-}
-
-// --- Test Implementation for Each Feature ---
-
-func testActualCost(t *testing.T, client pbc.CostSourceServiceClient) {
-	ctx := context.Background()
-	now := time.Now()
-
-	// Query last 7 days
-	start := now.AddDate(0, 0, -7)
-	end := now
-
-	req := &pbc.GetActualCostRequest{
-		ResourceId: "i-1234567890abcdef0", // Dummy ID, plugin should handle gracefully or use real ID if env setup
-		Start:      timestamppb.New(start),
-		End:        timestamppb.New(end),
-		Tags: map[string]string{
-			"Name": "e2e-test-instance",
-		},
-		// Granularity removed
-	}
-
-	resp, err := client.GetActualCost(ctx, req)
+	end := time.Now().UTC().Add(-24 * time.Hour)
+	start := end.Add(-24 * time.Hour)
+	resp, err := pbc.NewCostSourceServiceClient(conn).GetActualCost(ctx, &pbc.GetActualCostRequest{ResourceId: "e2e-service-totals", Start: timestamppb.New(start), End: timestamppb.New(end)})
 	if err != nil {
-		t.Errorf("GetActualCost failed: %v", err)
-		return
+		t.Fatal(err)
 	}
-
-	// Basic validation
-	if resp == nil {
-		t.Error("Received nil response")
-		return
+	if len(resp.GetResults()) != 1 || resp.GetResults()[0].GetCost() != 1.25 {
+		t.Fatalf("actual costs=%v", resp)
 	}
-
-	// Log fallback hint
-	t.Logf("Fallback Hint: %v", resp.FallbackHint)
-	t.Logf("Result Count: %d", len(resp.Results))
-}
-
-func testForecasting(t *testing.T, client pbc.CostSourceServiceClient) {
-	ctx := context.Background()
-	// now := time.Now()
-
-	// Forecast next 30 days
-	// start := now.AddDate(0, 0, 1)
-	// end := now.AddDate(0, 0, 31)
-
-	req := &pbc.GetProjectedCostRequest{
-		Resource: &pbc.ResourceDescriptor{
-			ResourceType: "aws:ec2/instance:Instance",
-			Tags: map[string]string{
-				"Environment": "Production",
-			},
-		},
-		// Start: timestamppb.New(start), // Removed based on proto inspection
-		// End:   timestamppb.New(end),   // Removed based on proto inspection
-		// Granularity: "DAILY",         // Removed based on proto inspection
-	}
-
-	resp, err := client.GetProjectedCost(ctx, req)
-	if err != nil {
-		t.Errorf("GetProjectedCost failed: %v", err)
-		return
-	}
-
-	if resp == nil {
-		t.Error("Received nil response")
-		return
-	}
-
-	t.Logf("Forecasted Cost Per Month: %f %s", resp.CostPerMonth, resp.Currency)
-}
-
-func testBudgets(t *testing.T, client pbc.CostSourceServiceClient) {
-	// Requires RPC definition in newer spec, assume client has it
-	// If method doesn't exist yet in the generated client code in this repo,
-	// this might fail compile.
-	// TODO: Uncomment once proto is updated/generated with GetBudgets
-
-	/*
-		ctx := context.Background()
-		req := &pbc.GetBudgetsRequest{}
-		resp, err := client.GetBudgets(ctx, req)
-		if err != nil {
-			t.Errorf("GetBudgets failed: %v", err)
-			return
-		}
-		t.Logf("Budgets Found: %d", len(resp.Budgets))
-	*/
-	t.Log("GetBudgets test placeholder (proto update required)")
-}
-
-func testAnomalies(t *testing.T, client pbc.CostSourceServiceClient) {
-	// TODO: Uncomment once proto is updated/generated with GetAnomalies
-	/*
-		ctx := context.Background()
-		req := &pbc.GetAnomaliesRequest{
-			Start: timestamppb.New(time.Now().AddDate(0, 0, -30)),
-			End:   timestamppb.New(time.Now()),
-		}
-		resp, err := client.GetAnomalies(ctx, req)
-		if err != nil {
-			t.Errorf("GetAnomalies failed: %v", err)
-			return
-		}
-		t.Logf("Anomalies Found: %d", len(resp.Anomalies))
-	*/
-	t.Log("GetAnomalies test placeholder (proto update required)")
-}
-
-func testRecommendations(t *testing.T, client pbc.CostSourceServiceClient) {
-	// TODO: Uncomment once proto is updated/generated with GetRecommendations
-	/*
-		ctx := context.Background()
-		req := &pbc.GetRecommendationsRequest{
-			Category: pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_RIGHTSIZING,
-		}
-		resp, err := client.GetRecommendations(ctx, req)
-		if err != nil {
-			t.Errorf("GetRecommendations failed: %v", err)
-			return
-		}
-		t.Logf("Recommendations Found: %d", len(resp.Recommendations))
-	*/
-	t.Log("GetRecommendations test placeholder (proto update required)")
-}
-
-func testEstimateCost(t *testing.T, client pbc.CostSourceServiceClient) {
-	// TODO: Uncomment once proto is updated/generated with EstimateCost
-	/*
-		ctx := context.Background()
-		req := &pbc.EstimateCostRequest{
-			Resource: &pbc.ResourceDescriptor{
-				ResourceType: "aws:ec2/instance:Instance",
-				Inputs: map[string]string{
-					"instanceType": "t3.micro",
-					"region": "us-east-1",
-				},
-			},
-		}
-		resp, err := client.EstimateCost(ctx, req)
-		if err != nil {
-			t.Errorf("EstimateCost failed: %v", err)
-			return
-		}
-		t.Logf("Estimated Cost: %f %s", resp.TotalCost, resp.Currency)
-	*/
-	t.Log("EstimateCost test placeholder (proto update required)")
 }

@@ -25,11 +25,14 @@ import (
 // Calculator implements the FinFocus plugin interface for AWS Cost Explorer.
 type Calculator struct {
 	*pluginsdk.BasePlugin
-	ceClient *client.Client
-	cache    *CacheManager
-	logger   zerolog.Logger
-	// openClient builds the client for one call that carried credentials.
-	// Nil uses client.NewClient. The result is not stored on ceClient.
+	ceClient      *client.Client
+	cache         *CacheManager
+	logger        zerolog.Logger
+	clientMu      sync.Mutex
+	clientInitErr error
+	clientRetryAt time.Time
+	// openClient constructs a client. Nil uses client.NewClient.
+	// Only the default credential-chain client is retained on ceClient.
 	openClient func(context.Context, client.Config) (*client.Client, error)
 	// maxRequestsPerMinute is the Cost Explorer page budget. Zero means no limit.
 	maxRequestsPerMinute int
@@ -47,8 +50,8 @@ const (
 	pluginName    = "aws-ce"
 	pluginVersion = "0.1.0"
 	// specVersion must keep the leading v. pluginsdk.ValidateSpecVersion rejects "0.7.0".
-	specVersion   = "v0.7.0"
-	supportedRPCs = "GetActualCost,Supports,GetPluginInfo,GetProjectedCost"
+	specVersion   = "v0.7.5"
+	supportedRPCs = "GetActualCost,Supports,GetPluginInfo,BatchCost"
 )
 
 // NewCalculator creates a new AWS Cost Explorer cost calculator plugin.
@@ -114,36 +117,25 @@ func NewCalculatorWithClient(ceClient *client.Client) *Calculator {
 // Supports reports whether Cost Explorer can answer for the resource.
 // An unsupported provider or an unusable resource returns Supported false and a
 // reason, never a Go error. Server.Supports replaces plugin errors with
-// codes.Internal, which would hide that reason. CapabilitiesEnum is left empty
-// so the server can fill it. Cost Explorer is global, so region is not checked.
+// codes.Internal, which would hide that reason. Explicit capabilities prevent
+// SDK interface inference from advertising unimplemented RPCs. Region is not checked.
 func (c *Calculator) Supports(ctx context.Context, req *pbc.SupportsRequest) (*pbc.SupportsResponse, error) {
 	logger := c.traceLogger(ctx)
 	done := pluginsdk.LogOperation(logger, "Supports")
 	defer done()
-
+	response := &pbc.SupportsResponse{CapabilitiesEnum: []pbc.PluginCapability{pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS}}
 	resource := req.GetResource()
-	if resource == nil {
-		return &pbc.SupportsResponse{
-			Supported: false,
-			Reason:    invalidResourceReason("resource descriptor is required"),
-		}, nil
+	switch {
+	case resource == nil:
+		response.Reason = invalidResourceReason("resource descriptor is required")
+	case resource.GetProvider() != "aws":
+		response.Reason = fmt.Sprintf("provider %q is not supported; aws-ce only supports provider \"aws\"", resource.GetProvider())
+	case awsResourceIdentified(resource):
+		response.Supported = true
+	default:
+		response.Reason = invalidResourceReason("aws resource needs a non-empty id or an ARN ParseARN accepts")
 	}
-	if resource.GetProvider() != "aws" {
-		return &pbc.SupportsResponse{
-			Supported: false,
-			Reason: fmt.Sprintf(
-				"provider %q is not supported; aws-ce only supports provider \"aws\"",
-				resource.GetProvider(),
-			),
-		}, nil
-	}
-	if awsResourceIdentified(resource) {
-		return &pbc.SupportsResponse{Supported: true}, nil
-	}
-	return &pbc.SupportsResponse{
-		Supported: false,
-		Reason:    invalidResourceReason("aws resource needs a non-empty id or an ARN ParseARN accepts"),
-	}, nil
+	return response, nil
 }
 
 func invalidResourceReason(detail string) string {
@@ -166,34 +158,36 @@ func awsResourceIdentified(resource *pbc.ResourceDescriptor) bool {
 
 // initClient initializes the Cost Explorer client if not already done.
 func (c *Calculator) initClient(ctx context.Context, logger zerolog.Logger) error {
+	c.clientMu.Lock()
+	defer c.clientMu.Unlock()
 	if c.ceClient != nil {
 		return nil
 	}
-
-	ceClient, err := client.NewClient(ctx, client.Config{})
-	if err != nil {
-		logger.Error().Err(err).Msg("Failed to initialize Cost Explorer client")
-		return fmt.Errorf("initializing Cost Explorer client: %w", err)
+	if c.clientInitErr != nil && time.Now().Before(c.clientRetryAt) {
+		return c.clientInitErr
 	}
-
+	open := c.openClient
+	if open == nil {
+		open = client.NewClient
+	}
+	ceClient, err := open(ctx, client.Config{})
+	if err != nil {
+		logger.Error().Msg("Failed to initialize Cost Explorer client")
+		c.clientInitErr = fmt.Errorf("initializing Cost Explorer client: %w", err)
+		c.clientRetryAt = time.Now().Add(time.Second)
+		return c.clientInitErr
+	}
 	c.ceClient = ceClient
+	c.clientInitErr = nil
 	return nil
 }
 
-// GetProjectedCost returns an error as this plugin only provides actual cost data.
-func (c *Calculator) GetProjectedCost(_ context.Context, req *pbc.GetProjectedCostRequest) (*pbc.GetProjectedCostResponse, error) {
-	// Check if we support this resource
-	if !c.Matcher().Supports(req.Resource) {
-		return nil, pluginsdk.NotSupportedError(req.Resource)
-	}
-
-	// ResourceDescriptor in this version does not have Id, using Type/Sku for logging
-	c.logger.Debug().
-		Str("resource_type", req.GetResource().GetResourceType()).
-		Str("sku", req.GetResource().GetSku()).
-		Msg("GetProjectedCost called but not supported")
-
-	return nil, fmt.Errorf("projected cost not supported: aws-ce plugin provides actual cost data only; use aws-public plugin for projected costs")
+// GetProjectedCost explicitly rejects an operation this actual-cost plugin cannot answer.
+func (c *Calculator) GetProjectedCost(ctx context.Context, _ *pbc.GetProjectedCostRequest) (*pbc.GetProjectedCostResponse, error) {
+	logger := c.traceLogger(ctx)
+	done := pluginsdk.LogOperation(logger, "GetProjectedCost")
+	defer done()
+	return nil, status.Error(codes.Unimplemented, "CE-6.10: projected costs are unavailable; use the aws-public plugin")
 }
 
 // GetActualCost retrieves actual historical costs from AWS Cost Explorer.
@@ -246,7 +240,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 	if !perRequest && c.cache != nil {
 		if entry, ok := c.cache.getEntry(cacheKey); ok {
 			logger.Info().Int("ce_requests", 0).Msg("Cache hit for cost query")
-			return c.buildResponse(entry.Results, entry.ExpiresAt), nil
+			return c.buildResponse(entry.Results, entry.ExpiresAt, req.GetBillingAccountId(), plan.resourceLevel), nil
 		}
 	}
 
@@ -263,6 +257,14 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 		}
 		if mapped, ok := mapAWSAPIError(err); ok {
 			logger.Error().Int("ce_requests", pages).Msg(status.Convert(mapped).Message())
+			return nil, mapped
+		}
+		if msg, sensitive := perRequestAWSFailure(perRequest, err); sensitive {
+			logger.Error().Int("ce_requests", pages).Msg(msg)
+			mapped := mapCostError(resourceID, err)
+			if status.Code(mapped) == codes.Internal {
+				return nil, status.Error(codes.Internal, msg)
+			}
 			return nil, mapped
 		}
 		logger.Error().Err(err).Int("ce_requests", pages).Msg("Failed to retrieve costs from AWS")
@@ -292,7 +294,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 
 	logger.Info().Int("ce_requests", pages).Int("results_count", len(costs)).Msg("Retrieved costs from AWS")
 
-	return c.buildResponse(costs, expires), nil
+	return c.buildResponse(costs, expires, req.GetBillingAccountId(), plan.resourceLevel), nil
 }
 
 type costQueryPlan struct {
@@ -306,14 +308,16 @@ type costQueryPlan struct {
 var ec2InstanceIDPattern = regexp.MustCompile(`^i-[0-9a-f]{8,17}$`)
 
 func (c *Calculator) planCostQuery(logger zerolog.Logger, req *pbc.GetActualCostRequest) (costQueryPlan, error) {
-	resourceID := req.GetResourceId()
+	resourceID, arn := actualCostIdentity(req)
+	if resource := req.GetResource(); resource != nil && resource.GetProvider() != "aws" {
+		return costQueryPlan{}, statusWithDetail(codes.InvalidArgument, "aws-ce only supports provider aws", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+	}
 	plan := costQueryPlan{cacheID: resourceID}
 	if id, ok := ec2InstanceID(resourceID); ok {
 		plan.resourceLevel = true
 		plan.resourceID = id
 		plan.cacheID = id
 	}
-	arn := req.GetArn()
 	if arn == "" {
 		return plan, nil
 	}
@@ -440,7 +444,7 @@ func statusWithDetail(code codes.Code, msg string, errorCode pbc.ErrorCode) erro
 	return detailed.Err()
 }
 
-func (c *Calculator) buildResponse(costs []CostEntry, expires time.Time) *pbc.GetActualCostResponse {
+func (c *Calculator) buildResponse(costs []CostEntry, expires time.Time, billingAccountID string, resourceLevel bool) *pbc.GetActualCostResponse {
 	expiresAt := timestamppb.New(expires.UTC())
 	results := make([]*pbc.ActualCostResult, 0, len(costs))
 	for _, cost := range costs {
@@ -450,13 +454,22 @@ func (c *Calculator) buildResponse(costs []CostEntry, expires time.Time) *pbc.Ge
 			usage = cost.UsageAmount
 			unit = cost.UsageUnit
 		}
+		var focus *pbc.FocusCostRecord
+		if billingAccountID != "" {
+			cost.AccountID = billingAccountID
+			cost.Lookback = "14_months"
+			if resourceLevel {
+				cost.Lookback = "14_days"
+			}
+			focus = focusFor(cost)
+		}
 		results = append(results, &pbc.ActualCostResult{
 			Timestamp:   timestamppb.New(cost.Timestamp.UTC()),
 			Cost:        cost.Amount,
 			UsageAmount: usage,
 			UsageUnit:   unit,
 			Source:      "aws-ce",
-			FocusRecord: focusFor(cost),
+			FocusRecord: focus,
 			ExpiresAt:   expiresAt,
 		})
 	}
@@ -577,4 +590,13 @@ func sumDecimalCosts(rows []client.CostResult) (float64, string, error) {
 	}
 	total, _ := sum.Float64()
 	return total, currency, nil
+}
+
+// actualCostIdentity prefers descriptor identity, then legacy request fields.
+func actualCostIdentity(req *pbc.GetActualCostRequest) (string, string) {
+	resource := req.GetResource()
+	if resource != nil && (resource.GetId() != "" || resource.GetArn() != "") {
+		return resource.GetId(), resource.GetArn()
+	}
+	return req.GetResourceId(), req.GetArn()
 }

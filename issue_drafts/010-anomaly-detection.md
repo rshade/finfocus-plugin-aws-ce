@@ -1,27 +1,32 @@
-# Issue: Feature - Anomaly Detection (#10)
+# Anomaly detection, issue 10
 
-**Status:** Researching
-**Type:** Feature
-**Priority:** Medium
+**Status:** researching
+**Type:** feature
+**Priority:** medium
 
-## User Story
-As a cloud admin, I want to be notified of unexpected cost spikes (anomalies) detected by AWS, so that I can investigate root causes immediately.
+## User story
 
-## Technical Thesis
-Implement functionality to retrieve pre-detected anomalies using the AWS Cost Explorer Anomaly Detection API.
+A cloud administrator needs notifications of unexpected cost spikes that AWS detects to investigate their causes promptly.
 
-### API Mapping
-*   **RPC:** `GetAnomalies(GetAnomaliesRequest)` (Proposed)
-*   **AWS API:** `costexplorer.GetAnomalies`
-*   **Input:** `AnomalyDateInterval` (Start/End)
-*   **Output:** Map `types.Anomaly` to the plugin's anomaly response format.
+## Technical approach
 
-## Boundary Guardrails (Hard Constraints)
-1.  **No Local ML:** We absolutely DO NOT implement anomaly detection algorithms (e.g., Z-score, IQR) locally. We only report what AWS has already flagged.
-2.  **Thresholds:** We do not filter anomalies by "Severity" unless the User explicitly requests a threshold (e.g., "Show only High impact"). We default to showing what AWS returns.
-3.  **Feedback:** We do not support submitting feedback ("False Positive") back to AWS in v1.
+Retrieve anomalies that AWS Cost Explorer has already detected through its anomaly detection API.
 
-## Acceptance Criteria
-- [ ] Successfully calls `GetAnomalies` with a valid date range.
-- [ ] Maps `AnomalyScore`, `Impact`, and `RootCauses` to the gRPC response.
-- [ ] Handles pagination (`NextPageToken`) for large sets of anomalies.
+### API mapping
+
+- **Proposed remote procedure call:** `GetAnomalies(GetAnomaliesRequest)`.
+- **AWS API:** `costexplorer.GetAnomalies`.
+- **Input:** `AnomalyDateInterval` for the start and end dates.
+- **Output:** map `types.Anomaly` to the plugin's anomaly response format.
+
+## Constraints
+
+1. Report only anomalies that AWS flags. Don't implement local detection algorithms, such as Z-scores or interquartile ranges.
+2. Show all anomalies that AWS returns unless the user requests a severity threshold, such as high-impact anomalies only.
+3. Don't submit false-positive feedback to AWS in version 1.
+
+## Acceptance criteria
+
+- [ ] Call `GetAnomalies` with a valid date range.
+- [ ] Map `AnomalyScore`, `Impact`, and `RootCauses` to the gRPC response.
+- [ ] Handle `NextPageToken` pagination for large anomaly sets.

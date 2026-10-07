@@ -1,90 +1,98 @@
-Here is the analysis of the current state of `finfocus-plugin-aws-ce` in relation to the `finfocus-spec` releases, AWS Cost Explorer capabilities, and the `spec-kit` methodology.
+# Product analysis
 
-### 1. Spec-Kit & Project Alignment
-The project is well-aligned with the **Spec-Kit** methodology, evidenced by the presence of `.gemini/`, `.claude/`, and `specs/` directories.
-*   **Current Spec:** `specs/001-aws-ce-plugin` is in "Draft" status (updated Dec 2025-12-05). This spec is considered complete as per user clarification.
-*   **Dependency:** The project uses `github.com/rshade/finfocus-spec v0.5.2`, which includes validation helpers, FOCUS 1.2 support, and the ARN field addition.
+This analysis compares `finfocus-plugin-aws-ce` with `finfocus-spec`, AWS Cost Explorer capabilities, and the `spec-kit` methodology. It records the planning baseline from December 2025.
 
-### 2. Upgrades & Improvements
-*   **Unblock FR-015 (FallbackHint):**
-    *   **Context:** Requirement `FR-015` states it is "blocked by finfocus-spec#124" in `specs/001-aws-ce-plugin/spec.md`.
-    *   **Action:** Verify if `FallbackHint` is available in the SDK (introduced circa v0.5.2). If so, the implementation for `001-aws-ce-plugin` should consider this and mark `FR-015` as resolved.
-*   **Leverage Validation Helpers (New in v0.5.2):**
-    *   **Context:** `v0.5.2` introduced request validation helpers in the `pluginsdk`.
-    *   **Action:** When implementing new features, utilize the `pluginsdk` validation helpers to improve `SR-001` (Input Validation) instead of writing custom validation logic where possible.
-*   **Unified Logging & Configuration (New in Spec PRs):**
-    *   **Context:** Recent PRs (#145, #143) added support for `FINFOCUS_LOG_FILE` and `--port` flag parsing in the SDK.
-    *   **Action:** Ensure `main.go` and logger initialization respect these configurations to integrate seamlessly with the Core's orchestration.
-*   **Security (Least Privilege):**
-    *   **Issue:** `SR-005` requests `ce:GetCostForecast` permission, but `FR-007` in `specs/001-aws-ce-plugin/spec.md` explicitly requires the system to *error* when `GetProjectedCost` is called.
-    *   **Improvement:** For any *new* spec related to forecasting, resolve this conflict by either removing the `ce:GetCostForecast` permission request to adhere to the principle of least privilege if forecasting is not to be implemented, or explicitly design the new feature spec to implement the forecasting capability.
+## 1. Project alignment with Spec-Kit
 
-### 3. Standards Compliance (FOCUS 1.2)
-*   **Standard:** The plugin must align with the **FinOps FOCUS 1.2** specification, which is now supported in `finfocus-spec` (via PR #99).
-*   **Data Types:** Financial fields (e.g., Billed Cost) MUST be implemented as **Protobuf `double`**, per user preference and the likely implementation in the SDK (mapping FOCUS "Decimal" to Proto `double`).
-*   **Implementation:** Use the SDK's `FocusRecordBuilder` to construct cost records, ensuring compliance with the schema.
+The `.gemini/`, `.claude/`, and `specs/` directories establish the project's use of Spec-Kit.
 
-### 4. Missing Features & Gaps
-Based on the **AWS Cost Explorer API** capabilities and **finfocus-spec v0.5.2** features, the following are potential new features that warrant *new* specification documents:
+- **Specification:** `specs/001-aws-ce-plugin` retained draft status as of 2025-12-05. The owner considers the specification complete.
+- **Dependency:** the planning baseline uses `github.com/rshade/finfocus-spec v0.5.2`, including validation helpers, FOCUS 1.2 support, and the ARN field.
 
-*   **AWS Budgets Support (High Priority):**
-    *   **Why:** `finfocus-spec` (since v0.5.2) explicitly added a `getbudgets` RPC.
-    *   **Gap:** This is a new feature for the plugin.
-    *   **Recommendation:** Create a **new spec** (e.g., `003-aws-budgets/spec.md`) with a User Story for "View Budget Status" and map it to the new SDK RPC.
-*   **Anomaly Detection (High Value):**
-    *   **Why:** AWS CE provides robust `GetAnomalies` capabilities.
-    *   **Gap:** This is a new feature for the plugin.
-    *   **Recommendation:** Create a **new spec** (e.g., `004-aws-anomalies/spec.md`) with a `P2` or `P3` User Story to surface cost anomalies.
-*   **Forecasting (Strategic):**
-    *   **Why:** You are already requesting the `ce:GetCostForecast` permission (`SR-005` in `001-aws-ce-plugin/spec.md`).
-    *   **Gap:** This is a new feature for the plugin.
-    *   **Recommendation:** Create a **new spec** (e.g., `005-aws-forecasting/spec.md`) to allow `GetProjectedCost` implementation using AWS's forecast API.
-*   **Optimization Recommendations (New in Spec PR #125):**
-    *   **Why:** `finfocus-spec` added a `getrecommendations` RPC. AWS offers Rightsizing and Savings Plans recommendations.
-    *   **Gap:** This is a newly enabled feature capability.
-    *   **Recommendation:** Create a **new spec** (e.g., `006-aws-recommendations/spec.md`) to expose AWS optimization recommendations.
+## 2. Upgrades and improvements
 
-### 5. Spec Updates (Completed)
-*   **Contextual Identity (ARN Field):** ✅ **COMPLETED** in `specs/002-add-arn-spec`
-    *   The `GetActualCostRequest` now includes an `arn` field (added in finfocus-spec v0.5.2).
-    *   Implementation: Commit `16cb974` adds ARN support to `GetActualCost` for precise resource identification.
-    *   The plugin uses ARN as the source of truth when available, with fallback to `resource_id` for backward compatibility.
+- **Resolve the `FR-015` dependency on `FallbackHint`:**
+  - **Context:** `specs/001-aws-ce-plugin/spec.md` describes `FR-015` as blocked by issue 124 in `finfocus-spec`.
+  - **Action:** check whether the SDK provides `FallbackHint`. Version 0.5.2 introduced this capability. If available, resolve `FR-015` in the implementation.
+- **Use the validation helpers from version 0.5.2:**
+  - **Context:** version 0.5.2 added request validation helpers to `pluginsdk`.
+  - **Action:** use these helpers for `SR-001` input validation when implementing features.
+- **Align logging and configuration with the SDK:**
+  - **Context:** upstream pull requests 145 and 143 added `FINFOCUS_LOG_FILE` and `--port` parsing.
+  - **Action:** configure `main.go` and logger initialization through these helpers to support core orchestration.
+- **Apply least privilege to forecasting permissions:**
+  - **Issue:** `SR-005` requests `ce:GetCostForecast`, but `FR-007` requires `GetProjectedCost` to return an error in the baseline specification.
+  - **Action:** resolve this conflict in a new forecasting specification. Remove the permission if forecasting remains unsupported, or define and implement forecasting explicitly.
 
-### 6. CI/CD Infrastructure Plan
-The project currently lacks the CI/CD infrastructure present in the sibling project `finfocus-plugin-aws-public`. Unlike the public plugin, which requires complex region-specific builds, this plugin is a **single-binary application**.
+## 3. FOCUS 1.2 compliance
 
-**Required Files & Configuration:**
+- **Standard:** align the plugin with FOCUS 1.2, which upstream pull request 99 added to `finfocus-spec`.
+- **Data types:** use Protocol Buffers `double` for financial fields such as billed cost, per the owner's preference. This maps FOCUS decimal values to the SDK's numeric representation.
+- **Implementation:** construct cost records through the SDK's `FocusRecordBuilder` to validate schema compliance.
 
-1.  **Workflows (`.github/workflows/`):**
-    *   `test.yml`: Standard Go testing workflow.
-    *   `release.yml`: Automated release workflow using `goreleaser/goreleaser-action`.
-    *   `release-please.yml`: Automated changelog and version bumping.
+## 4. Missing features and gaps
 
-2.  **Release Configuration:**
-    *   `.goreleaser.yaml`: Standard configuration for a single binary.
-    *   `release-please-config.json` & `.release-please-manifest.json`.
+Create separate specifications for these potential capabilities:
 
-3.  **Local Development:**
-    *   `Makefile`: Add convenience targets.
+- **AWS Budgets, high priority:**
+  - **Basis:** `finfocus-spec` added the `getbudgets` remote procedure call by version 0.5.2.
+  - **Proposal:** create `003-aws-budgets/spec.md` with a user story for viewing budget status and map it to the SDK contract.
+- **Anomaly detection, high value:**
+  - **Basis:** AWS Cost Explorer provides `GetAnomalies`.
+  - **Proposal:** create `004-aws-anomalies/spec.md` with a `P2` or `P3` user story for cost anomalies.
+- **Forecasting, strategic priority:**
+  - **Basis:** `SR-005` in `001-aws-ce-plugin/spec.md` already requests `ce:GetCostForecast`.
+  - **Proposal:** create `005-aws-forecasting/spec.md` to implement `GetProjectedCost` through the AWS forecast API.
+- **Optimization recommendations from upstream pull request 125:**
+  - **Basis:** `finfocus-spec` added `getrecommendations`. AWS provides rightsizing and Savings Plans recommendations.
+  - **Proposal:** create `006-aws-recommendations/spec.md` for these capabilities.
 
-### 7. Lessons Learned from Sibling Project
-*   **SDK Adoption:** Use `pluginsdk/env.go` and `pluginsdk/mapping`.
-*   **Robustness:** Handle zero-value pricing data gracefully.
-*   **Logging:** Strict adherence to `zerolog` structured logging.
+## 5. Completed specification updates
 
-### 8. Execution Roadmap (Active Issues)
+The contextual ARN identity work in `specs/002-add-arn-spec` is complete.
 
-#### v0.1.0 - Foundation & CI/CD
-- **Issue #6**: ✅ Update Dependencies & Refactor for SDK Compliance (Spec v0.5.2, SDK helpers, Zerolog, `FINFOCUS_LOG_FILE`, `--port`).
-- **Issue #7**: Establish CI/CD Infrastructure (Workflows, Goreleaser, release-please).
-- **Issue #11**: Implement Core Cost Plugin (Spec 001) & E2E Testing (AWS Integration, CI Secrets, FOCUS 1.2 Compliance).
-- **Issue #12**: Polish: Installation & Documentation (Makefile version fix, README rewrite, Manifest consolidation).
-- **Issue #14**: ✅ Upstream Spec Update: Add ARN to GetActualCostRequest (Implemented in `specs/002-add-arn-spec`).
+- Version 0.5.2 of `finfocus-spec` added `arn` to `GetActualCostRequest`.
+- Commit `16cb974` adds ARN support to `GetActualCost` for precise resource identification.
+- Use the ARN when available and fall back to `resource_id` for backward compatibility.
 
-#### v0.2.0 - Core Features
-- **Issue #8**: Feature: AWS Budgets Support (New Spec `003-aws-budgets`, `getbudgets` RPC).
-- **Issue #9**: Feature: Cost Forecasting (New Spec `005-aws-forecasting`, `GetProjectedCost` RPC).
-- **Issue #10**: Feature: Anomaly Detection (New Spec `004-aws-anomalies`, Anomaly logic).
+## 6. Continuous integration and delivery plan
 
-#### v0.3.0 - Advanced Features
-- **Issue #13**: Feature: Optimization Recommendations (New Spec `006-aws-recommendations`, Rightsizing, Savings Plans).
+At the planning baseline, the project lacked the infrastructure present in `finfocus-plugin-aws-public`. The public plugin needs builds for individual regions. This plugin uses a single binary.
+
+Required configuration:
+
+1. **Workflows in `.github/workflows/`:**
+   - `test.yml` for standard Go tests.
+   - `release.yml` for automated releases through `goreleaser/goreleaser-action`.
+   - `release-please.yml` for changelog generation and version updates.
+2. **Release configuration:**
+   - `.goreleaser.yaml` for a single binary.
+   - `release-please-config.json` and `.release-please-manifest.json`.
+3. **Local development:**
+   - Add convenience targets to `Makefile`.
+
+## 7. Lessons from the sibling project
+
+- Use `pluginsdk/env.go` and `pluginsdk/mapping` helpers.
+- Handle zero-value pricing data without errors.
+- Use `zerolog` structured logging.
+
+## 8. Execution roadmap and active issues
+
+### Foundation and delivery, version 0.1.0
+
+- **Issue 6, complete:** update dependencies and use SDK helpers for validation, logging, `FINFOCUS_LOG_FILE`, and `--port`. The baseline specification version is 0.5.2.
+- **Issue 7:** establish workflows, goreleaser, and release-please configuration.
+- **Issue 11:** implement the core cost plugin from specification 001, with AWS integration, continuous integration secrets, FOCUS 1.2 compliance, and tests of the complete workflow.
+- **Issue 12:** improve installation and documentation. Fix the Makefile version, rewrite the README, and consolidate manifests.
+- **Issue 14, complete:** add ARN to `GetActualCostRequest` in `specs/002-add-arn-spec`.
+
+### Core features, version 0.2.0
+
+- **Issue 8:** define AWS Budgets support in `003-aws-budgets`, with `getbudgets`.
+- **Issue 9:** define forecasting in `005-aws-forecasting`, with `GetProjectedCost`.
+- **Issue 10:** define anomaly detection in `004-aws-anomalies`.
+
+### Advanced features, version 0.3.0
+
+- **Issue 13:** define optimization recommendations in `006-aws-recommendations` for rightsizing and Savings Plans.

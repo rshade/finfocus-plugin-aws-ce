@@ -17,14 +17,17 @@ The plugin implements hybrid caching (in-memory + disk persistence) with automat
 **TTL**: 24 hours from cache write time
 
 **Mechanism**: Dual-layer validation
+
 1. **Embedded timestamp** (primary): `ExpiresAt` field in JSON
 2. **File modification time** (fallback): Filesystem timestamp
 
 **Eviction strategy**: Lazy (on-read)
+
 - Cache entries are not actively cleaned up in background
 - Stale entries removed when accessed or during cache load
 
 **Implementation:**
+
 ```go
 // Check embedded timestamp first (fastest)
 if time.Now().After(entry.ExpiresAt) {
@@ -43,12 +46,14 @@ if time.Since(fileInfo.ModTime()) > 24*time.Hour {
 **When**: After successful AWS Cost Explorer API call
 
 **Process:**
+
 1. Transform AWS response to internal format
 2. Create `CacheEntry` with `ExpiresAt = time.Now().Add(24 * time.Hour)`
 3. Write to in-memory cache (immediate)
 4. Write to disk cache (asynchronous, best-effort)
 
 **Failure handling:**
+
 - In-memory write failure: Log warning, continue (cache is optional)
 - Disk write failure: Log warning, continue (cache is optional)
 - Never return error to caller due to cache failures
@@ -60,12 +65,14 @@ if time.Since(fileInfo.ModTime()) > 24*time.Hour {
 **Variable**: `FINFOCUS_CACHE_BYPASS`
 
 **Values**:
+
 - `"true"`: Bypass cache completely, fetch fresh data
 - `"false"` or unset: Use cache normally
 
 **Scope**: Process-wide (affects all requests for duration of plugin execution)
 
 **Usage:**
+
 ```bash
 # Local development
 FINFOCUS_CACHE_BYPASS=true finfocus query --resource arn:aws:ec2:...
@@ -75,6 +82,7 @@ FINFOCUS_CACHE_BYPASS=true make e2e
 ```
 
 **Implementation:**
+
 ```go
 func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRequest) (*pbc.GetActualCostResponse, error) {
     cacheBypass := os.Getenv("FINFOCUS_CACHE_BYPASS") == "true"
@@ -106,6 +114,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 ```
 
 **Logging:**
+
 ```json
 {
   "level": "debug",
@@ -121,6 +130,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 **Proposed**: Add `force_refresh` field to protobuf request
 
 **Benefits:**
+
 - Granular control per request
 - No global state (environment variable)
 - Supports concurrent requests with different cache preferences
@@ -128,6 +138,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 **Requires**: Upstream proto change in finfocus-spec
 
 **Example future API:**
+
 ```protobuf
 message GetActualCostRequest {
     ResourceDescriptor resource = 1;
@@ -144,6 +155,7 @@ message GetActualCostRequest {
 **Not implemented in Phase 1** (manual file deletion required)
 
 **Manual procedure:**
+
 ```bash
 # Linux/macOS
 rm -rf ~/.cache/finfocus/aws-ce/*.json
@@ -153,6 +165,7 @@ del %LocalAppData%\finfocus\aws-ce\*.json
 ```
 
 **Future enhancement**: CLI command
+
 ```bash
 finfocus-plugin-aws-ce cache clear
 ```
@@ -162,6 +175,7 @@ finfocus-plugin-aws-ce cache clear
 **Not implemented in Phase 1** (manual file inspection required)
 
 **Manual procedure:**
+
 ```bash
 # List cache files
 ls -lh ~/.cache/finfocus/aws-ce/
@@ -171,6 +185,7 @@ cat ~/.cache/finfocus/aws-ce/cost_v1_i-12345___1704067200_1705276800.json | jq
 ```
 
 **Future enhancement**: CLI command
+
 ```bash
 finfocus-plugin-aws-ce cache list
 finfocus-plugin-aws-ce cache inspect <resource-id>
@@ -181,6 +196,7 @@ finfocus-plugin-aws-ce cache inspect <resource-id>
 **Format**: `cost:v1:RESOURCE:SERVICE:REGION:START:END`
 
 **Components**:
+
 - `cost`: Prefix for cache entry type
 - `v1`: Schema version (allows evolution)
 - `RESOURCE`: ResourceId (e.g., `i-12345`)
@@ -190,6 +206,7 @@ finfocus-plugin-aws-ce cache inspect <resource-id>
 - `END`: Unix timestamp (seconds)
 
 **Examples:**
+
 ```
 cost:v1:i-12345:_:_:1704067200:1705276800
 cost:v1:i-67890:AmazonEC2:us-east-1:1704067200:1705276800
@@ -197,6 +214,7 @@ cost:v1:db-ABC123:AmazonRDS:us-west-2:1704067200:1705276800
 ```
 
 **File mapping:**
+
 - Replace `:` with `_` for filesystem safety
 - Add `.json` extension
 - Example: `cost_v1_i-12345___1704067200_1705276800.json`
@@ -208,6 +226,7 @@ cost:v1:db-ABC123:AmazonRDS:us-west-2:1704067200:1705276800
 **Guaranteed**: Yes (in-memory cache updated synchronously)
 
 **Scenario**: Same process, sequential requests
+
 ```
 Request 1: GetActualCost(i-12345, Jan 1-7) → Cache MISS → Fetch AWS → Cache SET
 Request 2: GetActualCost(i-12345, Jan 1-7) → Cache HIT → Return cached
@@ -218,6 +237,7 @@ Request 2: GetActualCost(i-12345, Jan 1-7) → Cache HIT → Return cached
 **Guarantee**: Eventual consistency (24-hour window)
 
 **Scenario**: Multiple plugin instances (different processes)
+
 ```
 Process A: Fetches cost data at 10:00 AM → Caches with expires_at = 10:00 AM + 24h
 Process B: Starts at 11:00 AM → Loads disk cache → Uses Process A's cached data
@@ -231,6 +251,7 @@ Process C: Starts at 10:01 AM next day → Cached data expired → Fetches fresh
 **Problem**: What if AWS data changes within 24-hour window?
 
 **Answer**: Acceptable for use case
+
 - AWS Cost Explorer data refreshes every ~8 hours
 - Historical cost data rarely changes after 48 hours
 - 24-hour TTL balances freshness vs. API cost/latency
@@ -243,6 +264,7 @@ Process C: Starts at 10:01 AM next day → Cached data expired → Fetches fresh
 **Behavior**: Treat as cache miss, fetch from AWS
 
 **Logging**:
+
 ```json
 {
   "level": "warn",
@@ -260,6 +282,7 @@ Process C: Starts at 10:01 AM next day → Cached data expired → Fetches fresh
 **Behavior**: Log warning, continue with response
 
 **Logging**:
+
 ```json
 {
   "level": "warn",
@@ -277,6 +300,7 @@ Process C: Starts at 10:01 AM next day → Cached data expired → Fetches fresh
 **Behavior**: Cache writes fail, logged as warnings
 
 **Mitigation**:
+
 - In-memory cache still works for current process
 - Lazy eviction will eventually clean up old files
 - No automatic disk space management (user responsibility)
@@ -313,6 +337,7 @@ Process C: Starts at 10:01 AM next day → Cached data expired → Fetches fresh
 ### Unit Tests
 
 **CacheManager:**
+
 - `TestCacheSet_StoresEntry`
 - `TestCacheGet_ReturnsStoredEntry`
 - `TestCacheGet_ReturnsNilForExpiredEntry`
@@ -320,17 +345,20 @@ Process C: Starts at 10:01 AM next day → Cached data expired → Fetches fresh
 - `TestCacheGet_HandlesCorruptedJSONGracefully`
 
 **Cache bypass:**
+
 - `TestGetActualCost_BypassesCacheWhenEnvVarSet`
 - `TestGetActualCost_UsesCacheWhenEnvVarUnset`
 
 ### E2E Tests
 
 **Cache behavior:**
+
 - `TestE2E_CacheHitReducesLatency`
 - `TestE2E_CacheExpiredAfter24Hours`
 - `TestE2E_ForceRefreshFetchesFreshData`
 
 **Process:**
+
 1. Execute query (cache miss)
 2. Execute same query immediately (cache hit, verify fast)
 3. Advance time 25 hours (mock or real delay)

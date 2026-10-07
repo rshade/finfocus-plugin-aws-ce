@@ -12,36 +12,42 @@ assignees:
 projects:
 milestone:      v0.1.0 - Foundation & CI/CD
 number: 7
---
+
+---
+
 ## Objective
+
 Implement a robust CI/CD pipeline for the project, mirroring the standards of `finfocus-plugin-aws-public` but adapted for a single-binary architecture.
 
 ## Research
+
 - [ ] Review `product.md` for the detailed infrastructure plan.
 - [ ] Review `../finfocus-plugin-aws-public/.github/workflows` and config files for reference patterns.
 
 ## Tasks
+
 - [ ] **Configuration Files**:
-    - [ ] Create `.goreleaser.yaml` configured for single-binary builds (linux, darwin, windows; amd64/arm64).
-    - [ ] Create `release-please-config.json` (Go release type).
-    - [ ] Create `.release-please-manifest.json` (init with current version).
-    - [ ] Create `Makefile` with targets: `test`, `lint`, `build`, `ensure`.
+  - [ ] Create `.goreleaser.yaml` for a single binary on `linux`, `darwin`, and `windows`, with `amd64` and `arm64` architectures.
+  - [ ] Create `release-please-config.json` with the Go release type.
+  - [ ] Create `.release-please-manifest.json` and initialize it with the current version.
+  - [ ] Create `Makefile` with targets: `test`, `lint`, `build`, `ensure`.
 - [ ] **GitHub Workflows**:
-    - [ ] Create `.github/workflows/test.yml`:
-        - [ ] Checkout code.
-        - [ ] Setup Go 1.25.5
-        - [ ] Run `golangci-lint` - v2.6.2.
-        - [ ] Run `go test ./...`.
-    - [ ] Create `.github/workflows/release.yml`:
-        - [ ] Trigger on `release` (created).
-        - [ ] Use `goreleaser/goreleaser-action`.
-    - [ ] Create `.github/workflows/release-please.yml`:
-        - [ ] Use `googleapis/release-please-action`.
+  - [ ] Create `.github/workflows/test.yml`:
+    - [ ] Checkout code.
+    - [ ] Setup Go 1.25.5
+    - [ ] Run `golangci-lint` - v2.6.2.
+    - [ ] Run `go test ./...`.
+  - [ ] Create `.github/workflows/release.yml`:
+    - [ ] Trigger when a `release` event has the `created` activity type.
+    - [ ] Use `goreleaser/goreleaser-action`.
+  - [ ] Create `.github/workflows/release-please.yml`:
+    - [ ] Use `googleapis/release-please-action`.
 - [ ] **Documentation**:
-    - [ ] Update `AGENTS.md`, `GEMINI.md`, and `CLAUDE.md` with CI/CD info.
-    - [ ] Update `README.md` with build/test instructions.
+  - [ ] Update `AGENTS.md`, `GEMINI.md`, and `CLAUDE.md` with continuous integration and delivery information.
+  - [ ] Update `README.md` with build/test instructions.
 
 ## Verification
+
 - [ ] Verify `Makefile` targets run locally.
 - [ ] (Optional) Trigger a dummy workflow run if possible, or verify syntax. "
 
@@ -109,7 +115,7 @@ As a developer, I want consistent local build/test commands so that I can verify
 - **FR-005**: System MUST create GitHub workflow for automated testing using Go 1.25.5 and golangci-lint v2.6.2
 - **FR-006**: System MUST create GitHub workflow for automated releases using goreleaser action
 - **FR-007**: System MUST create GitHub workflow for automated release PR creation using release-please action
-- **FR-008**: System MUST update AGENTS.md, GEMINI.md, and CLAUDE.md with CI/CD command information
+- **FR-008**: the system must update `AGENTS.md`, `GEMINI.md`, and `CLAUDE.md` with continuous integration and delivery command information
 - **FR-009**: System MUST update README.md with build and test instructions
 
 ## Success Criteria *(mandatory)*
@@ -120,4 +126,4 @@ As a developer, I want consistent local build/test commands so that I can verify
 - **SC-002**: GitHub test workflow passes for all pushes to main branch
 - **SC-003**: Release workflow successfully builds binaries for all 6 platform/architecture combinations (linux/darwin/windows × amd64/arm64)
 - **SC-004**: Release-please workflow creates valid release PRs with proper versioning
-- **SC-005**: Documentation files contain accurate CI/CD command references
+- **SC-005**: documentation files contain accurate continuous integration and delivery command references

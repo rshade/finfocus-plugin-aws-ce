@@ -20,20 +20,24 @@ service CostSourceService {
 ## Method Contracts
 
 ### Name
+
 Returns the plugin identifier.
 
 **Request**: `NameRequest{}`
 **Response**: `NameResponse{name: "aws-ce"}`
 
 **Contract**:
+
 - Always returns "aws-ce"
 - No errors possible
 - Response time: < 1ms
 
 ### Supports
+
 Checks if the plugin supports a given resource.
 
 **Request**:
+
 ```protobuf
 message SupportsRequest {
   ResourceDescriptor resource = 1;
@@ -41,6 +45,7 @@ message SupportsRequest {
 ```
 
 **Response**:
+
 ```protobuf
 message SupportsResponse {
   bool supported = 1;
@@ -49,15 +54,18 @@ message SupportsResponse {
 ```
 
 **Contract**:
+
 - Returns `supported: true` only if `resource.provider == "aws"`
 - Returns `supported: false, reason: "Only AWS provider supported"` otherwise
 - No external API calls
 - Response time: < 10ms
 
 ### GetProjectedCost
+
 Returns an error (actual costs only plugin).
 
 **Request**:
+
 ```protobuf
 message GetProjectedCostRequest {
   ResourceDescriptor resource = 1;
@@ -66,6 +74,7 @@ message GetProjectedCostRequest {
 ```
 
 **Response**:
+
 ```protobuf
 message GetProjectedCostResponse {
   ErrorCode error_code = 1;
@@ -76,6 +85,7 @@ message GetProjectedCostResponse {
 ```
 
 **Contract**:
+
 - Always returns `error_code: ERROR_CODE_NOT_SUPPORTED`
 - Always returns `error_message: "Plugin only supports actual costs from AWS Cost Explorer"`
 - Always returns `fallback_hint: RECOMMENDED`
@@ -83,9 +93,11 @@ message GetProjectedCostResponse {
 - Response time: < 1ms
 
 ### GetActualCost
+
 Retrieves historical cost data for a specific resource.
 
 **Request**:
+
 ```protobuf
 message GetActualCostRequest {
   ResourceDescriptor resource = 1;
@@ -97,6 +109,7 @@ message GetActualCostRequest {
 ```
 
 **Response**:
+
 ```protobuf
 message GetActualCostResponse {
   repeated CostEntry entries = 1;
@@ -107,6 +120,7 @@ message GetActualCostResponse {
 ```
 
 **Contract**:
+
 - Validates date range (max 14 months, not in future)
 - Queries AWS Cost Explorer API with provided dimensions
 - Returns cost entries grouped by requested dimensions
@@ -116,9 +130,11 @@ message GetActualCostResponse {
 - Memory usage: Bounded with pagination for large result sets
 
 ### GetServiceActualCost
+
 Retrieves cost data aggregated by AWS service.
 
 **Request**:
+
 ```protobuf
 message GetServiceActualCostRequest {
   string service_code = 1;
@@ -129,6 +145,7 @@ message GetServiceActualCostRequest {
 ```
 
 **Response**:
+
 ```protobuf
 message GetServiceActualCostResponse {
   repeated ServiceCostEntry entries = 1;
@@ -139,6 +156,7 @@ message GetServiceActualCostResponse {
 ```
 
 **Contract**:
+
 - Validates service code and date range
 - Queries AWS Cost Explorer grouped by SERVICE dimension
 - Filters results to specified service
@@ -146,9 +164,11 @@ message GetServiceActualCostResponse {
 - Response time: < 10 seconds typical
 
 ### GetAccountActualCost
+
 Retrieves cost data aggregated by AWS account.
 
 **Request**:
+
 ```protobuf
 message GetAccountActualCostRequest {
   string account_id = 1;
@@ -159,6 +179,7 @@ message GetAccountActualCostRequest {
 ```
 
 **Response**:
+
 ```protobuf
 message GetAccountActualCostResponse {
   repeated AccountCostEntry entries = 1;
@@ -169,6 +190,7 @@ message GetAccountActualCostResponse {
 ```
 
 **Contract**:
+
 - Validates account ID format and date range
 - Queries AWS Cost Explorer grouped by LINKED_ACCOUNT dimension
 - Filters results to specified account
@@ -178,6 +200,7 @@ message GetAccountActualCostResponse {
 ## Common Data Types
 
 ### ResourceDescriptor
+
 ```protobuf
 message ResourceDescriptor {
   string provider = 1;
@@ -188,6 +211,7 @@ message ResourceDescriptor {
 ```
 
 ### CostEntry
+
 ```protobuf
 message CostEntry {
   google.protobuf.Timestamp timestamp = 1;
@@ -204,6 +228,7 @@ message CostEntry {
 ```
 
 ### ErrorCode
+
 ```protobuf
 enum ErrorCode {
   ERROR_CODE_UNSPECIFIED = 0;
@@ -215,6 +240,7 @@ enum ErrorCode {
 ```
 
 ### FallbackHint
+
 ```protobuf
 enum FallbackHint {
   FALLBACK_HINT_UNSPECIFIED = 0;
@@ -225,6 +251,7 @@ enum FallbackHint {
 ```
 
 ### Granularity
+
 ```protobuf
 enum Granularity {
   GRANULARITY_UNSPECIFIED = 0;
@@ -236,26 +263,31 @@ enum Granularity {
 ## Error Handling Contracts
 
 ### Authentication Errors
+
 - **Trigger**: Missing or invalid AWS credentials
 - **Response**: `error_code: ERROR_CODE_NO_DATA, error_message: "AWS authentication failed: <details>"`
 - **Fallback**: `RECOMMENDED`
 
 ### Rate Limit Errors
+
 - **Trigger**: AWS Cost Explorer API rate limit exceeded
 - **Behavior**: Automatic retry with exponential backoff (max 30 seconds)
 - **Response**: Success after retry, or timeout error if retries exhausted
 
 ### Invalid Date Range
+
 - **Trigger**: Date range exceeds 14 months or end date in future
 - **Response**: `error_code: ERROR_CODE_INVALID_RESOURCE, error_message: "Date range exceeds AWS Cost Explorer limits"`
 - **Fallback**: `RECOMMENDED`
 
 ### No Data Available
+
 - **Trigger**: Valid query returns no cost data
 - **Response**: Empty `entries` array, `error_code: ERROR_CODE_NO_DATA`
 - **Fallback**: `RECOMMENDED`
 
 ### Service Unavailable
+
 - **Trigger**: AWS Cost Explorer API returns 5xx errors
 - **Behavior**: Retry with exponential backoff
 - **Response**: Success after retry, or error if retries exhausted
@@ -275,5 +307,4 @@ enum Granularity {
 - **Authentication**: AWS credentials via standard SDK chain only
 - **Authorization**: Read-only ce:GetCostAndUsage permission required
 - **Input Validation**: Reject malformed ResourceDescriptor gracefully
-- **Logging**: No credentials or secrets in logs or responses</content>
-<parameter name="filePath">$GOPATH/src/github.com/rshade/finfocus-plugin-aws-ce/specs/001-aws-ce-plugin/contracts/grpc-service-contracts.md
+- **Logging**: no credentials or secrets in logs or responses

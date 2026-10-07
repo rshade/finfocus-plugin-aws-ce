@@ -1,72 +1,86 @@
-# CONTEXT.md
+# Architectural context
 
-## Core Architectural Identity
-**Lightweight gRPC Plugin / Adapter**
-This project is a stateless "Provider Plugin" for the FinFocus engine. It acts as a translation layer between the `finfocus-core` (gRPC client) and the AWS Cost Explorer API (External Service).
+## Core architectural identity
 
-It is **NOT** a standalone application, CLI tool, or dashboard. It is a worker node in a plugin architecture.
+**Lightweight gRPC plugin and adapter**
+This project is a stateless provider plugin for the FinFocus engine. It acts as a translation layer between the `finfocus-core` gRPC client and the external AWS Cost Explorer API.
 
-## Technical Boundaries & Hard No's
+The plugin operates as a worker node in a plugin architecture. It doesn't provide a standalone app, command-line tool, or dashboard.
+
+## Technical boundaries
+
 To prevent scope creep and architectural drift, this project adheres to the following boundaries:
 
-1.  **No "Fin" Logic (Math):** We do not invent forecasting algorithms, amortizations, or cost models. If AWS provides the number (e.g., via `GetCostForecast`), we use it. We only perform basic arithmetic (e.g., currency conversion, summing) if absolutely necessary to fit the FOCUS 1.2 schema.
-2.  **No "Ops" Logic (Resource Management):** This plugin is **Read-Only**. It will NEVER create, modify, or delete AWS resources (EC2, S3, etc.). It only reads billing data.
-3.  **No Durable State:** This plugin does not own a database. It utilizes a transient file-based cache for performance (to reduce API costs/latency) but assumes it can be restarted at any time with zero data loss.
-4.  **No UI/UX:** This project does not render HTML, charts, or CLI tables. It returns raw structured data (Protobuf/Go structs) to the Core engine.
+1. **No financial modeling:** the plugin doesn't invent forecasting algorithms, amortizations, or cost models. If AWS provides the number, for example through `GetCostForecast`, the plugin uses it. The plugin performs basic arithmetic, such as currency conversion or summing, only when necessary to fit the FOCUS 1.2 schema.
+2. **No resource management:** the plugin only reads billing data. It never creates, modifies, or deletes AWS resources such as EC2 instances or S3 buckets.
+3. **No durable state:** the plugin doesn't own a database. It uses a transient file-based cache to reduce API costs and latency. Restarting the plugin at any time must cause no data loss.
+4. **No user interface:** the project doesn't render HTML, charts, or command-line tables. It returns raw structured data as Protocol Buffers or Go structs to the core engine.
 
-## Data Source of Truth
-*   **Actual Costs:** AWS Cost Explorer API (`GetCostAndUsage`).
-*   **Forecasts:** AWS Cost Explorer API (`GetCostForecast`).
-*   **Budgets:** AWS Budgets API (Planned).
-*   **Metadata:** AWS Tags & Organizations APIs.
+## Data source of truth
 
-**Responsibility:** AWS is responsible for the accuracy of the billing data. We are responsible for the accuracy of the **translation** to the FOCUS 1.2 standard.
+* **Actual costs:** AWS Cost Explorer API supplies `GetCostAndUsage` for service totals and `GetCostAndUsageWithResources` for EC2 instances.
+* **Forecasts:** planned support uses AWS Cost Explorer API `GetCostForecast`. v0.1.0 serves actual costs only.
+* **Budgets:** planned support uses AWS Budgets API.
+* **Metadata:** Cost Explorer and the caller supply values. AWS Tags and Organizations integration remains unimplemented.
 
-## Interaction Model
+**Responsibility:** AWS owns billing data accuracy. The plugin owns the accuracy of the **translation** to the FOCUS 1.2 standard.
 
-- **Inbound:** gRPC Server (listening on localhost, port assigned by Core).
-- **Outbound:** AWS SDK for Go v2 (authenticated via standard AWS chains).
-- **Data Format:** Returns data complying strictly with the `finfocus-spec` (FOCUS 1.2 derived) Protocol Buffers.
+## Interaction model
 
-## Implementation Status
+* **Inbound:** a gRPC server listens on localhost at a port the core assigns.
+* **Outbound:** AWS SDK for Go v2 authenticates through standard AWS credential chains.
+* **Data format:** the plugin returns Protocol Buffers that comply with `finfocus-spec`, derived from FOCUS 1.2.
 
-### Currently Implemented
+## Implementation status
 
-| RPC | Status | AWS API |
+### Implemented features
+
+| Remote procedure call | Status | AWS API |
 |-----|--------|---------|
-| `GetActualCost` | ✅ Full | `GetCostAndUsage` |
-| `GetProjectedCost` | ❌ Blocked | Intentionally returns error (directs to aws-public plugin) |
+| `GetActualCost` | ✅ Offline protocol/contract verified | `GetCostAndUsage`, `GetCostAndUsageWithResources` |
+| `GetProjectedCost` | ❌ Outside v0.1.0 scope | Returns gRPC `Unimplemented` with task reference CE-6.10 |
 
-### SDK Compliance (v0.5.2)
+### SDK compliance for v0.7.5
 
 The plugin uses standardized SDK helpers:
 
-- `pluginsdk.NewLogWriter()` / `NewPluginLogger()` - Structured logging
-- `pluginsdk.LogOperation()` - Operation timing
-- `pluginsdk.ValidateActualCostRequest()` - Input validation
-- `pluginsdk.ParsePortFlag()` / `GetPort()` - Configuration
-- `pluginsdk.Serve()` - gRPC server startup
+* `pluginsdk.NewLogWriter()` / `NewPluginLogger()` - Structured logging
+* `pluginsdk.LogOperation()` - Operation timing
+* `pluginsdk.ValidateActualCostRequest()` - Input validation
+* `pluginsdk.ParsePortFlag()` / `GetPort()` - Configuration
+* `pluginsdk.Serve()` - gRPC server startup
 
-### Extension Points Available
+### Available extension points
 
-1. **New AWS Cost APIs** - CostExplorerAPI interface supports additional methods
-2. **Additional Cost Dimensions** - SERVICE, USAGE_TYPE, TAG-based grouping
-3. **Filter Expressions** - Cost Explorer query filters
-4. **Cache Configuration** - TTL and storage location customization
+1. **New AWS cost operations** - The `CostExplorerAPI` interface supports additional methods
+2. **Additional cost dimensions** - Grouping by `SERVICE`, `USAGE_TYPE`, or tags
+3. **Filter expressions** - Cost Explorer query filters
+4. **Cache configuration** - Time to live and storage location customization
 
-### Features Requiring Upstream Spec Work
+### Future work and current limits
 
-- `BudgetsProvider` interface (for AWS Budgets RPC)
-- `RecommendationsProvider` interface (for Rightsizing/RI/SP recommendations)
-- `AnomalyRecord` structure mapping (for Cost Explorer anomalies)
-- FOCUS 1.3 commitment columns (CommitmentDiscountId, etc.)
+The v0.7.5 SDK already provides budgets and recommendations interfaces and
+FOCUS commitment fields. Those features need plugin implementations and
+verification. Their presence isn't evidence of a protocol gap. Anomaly
+mapping requires separate design work outside this release.
 
-## Verification Checklist
+The caller must supply `billing_account_id` for FOCUS output. Without it,
+the plugin returns actual costs with no FOCUS record. Credential keys are plugin
+conventions documented in [AWS credentials](docs/CREDENTIALS.md). Resource
+queries need account opt-in, cover 14 days, and can lag 24 to 48 hours.
+Pulumi Environments, Secrets, and Configuration supplied an AWS identity for
+live checks. After the owner granted Cost Explorer read permission, the plugin
+matched nine live service totals for 2026-09-27 through 2026-10-04.
+The comparison included exact decimals and period metadata.
+The initial denied query also verified `PermissionDenied` mapping. Resource-level
+and FinFocus core E2E verification remain separate. See [AWS verification](docs/AWS-VERIFICATION.md).
+
+## Verification checklist
 
 When adding new features, verify:
 
-1. ✅ Does it only read data from AWS? (No writes allowed)
-2. ✅ Does it avoid local calculations? (Pass-through only)
-3. ✅ Does it use SDK helpers for logging/validation?
-4. ✅ Does it map to an existing AWS API? (No invented data)
+1. ✅ Does it only read data from AWS, without writes?
+2. ✅ Does it avoid local calculations and pass through AWS values?
+3. ✅ Does it use SDK helpers for logging and validation?
+4. ✅ Does it map to an existing AWS API without inventing data?
 5. ✅ Does it comply with FOCUS schema requirements?

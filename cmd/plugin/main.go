@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -24,36 +25,56 @@ func main() {
 
 	// Determine port: CLI flag takes precedence over environment variable
 	port := pluginsdk.ParsePortFlag()
-	if port == 0 {
+	portExplicit := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "port" {
+			portExplicit = true
+		}
+	})
+	if !portExplicit {
 		port = pluginsdk.GetPort()
+	}
+	if port < 0 || port > 65535 {
+		logger.Error().Int("port", port).Msg("Failed to serve plugin: port must be between 0 and 65535")
+		os.Exit(1)
+	}
+
+	maxBatchSize, batchWorkers, err := batchSettingsFromEnv()
+	if err != nil {
+		logger.Error().Err(err).Msg("Invalid batch configuration")
+		os.Exit(1)
 	}
 
 	// Create the plugin implementation
 	plugin := pricing.NewCalculator()
 
-	// Set up context for graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
+	// Cancel the server context when the process receives a shutdown signal.
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
-
-	// Handle interrupt signals
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigChan
-		logger.Info().Msg("Received interrupt signal, shutting down...")
-		cancel()
-	}()
 
 	// Start serving the plugin
 	config := pluginsdk.ServeConfig{
-		Plugin: plugin,
-		Port:   port,
+		Plugin:       plugin,
+		Port:         port,
+		MaxBatchSize: maxBatchSize,
+		BatchWorkers: batchWorkers,
+	}
+
+	// Serve otherwise resolves port zero from the environment a second time.
+	if portExplicit && port == 0 {
+		listener, listenErr := (&net.ListenConfig{}).Listen(ctx, "tcp", "127.0.0.1:0")
+		if listenErr != nil {
+			logger.Error().Err(listenErr).Msg("Failed to serve plugin")
+			os.Exit(1)
+		}
+		defer func() { _ = listener.Close() }()
+		config.Listener = listener
 	}
 
 	logger.Info().Str("plugin_name", plugin.Name()).Int("port", port).Msg("Starting plugin")
 	if err := pluginsdk.Serve(ctx, config); err != nil {
 		logger.Error().Err(err).Msg("Failed to serve plugin")
-		return
+		os.Exit(1)
 	}
 }
 
@@ -76,8 +97,6 @@ func parseLogLevel(levelStr string) zerolog.Level {
 	case "panic":
 		return zerolog.PanicLevel
 	default:
-		// Log warning about unrecognized level - but we can't log yet since logger isn't created
-		// This is a chicken-and-egg problem; default to info level
 		return zerolog.InfoLevel
 	}
 }

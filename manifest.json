@@ -13,12 +13,11 @@
     ]
   },
   "specification":  {
-    "specVersion":  "1.0",
+    "specVersion":  "v0.7.5",
     "supportedProviders":  [
       "aws"
     ],
     "capabilities":  [
-      "projected_cost",
       "actual_cost"
     ]
   }
