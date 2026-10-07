@@ -68,7 +68,11 @@ The caller must supply `billing_account_id` for FOCUS output. Without it,
 actual costs are returned with no FOCUS record. Credential keys are plugin
 conventions documented in [AWS credentials](docs/CREDENTIALS.md). Resource
 queries need account opt-in, cover 14 days and can lag 24 to 48 hours.
-Live-account verification is blocked on credentials.
+Pulumi ESC supplied an AWS identity for live checks. After the owner granted
+Cost Explorer read permission, the plugin matched nine live service totals
+for 2026-09-27 through 2026-10-04, including exact decimals and period metadata.
+The initial denied query also verified PermissionDenied mapping. Resource-level
+and FinFocus core E2E verification remain separate. See docs/AWS-VERIFICATION.md.
 
 ## Verification Checklist
 

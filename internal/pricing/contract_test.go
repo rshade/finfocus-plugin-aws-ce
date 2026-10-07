@@ -167,25 +167,6 @@ func TestCEContractFixtures(t *testing.T) {
 	}
 }
 
-// TestCEContractLiveOptIn is the credentialed Cost Explorer check.
-// It is skipped unless FINFOCUS_AWS_CE_LIVE=1 and must not be set in CI.
-func TestCEContractLiveOptIn(t *testing.T) {
-	if os.Getenv("FINFOCUS_AWS_CE_LIVE") != "1" {
-		t.Skip("BLOCKED-ON-CREDENTIALS")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	ce, err := client.NewClient(ctx, client.Config{Region: "us-east-1"})
-	if err != nil {
-		t.Fatalf("BLOCKED-ON-CREDENTIALS: client: %v", err)
-	}
-	end := time.Now().UTC().Truncate(24 * time.Hour)
-	start := end.Add(-48 * time.Hour)
-	if _, err := ce.GetCost(ctx, nil, []string{"SERVICE"}, start, end, "DAILY"); err != nil {
-		t.Fatalf("BLOCKED-ON-CREDENTIALS: live GetCost: %v", err)
-	}
-}
-
 func runResponseCase(t *testing.T, tc contractCase) contractRow {
 	t.Helper()
 	f := newFakeCE(t, tc.Pages)

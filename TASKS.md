@@ -124,8 +124,9 @@ and spec v0.7.5. This run makes local commits only; no tag, release or push.
 Run 2 scope: REL-1 to REL-4, CE-6.5, CE-6.6, CE-6.10, CE-6.11,
 CE-2.1 to CE-2.3, CE-3.1 and CE-4.3. The owner removed Docker support, so
 CE-3.2 is SKIPPED and CE-3.1 is complete. CE-3.3, CE-3.4, CE-4.1, CE-4.2, CE-5.1,
-CE-1.7 and Phase 7 are deferred with owner PM. Live CE-6.1 and CE-5.1 are
-blocked on credentials. Registry changes in core and release publication are
+CE-1.7 and Phase 7 are deferred with owner PM. CE-6.1 live service-cost verification passed through the selected Pulumi
+role after the owner granted read permission. Resource-level verification
+is separate, and CE-5.1 core E2E remains excluded. Registry changes in core and release publication are
 outside the write boundary. See the run report's not-delivered register.
 
 ## Scope (decided 2026-10-01)
@@ -161,9 +162,10 @@ Sources and confidence tags are in `finfocus-pm` research notes (`aws-ce-api-fac
   #43; wire the SDK's.
 - Spec blockers cited by #36 and #38 (`finfocus-spec` #314, #315) are closed.
 - Silent-failure defects in the original code are listed in CE-6.2 to CE-6.3 with file and line.
-- **No live AWS account exists and no sandbox, test data or free tier was found.** Moto returns
-  only canned results; LocalStack Cost Explorer is a paid tier. Verification therefore uses the
-  contract fixtures in `internal/client/testdata/ce-contract/` (CE-6.1) and an opt-in live test.
+- **Owner supplied Pulumi ESC AWS access on 2026-10-06.** The selected role
+  initially lacked ce:GetCostAndUsage. After the owner granted read permission,
+  nine live service totals matched the plugin. Fixtures remain offline proof;
+  the opt-in live check is documented in docs/AWS-VERIFICATION.md.
 
 ---
 
@@ -262,7 +264,7 @@ ok      github.com/rshade/finfocus-plugin-aws-ce/test/e2e               0.005s
 - **Caching:** Memory and disk with hashed file names; recent/estimated TTL
   15 minutes and closed historical TTL 24 hours; `expires_at` supplied.
 - **Verification:** Offline contract fixtures and local fake HTTP only;
-  live AWS account behavior remains blocked on credentials.
+  live service-cost comparison passed in CE-R.5.
 
 ### Open Issues Summary
 
@@ -273,7 +275,7 @@ ok      github.com/rshade/finfocus-plugin-aws-ce/test/e2e               0.005s
 
 ### Current release limitations
 
-1. Live account and core E2E verification remain blocked on credentials.
+1. Live service-cost comparison passed in CE-R.5; resource-level and core E2E verification remain separate.
 2. Resource attribution is implemented for EC2 only, with account opt-in and
    a 14-day window. Billing data lags by 24 hours or more.
 3. FOCUS requires caller `billing_account_id`; commitment and invoice detail
@@ -809,7 +811,7 @@ has none (read the SDK for `BaseEndpoint`). The fixture files are read-only.
 - every `ok` case matches exactly as a decimal, every `error` case returns the stated code and never
   a zero, `request_period` cases give the same answer under three `TZ` values
 - break check: change the amount parser to `float64` and watch the precision case fail
-- an opt-in live test exists (skipped by default, never in CI) and is marked BLOCKED-ON-CREDENTIALS
+- an opt-in live test exists (`awslive` tag plus FINFOCUS_AWS_LIVE=true); missing Cost Explorer permission is BLOCKED-ON-INPUT
 
 ### CE-6.2: Stop silent zeros and panics in the response parser
 
@@ -966,9 +968,9 @@ plugins use) and list its path in the report. The owner files it.
 
 ## Phase 7: Second run, Tier B (CE-7.x)
 
-*Not part of v0.1.0. Each task needs a live AWS account to verify against real Cost Explorer, so the
-live part is BLOCKED-ON-CREDENTIALS; everything else is tested with the fake endpoint and fixtures.
-All carriers below exist in finfocus-spec v0.7.0 unless stated.*
+*Excluded from this run. These features need their own implementation, AWS permissions and
+account data. The owner-authorized service-cost check verifies only the existing actual-cost
+query; it does not verify any Phase 7 feature. Carrier references below describe future work.*
 
 ### CE-7.1: AWS Budgets
 
@@ -1195,7 +1197,7 @@ The toolchain baseline is now in place. Remaining work:
 
 ## Open Questions
 
-1. **AWS Credentials for Testing:** E2E tests require live AWS credentials (e.g., `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`). Should e2e_test.go be marked with `BLOCKED-ON-CREDENTIALS`?
+1. **AWS Live Access:** Owner selected tailscale-phase-2/aws-oidc and granted read permission. Service-cost comparison passed; resource-level and core E2E verification remain separate. See docs/AWS-VERIFICATION.md.
 
 2. **Release Strategy:** Should v0.1.0 be released as a single binary (one region) or multi-region binaries like aws-public? aws-ce uses dynamic region from config, so single binary should suffice.
 
@@ -1234,7 +1236,7 @@ pkill finfocus-plugin-aws-ce
 - **Testing First:** Integration tests (CE-2.1) should validate all RPC methods before CI/CD setup
 - **Distribution:** Owner removed Docker support; releases publish archives only.
 - **No PR Blocking:** Tasks should be implemented phase-by-phase without PR approval gates
-- **E2E with Core:** Live/core verification is outside this run and blocked on credentials.
+- **E2E with Core:** Core verification remains outside this run; opt-in AWS checks use Pulumi ESC and require Cost Explorer read permission.
 
 ## Phase 8: Release readiness (REL-x)
 
@@ -1306,6 +1308,18 @@ and the fake Cost Explorer endpoint. Refresh the CE-1.1 verification for REL-4.
 
 **Description:** Remove the Docker Makefile target and support plan, verify
 its absence, and complete CE-3.1 under the revised owner requirements.
+
+### CE-R.5: Verify AWS access through Pulumi ESC
+
+**Status:** DONE, `go test -count=1 ./... && go test -count=1 -tags awslive ./test/live && golangci-lint run ./... && markdownlint-cli2 README.md ROADMAP.md CONTEXT.md TASKS.md docs/AWS-VERIFICATION.md`, exit 0; break check: disabling the float-cost comparison makes the wrong-float guard fail; restored; independent daily aggregation and live nine-service comparison pass.
+
+**ID:** CE-R.5
+
+**Description:** Add an explicitly gated live AWS check and offline comparison
+guards. Use the owner-selected tailscale-phase-2/aws-oidc environment to
+verify identity, real plugin discovery and AWS error mapping. Compare actual
+billing rows only when the role can read Cost Explorer; never substitute
+fixtures for denied live data. No resources or IAM policies are changed.
 
 ### CE-R.6: Count custom retry attempts against the request budget
 

@@ -51,12 +51,14 @@ credential values into source files or logs.
 | `FINFOCUS_LOG_FILE` | Absolute log file name; otherwise use stderr | Unset |
 | `FINFOCUS_AWS_CE_MAX_BATCH_SIZE` | Batch limit, integer from 1 to 1000 | 100 |
 | `FINFOCUS_AWS_CE_BATCH_WORKERS` | Concurrent batch workers, integer from 1 to 50 | 10 |
-| `FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` | CE page request budget per minute | Unlimited when unset or `0` |
+| `FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` | CE custom attempt budget per minute | Unlimited when unset or `0` |
 
 For a log file in the current directory, set
 `FINFOCUS_LOG_FILE="$(pwd)/aws-ce.log"`. Empty batch settings use defaults;
-invalid values stop startup and name the setting. Each page counts toward the
-request budget. Default client initialization is shared safely; a failed
+invalid values stop startup and name the setting. Each custom request attempt,
+including retries, counts toward the request budget. AWS SDK transport retries
+are separate; set `AWS_MAX_ATTEMPTS=1` to disable those. Default client
+initialization is shared safely; a failed
 initialization has a one-second retry delay.
 
 The host may supply `access_key_id` and `secret_access_key` together, optional
@@ -137,9 +139,11 @@ Makefile target were removed by owner decision.
 Set `FINFOCUS_E2E=true` to run the subprocess E2E test against a local fake CE
 endpoint. Legacy `finfocus_E2E` is a fallback only when the uppercase name is
 unset; explicit uppercase `false` disables the fallback. Tests inject synthetic
-credentials and never query a live AWS service. Contract fixtures prove parsing,
-paging, totals, dates and failure handling. Live-account and FinFocus core E2E
-verification remain blocked on credentials.
+credentials and use local fake endpoints. The ordinary suite never queries
+a live AWS service. Contract fixtures prove parsing,
+paging, totals, dates and failure handling. [Live AWS checks](docs/AWS-VERIFICATION.md)
+require an explicit build tag and environment flag, and a Pulumi environment
+with Cost Explorer read permission. FinFocus core E2E remains outside this run.
 
 The vulnerability check currently reports the known `GO-2026-6443` finding in
 gRPC v1.84.0. The stable dependency is retained; a fixed stable release is not yet

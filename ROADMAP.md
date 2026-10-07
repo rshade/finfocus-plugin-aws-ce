@@ -24,7 +24,9 @@ This roadmap outlines the development path for `finfocus-plugin-aws-ce`, priorit
 | ✅ Done | [#7](https://github.com/rshade/finfocus-plugin-aws-ce/issues/7) | Establish CI/CD Infrastructure |
 
 Release plumbing, actual-cost behavior, integration and conformance tests are
-verified offline. Live CE-6.1 and CE-5.1 remain blocked on credentials.
+verified offline. Pulumi ESC also supplied AWS credentials: live service
+cost comparison passed after the owner granted Cost Explorer read permission.
+Resource-level verification is separate, and core E2E remains outside this run.
 The whole-repository Markdown check retains frozen-history errors; vulnerability
 scanning retains the known gRPC finding. Docker support is removed by owner decision.
 Local delivery labels do not close GitHub issues.
