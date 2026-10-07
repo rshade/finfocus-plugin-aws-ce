@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
@@ -20,6 +21,7 @@ import (
 // CostExplorerAPI defines the interface for AWS Cost Explorer operations.
 // This interface allows for mocking in tests.
 type CostExplorerAPI interface {
+	GetDimensionValues(ctx context.Context, params *costexplorer.GetDimensionValuesInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetDimensionValuesOutput, error)
 	GetCostAndUsage(ctx context.Context, params *costexplorer.GetCostAndUsageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error)
 	GetCostAndUsageWithResources(ctx context.Context, params *costexplorer.GetCostAndUsageWithResourcesInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageWithResourcesOutput, error)
 	GetCostForecast(ctx context.Context, params *costexplorer.GetCostForecastInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostForecastOutput, error)
@@ -78,7 +80,7 @@ type pageHookKey struct{}
 
 // WithPageHook runs hook before each custom Cost Explorer attempt, including retries.
 // A non-nil error skips that attempt and stops the query. A nil hook returns ctx.
-// AWS SDK internal transport retries are separate; AWS_MAX_ATTEMPTS=1 disables them.
+// SDK retries are disabled so each Cost Explorer HTTP attempt uses this hook.
 func WithPageHook(ctx context.Context, hook func() error) context.Context {
 	if hook == nil {
 		return ctx
@@ -138,8 +140,12 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 	}
 
 	return &Client{
-		ceClient: costexplorer.NewFromConfig(ceCfg),
-		region:   ceCfg.Region,
+		ceClient: costexplorer.NewFromConfig(ceCfg, func(options *costexplorer.Options) {
+			// The custom retry loop owns retries so its request budget covers every
+			// Cost Explorer attempt, regardless of AWS_MAX_ATTEMPTS configuration.
+			options.Retryer = aws.NopRetryer{}
+		}),
+		region: ceCfg.Region,
 	}, nil
 }
 
@@ -345,6 +351,10 @@ func groupDefinitions(dimensions []string) []types.GroupDefinition {
 
 // GetCost retrieves cost data with flexible filtering and grouping.
 func (c *Client) GetCost(ctx context.Context, filter *types.Expression, dimensions []string, startTime, endTime time.Time, granularity string) ([]CostResult, error) {
+	return c.getCost(ctx, filter, dimensions, startTime, endTime, granularity, costIdentity{})
+}
+
+func (c *Client) getCost(ctx context.Context, filter *types.Expression, dimensions []string, startTime, endTime time.Time, granularity string, identity costIdentity) ([]CostResult, error) {
 	if granularity == "" {
 		granularity = string(types.GranularityDaily)
 	}
@@ -353,11 +363,15 @@ func (c *Client) GetCost(ctx context.Context, filter *types.Expression, dimensio
 		return nil, err
 	}
 	groups := groupDefinitions(dimensions)
-	metrics := []string{metricUnblendedCost, metricUsageQuantity}
-	if commitmentDimension(dimensions) {
+	metrics := []string{metricUnblendedCost}
+	usageAllowed := hasSingleUsageType(filter)
+	if usageAllowed {
+		metrics = append(metrics, metricUsageQuantity)
+	}
+	if commitmentDimension(dimensions) || identity.reservation != "" || identity.savings != "" {
 		metrics = append(metrics, metricAmortizedCost)
 	}
-	return c.collectCosts(ctx, dimensions, func(ctx context.Context, token *string) ([]types.ResultByTime, *string, error) {
+	return c.collectCosts(ctx, dimensions, identity, func(ctx context.Context, token *string) ([]types.ResultByTime, *string, error) {
 		input := &costexplorer.GetCostAndUsageInput{
 			TimePeriod:    interval,
 			Granularity:   types.Granularity(granularity),
@@ -382,6 +396,9 @@ func (c *Client) GetCost(ctx context.Context, filter *types.Expression, dimensio
 		if output == nil {
 			return nil, nil, fmt.Errorf("getting cost and usage: empty response")
 		}
+		if !usageAllowed {
+			omitUsage(output.ResultsByTime)
+		}
 		return output.ResultsByTime, output.NextPageToken, nil
 	})
 }
@@ -389,6 +406,10 @@ func (c *Client) GetCost(ctx context.Context, filter *types.Expression, dimensio
 // GetCostWithResources retrieves resource-level cost for an EC2 instance id.
 // resourceID is the Cost Explorer RESOURCE_ID value, never a full ARN.
 func (c *Client) GetCostWithResources(ctx context.Context, resourceID, accountID string, startTime, endTime time.Time) ([]CostResult, error) {
+	return c.getCostWithResources(ctx, resourceID, accountID, startTime, endTime, nil, costIdentity{})
+}
+
+func (c *Client) getCostWithResources(ctx context.Context, resourceID, accountID string, startTime, endTime time.Time, extraFilter *types.Expression, identity costIdentity) ([]CostResult, error) {
 	interval, err := dateInterval(startTime, endTime)
 	if err != nil {
 		return nil, err
@@ -415,16 +436,20 @@ func (c *Client) GetCostWithResources(ctx context.Context, resourceID, accountID
 			},
 		})
 	}
-	filter := &types.Expression{And: parts}
+	filter := andFilters(&types.Expression{And: parts}, extraFilter)
+	metrics := []string{metricUnblendedCost}
+	if identity.reservation != "" || identity.savings != "" {
+		metrics = append(metrics, metricAmortizedCost)
+	}
 	groups := []types.GroupDefinition{{
 		Type: types.GroupDefinitionTypeDimension,
 		Key:  aws.String(string(types.DimensionResourceId)),
 	}}
-	return c.collectCosts(ctx, []string{string(types.DimensionResourceId)}, func(ctx context.Context, token *string) ([]types.ResultByTime, *string, error) {
+	return c.collectCosts(ctx, []string{string(types.DimensionResourceId)}, identity, func(ctx context.Context, token *string) ([]types.ResultByTime, *string, error) {
 		input := &costexplorer.GetCostAndUsageWithResourcesInput{
 			TimePeriod:    interval,
 			Granularity:   types.GranularityDaily,
-			Metrics:       []string{metricUnblendedCost, metricUsageQuantity},
+			Metrics:       metrics,
 			NextPageToken: token,
 			GroupBy:       groups,
 			Filter:        filter,
@@ -445,11 +470,12 @@ func (c *Client) GetCostWithResources(ctx context.Context, resourceID, accountID
 		if output == nil {
 			return nil, nil, fmt.Errorf("getting cost and usage with resources: empty response")
 		}
+		omitUsage(output.ResultsByTime)
 		return output.ResultsByTime, output.NextPageToken, nil
 	})
 }
 
-func (c *Client) collectCosts(ctx context.Context, dimensions []string, fetch func(context.Context, *string) ([]types.ResultByTime, *string, error)) ([]CostResult, error) {
+func (c *Client) collectCosts(ctx context.Context, dimensions []string, identity costIdentity, fetch func(context.Context, *string) ([]types.ResultByTime, *string, error)) ([]CostResult, error) {
 	var all []CostResult
 	var token *string
 	for page := 0; page < 100; page++ {
@@ -457,7 +483,7 @@ func (c *Client) collectCosts(ctx context.Context, dimensions []string, fetch fu
 		if err != nil {
 			return nil, err
 		}
-		rows, err := parseResultPeriods(periods, dimensions)
+		rows, err := parseResultPeriodsWithIdentity(periods, dimensions, identity)
 		if err != nil {
 			return nil, fmt.Errorf("parsing cost results: %w", err)
 		}
@@ -473,13 +499,22 @@ func (c *Client) collectCosts(ctx context.Context, dimensions []string, fetch fu
 	return nil, fmt.Errorf("%w; NextPageToken still set", ErrPageCap)
 }
 
+// standardRetryClassifier supplies SDK retry classification without performing
+// retries itself. The custom loop owns all attempts and budget enforcement.
+var standardRetryClassifier = retry.NewStandard()
+
 // isRetryableError checks if an error should trigger a retry.
 func isRetryableError(err error) bool {
 	if err == nil {
 		return false
 	}
-	// Basic check for throttling/rate limiting strings
-	// In production, checking specific error types like types.LimitExceededException is better
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	if standardRetryClassifier.IsErrorRetryable(err) {
+		return true
+	}
+	// Preserve legacy throttling codes that Cost Explorer can return.
 	errMsg := err.Error()
 	return contains(errMsg, "Throttling") ||
 		contains(errMsg, "RateExceeded") ||
@@ -552,7 +587,7 @@ func commitmentDimension(dimensions []string) bool {
 	return false
 }
 
-func parseResultPeriods(periods []types.ResultByTime, dimensions []string) ([]CostResult, error) {
+func parseResultPeriodsWithIdentity(periods []types.ResultByTime, dimensions []string, identity costIdentity) ([]CostResult, error) {
 	var results []CostResult
 	for _, resultByTime := range periods {
 		if resultByTime.TimePeriod == nil || resultByTime.TimePeriod.Start == nil || resultByTime.TimePeriod.End == nil {
@@ -568,7 +603,7 @@ func parseResultPeriods(periods []types.ResultByTime, dimensions []string) ([]Co
 		}
 
 		for _, group := range resultByTime.Groups {
-			row, err := rowFromMetrics(group.Metrics, startDate, endDate, resultByTime.Estimated, group.Keys, dimensions)
+			row, err := rowFromMetricsWithIdentity(group.Metrics, startDate, endDate, resultByTime.Estimated, group.Keys, dimensions, identity)
 			if err != nil {
 				return nil, err
 			}
@@ -577,7 +612,7 @@ func parseResultPeriods(periods []types.ResultByTime, dimensions []string) ([]Co
 
 		if len(resultByTime.Groups) == 0 && len(resultByTime.Total) > 0 {
 			if _, ok := resultByTime.Total[metricUnblendedCost]; ok {
-				row, err := rowFromMetrics(resultByTime.Total, startDate, endDate, resultByTime.Estimated, nil, nil)
+				row, err := rowFromMetricsWithIdentity(resultByTime.Total, startDate, endDate, resultByTime.Estimated, nil, nil, identity)
 				if err != nil {
 					return nil, err
 				}
@@ -588,12 +623,18 @@ func parseResultPeriods(periods []types.ResultByTime, dimensions []string) ([]Co
 	return results, nil
 }
 
-func rowFromMetrics(metrics map[string]types.MetricValue, start, end time.Time, estimated bool, keys, dimensions []string) (CostResult, error) {
+func rowFromMetricsWithIdentity(metrics map[string]types.MetricValue, start, end time.Time, estimated bool, keys, dimensions []string, identity costIdentity) (CostResult, error) {
 	label := ""
 	if len(keys) > 0 {
 		label = keys[0]
 	}
 	service, reservation, savings := groupIdentity(dimensions, keys)
+	if identity.reservation != "" {
+		reservation = identity.reservation
+	}
+	if identity.savings != "" {
+		savings = identity.savings
+	}
 	amount, currency, metric, err := selectedAmount(metrics, reservation, savings, label)
 	if err != nil {
 		return CostResult{}, err

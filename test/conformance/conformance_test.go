@@ -2,6 +2,7 @@ package conformance
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -22,12 +23,44 @@ import (
 func TestActualCostProtocol(t *testing.T) {
 	id := fmt.Sprintf("i-%017x", time.Now().UnixNano())
 	var calls atomic.Int32
+	var reservations, savings atomic.Int32
 	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		if r.Header.Get("X-Amz-Target") == "AWSInsightsIndexService.GetDimensionValues" {
+			var body struct {
+				Dimension string
+				Filter    json.RawMessage
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Error(err)
+				return
+			}
+			// BillingAccountId is a FOCUS label; neither request supplies an ARN
+			// account. Discovery stays scoped to EC2 SERVICE, without RESOURCE_ID.
+			var compact map[string]any
+			if err := json.Unmarshal(body.Filter, &compact); err != nil {
+				t.Error(err)
+				return
+			}
+			filter, _ := json.Marshal(compact)
+			if string(filter) != `{"Dimensions":{"Key":"SERVICE","Values":["Amazon Elastic Compute Cloud - Compute"]}}` {
+				t.Errorf("discovery filter must contain only EC2 SERVICE, without RESOURCE_ID or account: %s", filter)
+			}
+			switch body.Dimension {
+			case "RESERVATION_ID":
+				reservations.Add(1)
+			case "SAVINGS_PLAN_ARN":
+				savings.Add(1)
+			default:
+				t.Errorf("unexpected discovery dimension: %s", body.Dimension)
+			}
+			_, _ = w.Write([]byte(`{"DimensionValues":[]}`))
+			return
+		}
 		calls.Add(1)
 		if r.Header.Get("X-Amz-Target") != "AWSInsightsIndexService.GetCostAndUsageWithResources" {
 			t.Errorf("operation=%s", r.Header.Get("X-Amz-Target"))
 		}
-		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
 		_, _ = fmt.Fprintf(w, `{"ResultsByTime":[{"TimePeriod":{"Start":"2026-09-20","End":"2026-09-21"},"Groups":[{"Keys":["%s"],"Metrics":{"UnblendedCost":{"Amount":"1.75","Unit":"USD"}}}]}]}`, id)
 	}))
 	defer fake.Close()
@@ -96,7 +129,11 @@ func TestActualCostProtocol(t *testing.T) {
 	if calls.Load() != 2 {
 		t.Fatalf("per-request calls=%d, want two uncached requests", calls.Load())
 	}
+	if reservations.Load() != 2 || savings.Load() != 2 {
+		t.Fatalf("commitment discovery requests: RI=%d SP=%d, want two each", reservations.Load(), savings.Load())
+	}
 	before := calls.Load()
+	beforeReservations, beforeSavings := reservations.Load(), savings.Load()
 	for _, tc := range []struct {
 		name   string
 		mutate func(*pbc.GetActualCostRequest)
@@ -127,7 +164,7 @@ func TestActualCostProtocol(t *testing.T) {
 			}
 		})
 	}
-	if calls.Load() != before {
+	if calls.Load() != before || reservations.Load() != beforeReservations || savings.Load() != beforeSavings {
 		t.Fatal("invalid requests reached Cost Explorer")
 	}
 }

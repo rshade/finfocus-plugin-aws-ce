@@ -1,0 +1,102 @@
+package pricing
+
+import (
+	"context"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
+	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
+	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
+	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
+	"math/big"
+	"testing"
+	"time"
+)
+
+func TestAuditDefaultIdentityDiskCache(t *testing.T) {
+	dir := t.TempDir()
+	a := pricedCostAPI()
+	ca := NewCalculatorWithClient(client.NewClientWithAPI(a, "us-east-1"))
+	ca.cache, _ = NewCacheManager(dir, 24*time.Hour)
+	start, end := closedHistoryWindow()
+	req := costRequest("AmazonS3", "", start, end, nil)
+	ra, err := ca.GetActualCost(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := &mockCostExplorerAPI{GetCostAndUsageFunc: func(context.Context, *costexplorer.GetCostAndUsageInput, ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error) {
+		out := pricedCostOutput()
+		out.ResultsByTime[0].Groups[0].Metrics["UnblendedCost"] = types.MetricValue{Amount: aws.String("99"), Unit: aws.String("USD")}
+		return out, nil
+	}}
+	cb := NewCalculatorWithClient(client.NewClientWithAPI(b, "us-east-1"))
+	cb.cache, _ = NewCacheManager(dir, 24*time.Hour)
+	rb, err := cb.GetActualCost(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("first account cost=%v second account cost=%v second account endpoint calls=%d", ra.Results[0].Cost, rb.Results[0].Cost, len(b.costCalls))
+	if rb.Results[0].Cost != 1 || len(b.costCalls) != 0 {
+		t.Fatal("collision did not reproduce")
+	}
+}
+func TestAuditSupportsMismatch(t *testing.T) {
+	calc := NewCalculator()
+	r, err := calc.Supports(context.Background(), &pbc.SupportsRequest{Resource: &pbc.ResourceDescriptor{Provider: "aws", Arn: "arn:aws:s3:::mybucket"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("S3 Supports: supported=%v reason=%q", r.Supported, r.Reason)
+	start, end := recentCostWindow()
+	_, err = calc.GetActualCost(context.Background(), costRequest("mybucket", "arn:aws:s3:::mybucket", start, end, nil))
+	t.Logf("S3 GetActualCost error=%v", err)
+	if !r.Supported || err == nil {
+		t.Fatal("mismatch did not reproduce")
+	}
+}
+func TestAuditNanosecondsCacheCollision(t *testing.T) {
+	a := pricedCostAPI()
+	c := calculatorWithCache(t, a)
+	day := time.Now().UTC().Add(-72 * time.Hour)
+	end := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
+	start := end.Add(-24 * time.Hour)
+	r1 := costRequest("AmazonS3", "", start, end, nil)
+	r2 := costRequest("AmazonS3", "", start, end.Add(time.Nanosecond), nil)
+	k1 := actualCostCacheKey(costQueryPlan{cacheID: "AmazonS3"}, r1)
+	k2 := actualCostCacheKey(costQueryPlan{cacheID: "AmazonS3"}, r2)
+	_, e := c.GetActualCost(context.Background(), r1)
+	if e != nil {
+		t.Fatal(e)
+	}
+	_, e = c.GetActualCost(context.Background(), r2)
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Logf("keys identical=%v endpoint calls=%d midnight end=%s next request end=%s", k1 == k2, len(a.costCalls), end, end.Add(time.Nanosecond))
+	if k1 != k2 || len(a.costCalls) != 1 {
+		t.Fatal("collision did not reproduce")
+	}
+}
+
+func TestAuditUnsupportedResource(t *testing.T) {
+	calc, mock := newClassifiedCalc()
+	calc.cache = nil
+	start, end := recentCostWindow()
+	supports, _ := calc.Supports(context.Background(), &pbc.SupportsRequest{Resource: &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "s3", Id: "my-bucket"}})
+	resp, err := calc.GetActualCost(context.Background(), costRequest("my-bucket", "", start, end, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("bucket supports=%v cost=%v filter=%#v groups=%#v", supports.Supported, resp.Results[0].Cost, mock.costCalls[0].Filter, mock.costCalls[0].GroupBy)
+	supports, _ = calc.Supports(context.Background(), &pbc.SupportsRequest{Resource: &pbc.ResourceDescriptor{Provider: "aws", Arn: "arn:aws:s3:::my-bucket"}})
+	_, err = calc.GetActualCost(context.Background(), costRequest("my-bucket", "arn:aws:s3:::my-bucket", start, end, nil))
+	t.Logf("same bucket ARN supports=%v actual error=%v", supports.Supported, err)
+}
+func TestAuditMixedUsageUnits(t *testing.T) {
+	start := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	rows := []client.CostResult{{ServiceName: "AmazonEC2", Currency: "USD", StartDate: start, EndDate: start.Add(24 * time.Hour), AmountExact: big.NewRat(1, 1), UsageExact: big.NewRat(2, 1), UsageUnit: "Hrs"}, {ServiceName: "AmazonEC2", Currency: "USD", StartDate: start.Add(24 * time.Hour), EndDate: start.Add(48 * time.Hour), AmountExact: big.NewRat(1, 1), UsageExact: big.NewRat(3, 1), UsageUnit: "GB"}}
+	costs, err := aggregateCosts(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("2 Hrs + 3 GB => %v %s", costs[0].UsageAmount, costs[0].UsageUnit)
+}

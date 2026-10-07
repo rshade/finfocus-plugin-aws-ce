@@ -51,7 +51,7 @@ func TestSupports(t *testing.T) {
 				Provider: "aws",
 				Arn:      "arn:aws:s3:::my_bucket",
 			}},
-			supported: true,
+			supported: false, reasonHas: invalidResource,
 		},
 		{
 			name: "malformed ARN with Id",
@@ -60,7 +60,7 @@ func TestSupports(t *testing.T) {
 				Arn:      "not-an-arn",
 				Id:       "bucket-logs",
 			}},
-			supported: true,
+			supported: false, reasonHas: invalidResource,
 		},
 		{
 			name: "missing identifiers",
@@ -135,8 +135,8 @@ func TestSupports(t *testing.T) {
 			}
 			switch {
 			case tc.supported:
-				if resp.GetReason() != "" {
-					t.Fatalf("supported reason = %q, want empty", resp.GetReason())
+				if !strings.Contains(resp.GetReason(), "14 days") || !strings.Contains(resp.GetReason(), "opt-in") {
+					t.Fatalf("supported reason = %q, want resource limitations", resp.GetReason())
 				}
 			case tc.plainReason:
 				reason := resp.GetReason()

@@ -27,6 +27,10 @@ type mockCostExplorerAPI struct {
 	resourceCalls       []*costexplorer.GetCostAndUsageWithResourcesInput
 }
 
+func (m *mockCostExplorerAPI) GetDimensionValues(context.Context, *costexplorer.GetDimensionValuesInput, ...func(*costexplorer.Options)) (*costexplorer.GetDimensionValuesOutput, error) {
+	return &costexplorer.GetDimensionValuesOutput{}, nil
+}
+
 func (m *mockCostExplorerAPI) GetCostAndUsage(ctx context.Context, params *costexplorer.GetCostAndUsageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error) {
 	m.costCalls = append(m.costCalls, params)
 	if m.GetCostAndUsageFunc != nil {
@@ -276,24 +280,10 @@ func TestGetActualCost_MalformedArn(t *testing.T) {
 	}
 
 	_, err := calc.GetActualCost(context.Background(), req)
-	if err != nil {
-		t.Errorf("GetActualCost failed with malformed ARN: %v", err)
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("unsupported malformed identity: %v", err)
 	}
-	if len(mockAPI.resourceCalls) != 0 {
-		t.Fatalf("malformed ARN with a non-instance id called GetCostAndUsageWithResources")
-	}
-	if len(mockAPI.costCalls) != 1 {
-		t.Fatalf("malformed ARN service query calls=%d", len(mockAPI.costCalls))
-	}
-	if ids := resourceIDs(mockAPI.costCalls[0].Filter); len(ids) != 0 {
-		t.Fatalf("service total filtered by RESOURCE_ID %v", ids)
-	}
-	if strings.Contains(logs.String(), "falling back to ResourceId") {
-		t.Fatalf("log claims a ResourceId fallback that does not filter: %s", logs.String())
-	}
-	if !strings.Contains(logs.String(), "querying service totals") {
-		t.Fatalf("log does not describe the service-total query: %s", logs.String())
-	}
+	assertNoCostExplorerCall(t, mockAPI)
 
 	instanceMock := &mockCostExplorerAPI{
 		GetCostAndUsageFunc: func(ctx context.Context, params *costexplorer.GetCostAndUsageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error) {

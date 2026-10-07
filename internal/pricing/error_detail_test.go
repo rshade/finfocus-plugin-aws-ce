@@ -33,7 +33,7 @@ func TestGetActualCost_ErrorDetails(t *testing.T) {
 			name: "invalid time range",
 			calc: func() *Calculator { return NewCalculator() },
 			req: &pbc.GetActualCostRequest{
-				ResourceId: "AmazonS3",
+				ResourceId: "aws-account-total",
 				Start:      same,
 				End:        same,
 			},
@@ -44,7 +44,7 @@ func TestGetActualCost_ErrorDetails(t *testing.T) {
 			name: "empty results",
 			calc: emptyCostCalculator,
 			req: &pbc.GetActualCostRequest{
-				ResourceId: "AmazonS3",
+				ResourceId: "aws-account-total",
 				Start:      start,
 				End:        end,
 			},

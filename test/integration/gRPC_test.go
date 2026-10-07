@@ -19,20 +19,40 @@ import (
 
 func TestPluginSubprocessGRPC(t *testing.T) {
 	var requests atomic.Int32
+	var reservations, savings atomic.Int32
 	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+			return
+		}
+		wire, _ := json.Marshal(body)
+		if r.Header.Get("X-Amz-Target") == "AWSInsightsIndexService.GetDimensionValues" {
+			filter, _ := json.Marshal(body["Filter"])
+			// These ID-only requests have no ARN account scope. BillingAccountId
+			// labels FOCUS records and must not become an AWS account filter.
+			if string(filter) != `{"Dimensions":{"Key":"SERVICE","Values":["Amazon Elastic Compute Cloud - Compute"]}}` {
+				t.Errorf("discovery filter must contain only EC2 SERVICE, without RESOURCE_ID or account: %s", filter)
+			}
+			switch body["Dimension"] {
+			case "RESERVATION_ID":
+				reservations.Add(1)
+			case "SAVINGS_PLAN_ARN":
+				savings.Add(1)
+			default:
+				t.Errorf("unexpected discovery dimension: %v", body["Dimension"])
+			}
+			_, _ = w.Write([]byte(`{"DimensionValues":[]}`))
+			return
+		}
 		requests.Add(1)
 		if r.Header.Get("X-Amz-Target") != "AWSInsightsIndexService.GetCostAndUsageWithResources" {
 			t.Errorf("unexpected CE operation %s", r.Header.Get("X-Amz-Target"))
 		}
-		var body map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Error(err)
-		}
-		wire, _ := json.Marshal(body)
 		if !strings.Contains(string(wire), "i-0abc123def4567890") || strings.Contains(string(wire), "instance/") {
 			t.Errorf("wrong resource filter: %s", wire)
 		}
-		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
 		_, _ = w.Write([]byte(`{"ResultsByTime":[{"Estimated":true,"TimePeriod":{"Start":"2026-09-20","End":"2026-09-21"},"Groups":[{"Keys":["i-0abc123def4567890"],"Metrics":{"UnblendedCost":{"Amount":"2.50","Unit":"USD"}}}]}]}`))
 	}))
 	defer fake.Close()
@@ -72,6 +92,9 @@ func TestPluginSubprocessGRPC(t *testing.T) {
 	}
 	if requests.Load() != 1 {
 		t.Fatalf("CE requests=%d", requests.Load())
+	}
+	if reservations.Load() != 1 || savings.Load() != 1 {
+		t.Fatalf("commitment discovery requests: RI=%d SP=%d, want one each", reservations.Load(), savings.Load())
 	}
 	batch, err := proc.Client.BatchCost(ctx, &pbc.BatchCostRequest{})
 	if err != nil || batch.GetMaxBatchSize() != 2 {

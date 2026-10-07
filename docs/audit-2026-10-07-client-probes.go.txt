@@ -1,0 +1,43 @@
+package client
+
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
+	"testing"
+	"time"
+)
+
+func TestAuditSDKRetryEscapesHook(t *testing.T) {
+	t.Setenv("AWS_MAX_ATTEMPTS", "3")
+	var calls, hooks atomic.Int32
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		if calls.Add(1) == 1 {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"__type":"LimitExceededException","Message":"retry once"}`))
+			return
+		}
+		w.Write([]byte(`{"ResultsByTime":[{"TimePeriod":{"Start":"2026-10-01","End":"2026-10-02"},"Groups":[{"Keys":["S3"],"Metrics":{"UnblendedCost":{"Amount":"1","Unit":"USD"}}}]}]}`))
+	}))
+	defer s.Close()
+	c, err := NewClient(context.Background(), Config{Region: "us-east-1", BaseEndpoint: s.URL, AccessKeyID: "test", SecretAccessKey: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	ctx = WithPageHook(ctx, func() error {
+		if hooks.Add(1) > 1 {
+			return ErrRateLimited
+		}
+		return nil
+	})
+	start := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	_, err = c.GetCost(ctx, nil, []string{"SERVICE"}, start, start.Add(24*time.Hour), "DAILY")
+	t.Logf("configured hook budget=1 HTTP calls=%d hooks=%d query error=%v", calls.Load(), hooks.Load(), err)
+	if calls.Load() != 2 || hooks.Load() != 1 || err != nil {
+		t.Fatal("bypass did not reproduce")
+	}
+}

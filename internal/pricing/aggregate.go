@@ -79,9 +79,10 @@ func ratDecimal(r *big.Rat) string {
 
 func aggregateCosts(rows []client.CostResult) ([]CostEntry, error) {
 	type acc struct {
-		entry CostEntry
-		cost  *big.Rat
-		usage *big.Rat
+		entry        CostEntry
+		cost         *big.Rat
+		usage        *big.Rat
+		usageInvalid bool
 	}
 	order := make([]string, 0)
 	byKey := make(map[string]*acc)
@@ -131,12 +132,18 @@ func aggregateCosts(rows []client.CostResult) ([]CostEntry, error) {
 		if end := row.EndDate.UTC(); !end.IsZero() && end.After(a.entry.PeriodEnd) {
 			a.entry.PeriodEnd = end
 		}
-		if row.UsageExact != nil {
+		if row.UsageExact == nil || row.UsageUnit == "" || (a.entry.HasUsage && a.entry.UsageUnit != row.UsageUnit) {
+			a.usageInvalid = true
+		}
+		if !a.usageInvalid && row.UsageExact != nil {
 			a.usage = addCost(a.usage, row.UsageExact)
 			a.entry.HasUsage = true
-			if a.entry.UsageUnit == "" {
-				a.entry.UsageUnit = row.UsageUnit
-			}
+			a.entry.UsageUnit = row.UsageUnit
+		}
+		if a.usageInvalid {
+			a.entry.HasUsage = false
+			a.entry.UsageUnit = ""
+			a.usage = nil
 		}
 		if a.entry.Currency == "" && row.Currency != "" {
 			a.entry.Currency = row.Currency

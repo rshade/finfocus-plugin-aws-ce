@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
 	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
 )
 
@@ -19,6 +20,12 @@ type CacheManager struct {
 	cacheDir    string
 	mu          sync.RWMutex
 	ttl         time.Duration
+}
+
+// newMemoryCacheManager creates a cache confined to this process.
+// Default AWS credentials do not provide a stable, verified billing identity.
+func newMemoryCacheManager(ttl time.Duration) *CacheManager {
+	return &CacheManager{memoryCache: make(map[string]CacheEntry), ttl: ttl}
 }
 
 // NewCacheManager creates a new CacheManager.
@@ -56,6 +63,7 @@ const (
 	closedHistoryTTL   = 24 * time.Hour
 	recentCostTTL      = 15 * time.Minute
 	recentCostHorizon  = 48 * time.Hour
+	cacheVersion       = "v2"
 	cacheGranularity   = "DAILY"
 	cacheMetric        = "UnblendedCost"
 	cacheGroupService  = "SERVICE"
@@ -119,6 +127,9 @@ func cacheFileName(key string) string {
 
 // saveToDisk writes a single cache entry to disk.
 func (cm *CacheManager) saveToDisk(key string, entry CacheEntry) error {
+	if cm.cacheDir == "" {
+		return nil
+	}
 	filename := filepath.Join(cm.cacheDir, cacheFileName(key))
 	data, err := json.Marshal(entry)
 	if err != nil {
@@ -188,11 +199,15 @@ func actualCostCacheKey(plan costQueryPlan, req *pbc.GetActualCostRequest) strin
 	if plan.resourceLevel {
 		group = cacheGroupResource
 	}
-	return fmt.Sprintf("cost:%s:%s:%d:%d:%s:%s:%s",
+	// Validation precedes cache lookup, so this period is valid. The key uses
+	// the same dates as the API, including nanosecond rounding at midnight.
+	startDate, endDate, _ := client.CostExplorerPeriod(req.GetStart().AsTime(), req.GetEnd().AsTime())
+	return fmt.Sprintf("cost:%s:%s:%s:%s:%s:%s:%s:%s",
+		cacheVersion,
 		plan.cacheID,
 		plan.accountID,
-		req.GetStart().GetSeconds(),
-		req.GetEnd().GetSeconds(),
+		startDate,
+		endDate,
 		cacheGranularity,
 		group,
 		cacheMetric,

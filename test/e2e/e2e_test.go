@@ -123,7 +123,7 @@ func TestE2E(t *testing.T) {
 	defer func() { _ = conn.Close() }()
 	end := time.Now().UTC().Add(-24 * time.Hour)
 	start := end.Add(-24 * time.Hour)
-	resp, err := pbc.NewCostSourceServiceClient(conn).GetActualCost(ctx, &pbc.GetActualCostRequest{ResourceId: "e2e-service-totals", Start: timestamppb.New(start), End: timestamppb.New(end)})
+	resp, err := pbc.NewCostSourceServiceClient(conn).GetActualCost(ctx, &pbc.GetActualCostRequest{ResourceId: "aws-account-total", Start: timestamppb.New(start), End: timestamppb.New(end)})
 	if err != nil {
 		t.Fatal(err)
 	}

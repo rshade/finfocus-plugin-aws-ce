@@ -206,8 +206,8 @@ func TestGetActualCost_CacheHitSkipsCostExplorer(t *testing.T) {
 		t.Fatalf("endpoint calls = %d, want %d", len(api.costCalls), pages)
 	}
 	counts := ceRequestCounts(t, buf)
-	if len(counts) != 2 || counts[0] != pages || counts[1] != 0 {
-		t.Fatalf("ce_requests = %v, want [%d 0]", counts, pages)
+	if len(counts) != 2 || counts[0] != pages+2 || counts[1] != 0 {
+		t.Fatalf("ce_requests = %v, want [%d 0]", counts, pages+2)
 	}
 	if len(first.GetResults()) != 1 || len(second.GetResults()) != 1 {
 		t.Fatalf("results first=%d second=%d", len(first.GetResults()), len(second.GetResults()))
@@ -243,7 +243,7 @@ func TestGetActualCost_RateLimit(t *testing.T) {
 		t.Parallel()
 		api := pagingCostAPI(1, false)
 		calc, buf := cachedCalc(t, api)
-		calc.maxRequestsPerMinute = 1
+		calc.maxRequestsPerMinute = 3
 		start, end := closedHistoryWindow()
 		req := costRequest("AmazonS3", "", start, end, nil)
 		if _, err := calc.GetActualCost(context.Background(), req); err != nil {
@@ -252,7 +252,9 @@ func TestGetActualCost_RateLimit(t *testing.T) {
 		if _, err := calc.GetActualCost(context.Background(), req); err != nil {
 			t.Fatalf("cache hit under the limit: %v", err)
 		}
-		_, err := calc.GetActualCost(context.Background(), costRequest("AmazonEC2", "", start, end, nil))
+		req2 := costRequest("service-total", "", start, end, nil)
+		req2.Resource = &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:service", Id: "Amazon Elastic Compute Cloud - Compute"}
+		_, err := calc.GetActualCost(context.Background(), req2)
 		assertRateLimited(t, err)
 		if len(api.costCalls) != 1 {
 			t.Fatalf("endpoint calls = %d, want 1", len(api.costCalls))
@@ -266,7 +268,7 @@ func TestGetActualCost_RateLimit(t *testing.T) {
 		t.Parallel()
 		api := pagingCostAPI(5, false)
 		calc, _ := cachedCalc(t, api)
-		calc.maxRequestsPerMinute = 1
+		calc.maxRequestsPerMinute = 3
 		start, end := closedHistoryWindow()
 		_, err := calc.GetActualCost(context.Background(), costRequest("AmazonS3", "", start, end, nil))
 		assertRateLimited(t, err)

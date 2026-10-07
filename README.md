@@ -50,13 +50,13 @@ credential values into source files or logs.
 | `FINFOCUS_LOG_FILE` | Absolute log filename. Unset uses stderr | Unset |
 | `FINFOCUS_AWS_CE_MAX_BATCH_SIZE` | Batch limit, integer from 1 to 1000 | 100 |
 | `FINFOCUS_AWS_CE_BATCH_WORKERS` | Concurrent batch workers, integer from 1 to 50 | 10 |
-| `FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` | CE custom attempt budget per minute | Unlimited when unset or `0` |
+| `FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` | CE request attempt budget per minute | Unlimited when unset or `0` |
 
 For a log file in the current directory, set
 `FINFOCUS_LOG_FILE="$(pwd)/aws-ce.log"`. Empty batch settings use defaults.
 Invalid values stop startup and name the setting. Each custom request attempt,
-including retries, counts toward the request budget. AWS SDK transport retries
-are separate. Set `AWS_MAX_ATTEMPTS=1` to turn off those retries. Requests
+including discovery, pagination and retries, counts toward the request budget.
+The CE client turns off SDK retries and uses one budgeted retry loop. Requests
 safely share default client initialization. A failed initialization has a
 one-second retry delay.
 
@@ -75,24 +75,43 @@ An EC2 instance id consists of `i-` plus 8 to 17 lowercase hex characters.
 An instance id supplied as a bare id or instance ARN uses `GetCostAndUsageWithResources` and filters
 `RESOURCE_ID` by the bare id. This requires the account's resource-level
 Cost Explorer opt-in and covers the last 14 days. A non-EC2 ARN returns an
-explicit unsupported-resource error. Other ids, including `contract-*`, use
-unfiltered `GetCostAndUsage` grouped by service. Those are service totals,
-not attributed resource costs. Service queries cover the last 14 months.
+explicit unsupported-resource error. Unknown bare resource ids also return an
+error. To query totals, set `resource.provider` to `aws` and choose:
 
-Queries use Coordinated Universal Time dates, `DAILY` granularity, and an exclusive end date. The metric
-is `UnblendedCost`. The plugin uses `AmortizedCost` only when a returned group key names
-a reservation or Savings Plan and that metric exists. The actual-cost remote
-procedure call doesn't request those groups, so commitment fields stay unset.
-The plugin doesn't invent quantity or status or call reservation-utilization
-and Savings Plan coverage operations. Rows labelled "No resource ID" aren't
-a service total. The plugin ignores `GetActualCostRequest.tags` in v0.1.0.
+| `resource.resource_type` | `resource.id` | Query |
+| --- | --- | --- |
+| `aws:account` | Any non-empty account query label | All services visible to the credentials |
+| `aws:service` | Exact AWS Cost Explorer service name | That service only |
+
+The legacy `resource_id` value `aws-account-total` also selects account totals.
+The SDK still requires a non-empty `resource_id` when using a descriptor.
+Service and account queries cover the last 14 months.
+
+Queries use Coordinated Universal Time dates, `DAILY` granularity, and an exclusive end date. The
+plugin discovers reservation and Savings Plan ids with paginated
+`GetDimensionValues` calls. It queries each commitment through a dimension
+filter, then queries the remaining charges with those ids excluded. Each
+charge belongs to one partition. Commitment partitions use `AmortizedCost`
+when AWS returns it. Other charges use `UnblendedCost`. This also applies to
+EC2 resource queries. Commitment fields stay unset when AWS supplies no id.
+The plugin doesn't invent commitment quantity, status, or invoice details.
+
+Service and resource totals can contain incompatible usage types. The public
+remote procedure call omits usage amounts and units for these queries. It preserves the monetary
+cost. The client only requests usage quantities when a single `USAGE_TYPE`
+filter establishes a common unit. The plugin ignores `GetActualCostRequest.tags`
+in v0.1.0.
 
 Cost Explorer has a **24-hour data lag** or longer. Resource-level data may lag
 up to 48 hours. Missing data returns an explicit error. Recent or estimated
 results stay in the cache for 15 minutes. Closed historical results stay for 24 hours.
-Cache keys include the linked-account filter, so costs from different account
-queries stay separate.
-Each paginated CE request costs $0.01 in real use.
+Each calculator instance keeps its default cache in memory.
+The plugin doesn't reuse disk entries across sessions because the default
+credential chain doesn't establish a verified billing identity. Cache keys
+include the linked-account filter and the normalized Coordinated Universal Time API dates.
+Each CE request costs $0.01 in real use. A query without a cache hit needs at least two
+commitment discovery requests and one cost request. Each discovered commitment
+and each additional page adds requests. The request budget bounds this work.
 
 ## Spec compatibility and FOCUS
 

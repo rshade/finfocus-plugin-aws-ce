@@ -71,7 +71,7 @@ Each paginated Cost Explorer request costs $0.01 in real use.
 | Symptom | Action |
 | --- | --- |
 | Missing AWS region | Set `AWS_REGION=us-east-1` or configure your profile's region |
-| `PermissionDenied` | Grant `ce:GetCostAndUsage` and, for EC2, `ce:GetCostAndUsageWithResources` |
+| `PermissionDenied` | Grant `ce:GetDimensionValues`, `ce:GetCostAndUsage` and, for EC2, `ce:GetCostAndUsageWithResources` |
 | `Unauthenticated` | Refresh expired session credentials and include `AWS_SESSION_TOKEN` |
 | `InvalidArgument` with `ERROR_CODE_INVALID_CREDENTIALS` | Check supported key names, matching key pair, and role ARN |
 | Resource query has no data | Confirm resource opt-in, instance id, 14-day window and 24-to-48-hour data lag |

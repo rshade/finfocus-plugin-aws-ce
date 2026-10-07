@@ -3,6 +3,7 @@ package pricing
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"math/big"
@@ -15,6 +16,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
+	"github.com/rshade/finfocus-plugin-aws-ce/internal/version"
 	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
 	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
 	"google.golang.org/grpc/codes"
@@ -27,6 +29,7 @@ type Calculator struct {
 	*pluginsdk.BasePlugin
 	ceClient      *client.Client
 	cache         *CacheManager
+	cacheScope    string
 	logger        zerolog.Logger
 	clientMu      sync.Mutex
 	clientInitErr error
@@ -47,8 +50,7 @@ var (
 )
 
 const (
-	pluginName    = "aws-ce"
-	pluginVersion = "0.1.0"
+	pluginName = "aws-ce"
 	// specVersion must keep the leading v. pluginsdk.ValidateSpecVersion rejects "0.7.0".
 	specVersion   = "v0.7.5"
 	supportedRPCs = "GetActualCost,Supports,GetPluginInfo,BatchCost"
@@ -65,7 +67,7 @@ func NewCalculator() *Calculator {
 	}
 
 	// Initialize cache with default settings
-	cm, _ := NewCacheManager("", 24*time.Hour)
+	cm := newMemoryCacheManager(24 * time.Hour)
 
 	// Configure logger with component field
 	logger := log.With().Str("component", "finfocus-plugin-aws-ce").Logger()
@@ -74,6 +76,7 @@ func NewCalculator() *Calculator {
 		BasePlugin:           base,
 		ceClient:             nil, // Will be initialized lazily
 		cache:                cm,
+		cacheScope:           rand.Text(),
 		logger:               logger,
 		maxRequestsPerMinute: maxRequestsPerMinuteFromEnv(),
 	}
@@ -95,7 +98,7 @@ func (c *Calculator) GetPluginInfo(ctx context.Context, _ *pbc.GetPluginInfoRequ
 
 	return &pbc.GetPluginInfoResponse{
 		Name:        pluginName,
-		Version:     pluginVersion,
+		Version:     version.Version,
 		SpecVersion: specVersion,
 		Providers:   []string{"aws"},
 		Metadata: map[string]string{
@@ -130,30 +133,22 @@ func (c *Calculator) Supports(ctx context.Context, req *pbc.SupportsRequest) (*p
 		response.Reason = invalidResourceReason("resource descriptor is required")
 	case resource.GetProvider() != "aws":
 		response.Reason = fmt.Sprintf("provider %q is not supported; aws-ce only supports provider \"aws\"", resource.GetProvider())
-	case awsResourceIdentified(resource):
-		response.Supported = true
 	default:
-		response.Reason = invalidResourceReason("aws resource needs a non-empty id or an ARN ParseARN accepts")
+		plan, err := c.planCostQuery(logger, &pbc.GetActualCostRequest{Resource: resource})
+		if err != nil {
+			response.Reason = invalidResourceReason(status.Convert(err).Message())
+		} else {
+			response.Supported = true
+			if plan.resourceLevel {
+				response.Reason = "EC2 resource costs require Cost Explorer resource-level opt-in and cover the last 14 days"
+			}
+		}
 	}
 	return response, nil
 }
 
 func invalidResourceReason(detail string) string {
 	return pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE.String() + ": " + detail
-}
-
-// awsResourceIdentified is true when Arn parses or Id is non-empty.
-// A malformed ARN does not reject a resource that still has an Id.
-func awsResourceIdentified(resource *pbc.ResourceDescriptor) bool {
-	if resource.GetId() != "" {
-		return true
-	}
-	arn := resource.GetArn()
-	if arn == "" {
-		return false
-	}
-	_, err := ParseARN(arn)
-	return err == nil
 }
 
 // initClient initializes the Cost Explorer client if not already done.
@@ -236,7 +231,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 		return nil, status.Errorf(codes.Internal, "client initialization failed: %v", err)
 	}
 
-	cacheKey := actualCostCacheKey(plan, req)
+	cacheKey := c.cacheScope + ":" + actualCostCacheKey(plan, req)
 	if !perRequest && c.cache != nil {
 		if entry, ok := c.cache.getEntry(cacheKey); ok {
 			logger.Info().Int("ce_requests", 0).Msg("Cache hit for cost query")
@@ -246,9 +241,13 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 
 	var clientCosts []client.CostResult
 	if plan.resourceLevel {
-		clientCosts, err = ce.GetCostWithResources(ctx, plan.resourceID, plan.accountID, startTime, endTime)
+		clientCosts, err = ce.GetAttributedCostWithResources(ctx, plan.resourceID, plan.accountID, startTime, endTime)
 	} else {
-		clientCosts, err = ce.GetCost(ctx, nil, []string{"SERVICE"}, startTime, endTime, cacheGranularity)
+		var filter *types.Expression
+		if plan.serviceName != "" {
+			filter = &types.Expression{Dimensions: &types.DimensionValues{Key: types.DimensionService, Values: []string{plan.serviceName}}}
+		}
+		clientCosts, err = ce.GetAttributedCost(ctx, filter, startTime, endTime, cacheGranularity)
 	}
 	if err != nil {
 		if errors.Is(err, client.ErrRateLimited) {
@@ -302,6 +301,7 @@ type costQueryPlan struct {
 	resourceID    string
 	accountID     string
 	cacheID       string
+	serviceName   string
 }
 
 // ec2InstanceIDPattern is an EC2 instance id: 8 to 17 lowercase hex characters.
@@ -319,7 +319,27 @@ func (c *Calculator) planCostQuery(logger zerolog.Logger, req *pbc.GetActualCost
 		plan.cacheID = id
 	}
 	if arn == "" {
-		return plan, nil
+		resource := req.GetResource()
+		switch resource.GetResourceType() {
+		case "aws:account":
+			if resourceID != "" {
+				plan = costQueryPlan{cacheID: "account-total"}
+				return plan, nil
+			}
+		case "aws:service":
+			if resourceID != "" {
+				plan = costQueryPlan{cacheID: "service:" + resourceID, serviceName: resourceID}
+				return plan, nil
+			}
+		}
+		if plan.resourceLevel {
+			return plan, nil
+		}
+		if resourceID == "aws-account-total" {
+			plan.cacheID = "account-total"
+			return plan, nil
+		}
+		return costQueryPlan{}, statusWithDetail(codes.InvalidArgument, "resource-level costs require an EC2 instance id; use aws:account or aws:service for explicit totals", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
 	}
 	parsed, err := ParseARN(arn)
 	if err != nil {
@@ -330,8 +350,7 @@ func (c *Calculator) planCostQuery(logger zerolog.Logger, req *pbc.GetActualCost
 			logger.Warn().Err(err).Str("arn", arn).Str("resource_id", plan.resourceID).
 				Msg("Malformed ARN; using ResourceId as the EC2 instance id")
 		} else {
-			logger.Warn().Err(err).Str("arn", arn).Str("resource_id", resourceID).
-				Msg("Malformed ARN; ResourceId is not an EC2 instance id, querying service totals")
+			return costQueryPlan{}, statusWithDetail(codes.InvalidArgument, "malformed ARN without a usable EC2 instance id", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
 		}
 		return plan, nil
 	}

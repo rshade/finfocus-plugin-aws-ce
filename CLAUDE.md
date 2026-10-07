@@ -9,11 +9,14 @@ code in this repository.
 make build      # Build plugin binary to bin/finfocus-plugin-aws-ce
 make test       # Run all tests
 make lint       # Run golangci-lint
-make install    # Build and install to ~/.finfocus/plugins/aws-ce/1.0.0/
+make install    # Build and install to ~/.finfocus/plugins/aws-ce/0.1.0/
 make fmt        # Format code with go fmt
 make ensure     # Update dependencies (alias for deps)
 make deps       # Update dependencies (go mod tidy && go mod download)
 ```
+
+Installation uses the version in `manifest.json`, whose value is `0.1.0`. Override
+`PLUGIN_VERSION` or `FINFOCUS_HOME` when using another registry directory.
 
 Run a single test:
 
@@ -55,7 +58,7 @@ The plugin uses standardized SDK helpers for configuration and logging:
 // Initialize logger using SDK helpers
 logWriter := pluginsdk.NewLogWriter()
 level := parseLogLevel(pluginsdk.GetLogLevel())
-logger := pluginsdk.NewPluginLogger("aws-ce", "0.1.0", level, logWriter)
+logger := pluginsdk.NewPluginLogger("aws-ce", version.Version, level, logWriter)
 
 
 ```
@@ -89,13 +92,13 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 
 ### Testing pattern
 
-Uses `pluginsdk.NewTestPlugin(t, plugin)` for integration tests:
+Integration tests build the plugin and query its real gRPC server through
+`internal/testutil.StartPlugin`. The custom checks in `test/conformance` cover
+protocol validation and use `pluginsdk.ValidateFocusRecord` for FOCUS records.
+The repository doesn't run the upstream SDK conformance suite.
 
-```go
-testPlugin := pluginsdk.NewTestPlugin(t, plugin)
-testPlugin.TestName("aws-ce")
-testPlugin.TestProjectedCost(resource, expectError)
-testPlugin.TestActualCost(resourceID, from, to, expectError)
+```bash
+make test-integration
 ```
 
 ## Dependencies

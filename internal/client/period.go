@@ -9,10 +9,10 @@ import (
 
 const ec2ComputeService = "Amazon Elastic Compute Cloud - Compute"
 
-// costExplorerPeriod converts instants into Cost Explorer dates.
+// CostExplorerPeriod converts instants into Cost Explorer dates.
 // Start is the UTC calendar day of start. End is exclusive: midnight UTC stays
 // on that day, and any later time on a UTC day uses the next day.
-func costExplorerPeriod(start, end time.Time) (string, string, error) {
+func CostExplorerPeriod(start, end time.Time) (string, string, error) {
 	start = start.UTC()
 	end = end.UTC()
 	if !end.After(start) {
@@ -27,7 +27,7 @@ func costExplorerPeriod(start, end time.Time) (string, string, error) {
 }
 
 func dateInterval(start, end time.Time) (*types.DateInterval, error) {
-	startDate, endDate, err := costExplorerPeriod(start, end)
+	startDate, endDate, err := CostExplorerPeriod(start, end)
 	if err != nil {
 		return nil, err
 	}
