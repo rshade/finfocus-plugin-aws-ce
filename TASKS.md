@@ -1330,3 +1330,11 @@ fixtures for denied live data. No resources or IAM policies are changed.
 **Description:** Enforce CE-R.5 live-check request bounds for service and
 resource queries. Check the budget before each custom retry attempt. AWS SDK
 transport retries are separately disabled for the opt-in live check.
+
+### CE-R.7: Format the recorded Pulumi environment name
+
+**Status:** DONE, `vale docs/AWS-VERIFICATION.md && markdownlint-cli2 docs/AWS-VERIFICATION.md TASKS.md`, exit 0; break check: plain-text aws in the recorded environment name triggered Vale.Terms; inline-code identifier has zero errors.
+
+Use inline code for the environment identifier so Vale treats it as a literal
+name. This corrects documentation lint after CE-R.5 without changing the live
+check or its captured AWS evidence.

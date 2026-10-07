@@ -72,7 +72,7 @@ rows. Synthetic comparison data is separate from live AWS evidence.
 
 ## Recorded verification
 
-On 2026-10-06, tailscale-phase-2/aws-oidc supplied a valid AWS identity. The
+On 2026-10-06, `tailscale-phase-2/aws-oidc` supplied a valid AWS identity. The
 initial role policy denied GetCostAndUsage, and the plugin returned
 PermissionDenied. The owner granted Cost Explorer read permission. A rerun
 then matched nine service totals for 2026-09-27 through 2026-10-04, including
