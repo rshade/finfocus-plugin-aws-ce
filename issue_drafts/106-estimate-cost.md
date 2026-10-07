@@ -1,34 +1,34 @@
-# Issue: Research - EstimateCost (What-If) (#106)
+# Cost estimates before deployment, issue 106
 
-**Status:** Researching
-**Type:** Feature
-**Priority:** Low (Strategic)
+**Status:** researching
+**Type:** feature
+**Priority:** low, strategic
 
-## User Story
+## User story
 
-As a developer, I want to estimate the cost of a resource *before* I deploy it (Shift-Left), using official AWS list prices.
+A developer needs to estimate resource costs before deployment using official AWS list prices.
 
-## Technical Thesis
+## Technical approach
 
-Implement the `EstimateCost` RPC by utilizing the AWS Pricing API (Price List Service) via `pricing:GetProducts`.
+Implement the `EstimateCost` remote procedure call through the Price List Service in the AWS Pricing API and `pricing:GetProducts`.
 
-### API Mapping
+### API mapping
 
-* **RPC:** `EstimateCost`
-* **AWS API:** `pricing.GetProducts`
-* **Logic:**
-    1. Extract attributes from `ResourceDescriptor` (e.g., `instanceType`, `region`, `operatingSystem`).
-    2. Query `GetProducts` with these filters.
-    3. Parse the returned JSON (Price List) to find the On-Demand price.
+- **Remote procedure call:** `EstimateCost`.
+- **AWS API:** `pricing.GetProducts`.
+- **Processing steps:**
+  1. Extract attributes from `ResourceDescriptor`, such as `instanceType`, `region`, and `operatingSystem`.
+  2. Query `GetProducts` with these filters.
+  3. Parse the returned price list JSON to find the on-demand price.
 
-## Boundary Guardrails (Hard Constraints)
+## Constraints
 
-1. **No Local Database:** We do not download the huge `index.json` price file. We must query the API live or cache specific SKUs.
-2. **Accuracy:** Disclaimer required: "This is a List Price estimate. It does not include your EDP discounts, Savings Plans, or Spot fluctuations."
-3. **Complexity:** Limit initial support to EC2 and RDS. Complex pricing (e.g., Lambda request tiers, S3 storage classes) is out of scope for v1.
+1. Query the API live or cache specific stock keeping units. Don't download the full `index.json` price file.
+2. Include this qualification: this list price estimate excludes enterprise discount program discounts, Savings Plans, and Spot price fluctuations.
+3. Limit initial support to EC2 and RDS. Version 1 excludes complex pricing. Examples include Lambda request tiers and S3 storage classes.
 
-## Research Tasks
+## Research tasks
 
-* [ ] Verify latency of `GetProducts` for a simple EC2 query.
-* [ ] Confirm if we can query by `sku` if the Core provides it.
-* [ ] Assess the complexity of parsing the "Terms" JSON blob from the Pricing API.
+- [ ] Measure `GetProducts` latency for a simple EC2 query.
+- [ ] Check whether the plugin can query by `sku` when the core provides it.
+- [ ] Assess the complexity of parsing the `Terms` JSON object from the Pricing API.

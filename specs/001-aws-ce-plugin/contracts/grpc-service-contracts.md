@@ -307,4 +307,4 @@ enum Granularity {
 - **Authentication**: AWS credentials via standard SDK chain only
 - **Authorization**: Read-only ce:GetCostAndUsage permission required
 - **Input Validation**: Reject malformed ResourceDescriptor gracefully
-- **Logging**: No credentials or secrets in logs or responses
+- **Logging**: no credentials or secrets in logs or responses

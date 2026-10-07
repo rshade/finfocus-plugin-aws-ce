@@ -1,29 +1,29 @@
-# Issue: Feature - Reserved Instance Recommendations (#109)
+# Reserved Instance recommendations, issue 109
 
-**Status:** Researching
-**Type:** Feature
-**Priority:** Low (Legacy)
+**Status:** researching
+**Type:** feature
+**Priority:** low, legacy
 
-## User Story
+## User story
 
-As a cloud admin, I want to see recommendations for Reserved Instances (RIs) for services that do not yet support Savings Plans (e.g., RDS, ElastiCache, Redshift, OpenSearch).
+A cloud administrator needs Reserved Instance recommendations for services without Savings Plans support, such as RDS, ElastiCache, Redshift, and OpenSearch.
 
-## Technical Thesis
+## Technical approach
 
-Implement the `GetRecommendations` RPC (scoped to `ReservedInstances`) by proxying `costexplorer.GetReservationPurchaseRecommendation`.
+Implement the `GetRecommendations` remote procedure call for `ReservedInstances` as a proxy for `costexplorer.GetReservationPurchaseRecommendation`.
 
-### API Mapping
+### API mapping
 
-* **RPC:** `GetRecommendations` (Filter: `RECOMMENDATION_TYPE_RESERVATION`)
-* **AWS API:** `costexplorer.GetReservationPurchaseRecommendation`
-* **Scope:** RDS, Redshift, ElastiCache, OpenSearch (ES).
+- **Remote procedure call:** `GetRecommendations`, with the `RECOMMENDATION_TYPE_RESERVATION` filter.
+- **AWS API:** `costexplorer.GetReservationPurchaseRecommendation`.
+- **Scope:** RDS, Redshift, ElastiCache, and OpenSearch, identified as `ES`.
 
-## Boundary Guardrails
+## Constraints
 
-1. **No Logic:** We simply pipe the AWS recommendation.
-2. **Exclusion:** Do NOT return EC2 RI recommendations if Savings Plans are preferred (User config might be needed, or just return everything AWS gives).
+1. Forward AWS recommendations without additional calculations.
+2. Exclude EC2 Reserved Instance recommendations when the user prefers Savings Plans. Research whether this requires user configuration or whether the plugin should return all AWS recommendations.
 
-## Acceptance Criteria
+## Acceptance criteria
 
-* [ ] Returns RI recommendations for RDS and other non-compute services.
-* [ ] correctly maps the specific service (e.g., "AmazonRDS") to the recommendation record.
+- [ ] Return Reserved Instance recommendations for RDS and other non-compute services.
+- [ ] Map each service, such as `AmazonRDS`, to the recommendation record.

@@ -134,4 +134,4 @@
 - GitHub repository with Actions enabled
 - Go 1.25.5 available in GitHub Actions runners
 - goreleaser, golangci-lint, release-please actions available
-- Write permissions for releases and contents (for automated releases)
+- Write permissions for releases and contents to automate releases

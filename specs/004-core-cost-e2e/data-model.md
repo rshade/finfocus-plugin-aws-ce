@@ -434,7 +434,7 @@ type WarningLog struct {
 
 ### 4.3 Warning Scenarios
 
-#### Scenario 1: No data found
+#### Scenario 1: no data found
 
 ```go
 c.logger.Warn().
@@ -452,7 +452,7 @@ return &pbc.GetActualCostResponse{
 }, nil
 ```
 
-#### Scenario 2: Identifier mismatch
+#### Scenario 2: identifier mismatch
 
 ```go
 c.logger.Warn().
@@ -466,7 +466,7 @@ c.logger.Warn().
 // Continue with ARN-based resource ID
 ```
 
-#### Scenario 3: Cache write failure
+#### Scenario 3: cache write failure
 
 ```go
 if err := c.cache.Set(cacheKey, costs); err != nil {

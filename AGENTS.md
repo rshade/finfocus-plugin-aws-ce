@@ -1,15 +1,15 @@
-# finfocus-plugin-aws-ce Development Guidelines
+# `finfocus-plugin-aws-ce` development guidelines
 
-Auto-generated from all feature plans. Last updated: 2025-12-10
+Feature plans provide these guidelines. Last updated: 2025-12-10
 
-## Active Technologies
+## Active technologies
 
-- Go 1.25.5 + goreleaser (for cross-platform binary builds), golangci-lint v2.6.2 (for code quality), release-please (for automated versioning), GitHub Actions (for CI/CD workflows) (001-cicd-infrastructure)
-- N/A (configuration and documentation files only) (001-cicd-infrastructure)
+- `001-cicd-infrastructure` uses Go 1.25.5, `goreleaser` for cross-platform binary builds, `golangci-lint` v2.6.2 for code quality, `release-please` for automated versioning, and GitHub Actions for continuous integration and delivery workflows.
+- `001-cicd-infrastructure` changes configuration and documentation files only.
 
-- Go 1.25.5 + github.com/rshade/finfocus-spec (FinFocus plugin SDK), github.com/aws/aws-sdk-go-v2 (AWS SDK for Cost Explorer API) (001-aws-ce-plugin)
+- `001-aws-ce-plugin` uses Go 1.25.5, `github.com/rshade/finfocus-spec` for the FinFocus plugin SDK, and `github.com/aws/aws-sdk-go-v2` for the AWS Cost Explorer API SDK.
 
-## Project Structure
+## Project structure
 
 ```text
 src/
@@ -18,84 +18,92 @@ tests/
 
 ## Commands
 
-- `make test`: Run all tests
-- `make lint`: Run linters
-- `make build`: Build the plugin binary
-- `make ensure`: Update dependencies
-- `make install`: Install plugin to local registry
+- `make test`: run all tests
+- `make lint`: run linters
+- `make build`: build the plugin binary
+- `make ensure`: update dependencies
+- `make install`: install plugin to local registry
 
-## Code Style
+## Code style
 
-Go 1.25.5: Follow standard conventions
+Go 1.25.5: follow standard conventions
 
-## Recent Changes
+## Recent changes
 
-- 001-cicd-infrastructure: Added Go 1.25.5 + goreleaser (for cross-platform binary builds), golangci-lint v2.6.2 (for code quality), release-please (for automated versioning), GitHub Actions (for CI/CD workflows)
+- `001-cicd-infrastructure` added Go 1.25.5, `goreleaser` for cross-platform binary builds, `golangci-lint` v2.6.2 for code quality, `release-please` for automated versioning, and GitHub Actions for continuous integration and delivery workflows.
 
-- 001-aws-ce-plugin: Added Go 1.25.5 + github.com/rshade/finfocus-spec (FinFocus plugin SDK), github.com/aws/aws-sdk-go-v2 (AWS SDK for Cost Explorer API)
+- `001-aws-ce-plugin` added Go 1.25.5, `github.com/rshade/finfocus-spec` for the FinFocus plugin SDK, and `github.com/aws/aws-sdk-go-v2` for the AWS Cost Explorer API SDK.
 
-## Roadmap & Active Issues
+## Roadmap and active issues
 
-The project is currently executing against the following milestones and issues:
+The project follows these milestones and issues:
 
-### v0.1.0 - Foundation & CI/CD
+### Foundation and continuous integration and delivery for v0.1.0
 
-- **Issue #6**: Update Dependencies & Refactor for SDK Compliance (Spec v0.5.2, SDK helpers, Zerolog).
-- **Issue #7**: Establish CI/CD Infrastructure (Workflows, Goreleaser, release-please).
-- **Issue #11**: Implement Core Cost Plugin (Spec 001) & E2E Testing (AWS Integration, CI Secrets).
-- **Issue #12**: Polish: Installation & Documentation (Makefile version fix, README rewrite).
+- **Issue #6**: update dependencies and refactor for SDK compliance with spec v0.5.2, SDK helpers, and `zerolog`.
+- **Issue #7**: establish continuous integration and delivery infrastructure with workflows, `goreleaser`, and `release-please`.
+- **Issue #11**: implement the core cost plugin from spec 001 and end-to-end testing with AWS integration and workflow secrets.
+- **Issue #12**: polish installation and documentation with a `Makefile` version fix and a `README` rewrite.
 
-### v0.2.0 - Core Features
+### Core features for v0.2.0
 
-- **Issue #8**: Feature: AWS Budgets Support (New Spec, `getbudgets` RPC).
-- **Issue #9**: Feature: Cost Forecasting (New Spec, `GetProjectedCost` RPC).
-- **Issue #10**: Feature: Anomaly Detection (New Spec, Anomaly logic).
+- **Issue #8**: add AWS Budgets support with a new spec and the `getbudgets` remote procedure call.
+- **Issue #9**: add cost forecasting with a new spec and the `GetProjectedCost` remote procedure call.
+- **Issue #10**: add anomaly detection with a new spec and anomaly logic.
 
-### v0.3.0 - Advanced Features
+### Advanced features for v0.3.0
 
-- **Issue #13**: Feature: Optimization Recommendations (Rightsizing, Savings Plans).
+- **Issue #13**: add optimization recommendations for rightsizing and Savings Plans.
 
-## Context for Next Agent
+## Context for the next agent
 
-- **product.md**: Contains the master plan and analysis.
-- **specs/**: Contains the completed `001-aws-ce-plugin/spec.md`. New specs should be created in this directory as per the issues above.
-- **Refactoring**: Be mindful of `pluginsdk` helpers (`env`, `mapping`) and `zerolog` when touching any code.
+- `product.md` contains the master plan and analysis.
+- `specs/` contains the completed `001-aws-ce-plugin/spec.md`. Create new specs in this directory for the roadmap issues.
+- **Refactoring**: use the `env` and `mapping` helpers in `pluginsdk`, and use `zerolog` when touching any code.
 
-## Plugin SDK Reference (v0.5.2)
+## Plugin SDK reference for v0.5.2
 
-The `pluginsdk` package (`github.com/rshade/finfocus-spec/sdk/go/pluginsdk`) provides standardized helpers that **MUST** be used.
+The `pluginsdk` package at `github.com/rshade/finfocus-spec/sdk/go/pluginsdk`
+provides standardized helpers. You must use these helpers.
 
-### 1. Environment Variables (`env.go`)
+### 1. Environment variables
 
-- **Usage**: Replace manual `os.Getenv` calls.
-- `GetPort()`: `FINFOCUS_PLUGIN_PORT`
-- `GetLogLevel()`: `FINFOCUS_LOG_LEVEL`
-- `GetLogFile()`: `FINFOCUS_LOG_FILE` (Absolute path)
-- `IsTestMode()`: `FINFOCUS_TEST_MODE == "true"`
+Use the helpers in `env.go` to replace manual `os.Getenv` calls.
 
-### 2. Validation (`validation.go`)
+- `GetPort()` reads `FINFOCUS_PLUGIN_PORT`.
+- `GetLogLevel()` reads `FINFOCUS_LOG_LEVEL`.
+- `GetLogFile()` reads `FINFOCUS_LOG_FILE`, an absolute path.
+- `IsTestMode()` checks `FINFOCUS_TEST_MODE == "true"`.
 
-- **Usage**: Call at the start of RPC handlers.
+### 2. Validation
+
+Call the helpers in `validation.go` at the start of remote procedure call handlers.
+
 - `ValidateProjectedCostRequest(req)`
 - `ValidateActualCostRequest(req)`
-- Returns pre-defined errors (e.g., `ErrActualCostTimeRangeInvalid`).
 
-### 3. FOCUS 1.2 Builder (`focus_builder.go`)
+These helpers return predefined errors, such as `ErrActualCostTimeRangeInvalid`.
 
-- **Usage**: Constructing `FocusCostRecord`s for `GetActualCost`.
+### 3. FOCUS 1.2 builder
+
+Use `focus_builder.go` to construct `FocusCostRecord` values for `GetActualCost`.
+
 - `NewFocusRecordBuilder().WithIdentity(...).WithFinancials(...).Build()`
-- Ensures compliance with FinOps FOCUS 1.2 schema.
 
-### 4. Logging (`logging.go`)
+The builder ensures compliance with the FinOps FOCUS 1.2 schema.
 
-- **Usage**: Structured Zerolog setup.
-- `NewLogWriter()`: Returns writer for `FINFOCUS_LOG_FILE`.
-- `NewPluginLogger(name, version, level, writer)`: Creates standard logger.
-- `LogOperation(logger, "OperationName")`: returns a done function to defer for timing.
+### 4. Logging
 
-### 5. Server & Flags (`sdk.go`)
+Use `logging.go` to set up structured logging with `zerolog`.
 
-- **Usage**: Main entry point.
-- `ParsePortFlag()`: Parses `--port` (call `flag.Parse()` first).
-- `Serve(ctx, config)`: Starts gRPC server.
-- **Interfaces**: Implement `BudgetsProvider` and `RecommendationsProvider` for new features.
+- `NewLogWriter()` returns a writer for `FINFOCUS_LOG_FILE`.
+- `NewPluginLogger(name, version, level, writer)` creates a standard logger.
+- `LogOperation(logger, "OperationName")` returns a function to defer for timing.
+
+### 5. Server and flags
+
+Use `sdk.go` for the main entry point.
+
+- `ParsePortFlag()` parses `--port`. Call `flag.Parse()` first.
+- `Serve(ctx, config)` starts the gRPC server.
+- Implement `BudgetsProvider` and `RecommendationsProvider` for new features.

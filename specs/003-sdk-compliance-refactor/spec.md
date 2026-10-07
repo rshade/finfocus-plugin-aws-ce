@@ -89,13 +89,13 @@ As an operator managing plugin lifecycle, I want the plugin to shut down cleanly
 
 ### Functional Requirements
 
-#### Environment Variables
+#### Environment variables
 
 - **FR-001**: Plugin MUST read port configuration from `FINFOCUS_PLUGIN_PORT` environment variable using SDK helpers.
 - **FR-002**: Plugin MUST read log file path from `FINFOCUS_LOG_FILE` environment variable using SDK helpers.
 - **FR-003**: Plugin MUST read log level from `FINFOCUS_LOG_LEVEL` environment variable using SDK helpers.
 
-#### CLI Flags
+#### Command-line flags
 
 - **FR-004**: Plugin MUST support `--port` CLI flag for specifying the gRPC server port.
 - **FR-005**: CLI flag values MUST take precedence over environment variable values when both are specified.

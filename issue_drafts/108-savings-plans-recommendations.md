@@ -1,31 +1,31 @@
-# Issue: Feature - Savings Plans Recommendations (#108)
+# Savings Plans recommendations, issue 108
 
-**Status:** Researching
-**Type:** Feature
-**Priority:** Medium
+**Status:** researching
+**Type:** feature
+**Priority:** medium
 
-## User Story
+## User story
 
-As a FinOps lead, I want to see AWS-generated Savings Plans purchase recommendations to cover my steady-state usage.
+A FinOps lead needs AWS Savings Plans purchase recommendations to cover steady-state usage.
 
-## Technical Thesis
+## Technical approach
 
-Implement the `GetRecommendations` RPC (scoped to `SavingsPlans`) by proxying `costexplorer.GetSavingsPlansPurchaseRecommendation`.
+Implement the `GetRecommendations` remote procedure call for `SavingsPlans` as a proxy for `costexplorer.GetSavingsPlansPurchaseRecommendation`.
 
-### API Mapping
+### API mapping
 
-* **RPC:** `GetRecommendations` (Filter: `RECOMMENDATION_TYPE_SAVINGS_PLAN`)
-* **AWS API:** `costexplorer.GetSavingsPlansPurchaseRecommendation`
-* **Inputs:** Requires `LookbackPeriodInDays` (7, 30, 60) and `SavingsPlansType` (Compute, EC2, SageMaker). We should expose these via the request or default to standard values (e.g., 30 days, Compute).
+- **Remote procedure call:** `GetRecommendations`, with the `RECOMMENDATION_TYPE_SAVINGS_PLAN` filter.
+- **AWS API:** `costexplorer.GetSavingsPlansPurchaseRecommendation`.
+- **Inputs:** `LookbackPeriodInDays`, which accepts 7, 30, or 60 days, and `SavingsPlansType`, which accepts Compute, EC2, or SageMaker. Expose these through the request or use standard defaults of 30 days and Compute.
 
-## Boundary Guardrails
+## Constraints
 
-1. **No Financial Advice:** We rely entirely on AWS's calculated "ROI" and "Break-even months".
-2. **Parameters:** If the User doesn't specify a lookback period, default to AWS defaults (usually 7 or 30 days).
-3. **Complexity:** Handle the complex nested structure of `SavingsPlansPurchaseRecommendation` (which includes hourly usage details) by flattening it to the summary level for v1.
+1. Use only AWS calculations for return on investment and months to break even.
+2. Use AWS defaults when the user omits a lookback period. Defaults usually span 7 or 30 days.
+3. Flatten the nested `SavingsPlansPurchaseRecommendation` structure, including hourly usage details, to a summary for version 1.
 
-## Acceptance Criteria
+## Acceptance criteria
 
-* [ ] Returns Compute Savings Plans recommendations.
-* [ ] Returns EC2 Instance Savings Plans recommendations.
-* [ ] Maps "Estimated Monthly Savings" and "Upfront Cost" correctly.
+- [ ] Return Compute Savings Plans recommendations.
+- [ ] Return EC2 Instance Savings Plans recommendations.
+- [ ] Map estimated monthly savings and upfront cost correctly.

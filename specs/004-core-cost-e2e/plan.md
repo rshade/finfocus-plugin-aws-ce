@@ -19,20 +19,24 @@ Implement the core AWS Cost Explorer integration for the PulumiCost plugin, enab
 **Project Type**: Single (Go plugin)
 **Performance Goals**:
 
-- Plugin startup: < 500ms
-- PORT announcement: < 1s
-- GetActualCost() RPC: < 10s for 30-day ranges
-- E2E test execution: < 2min with 7-day max queries
+- Plugin startup in less than 500 milliseconds
+- Port announcement in less than 1 second
+- `GetActualCost()` remote procedure calls in less than 10 seconds for 30-day ranges
+- End-to-end test execution in less than 2 minutes with queries spanning up to 7 days
+
 **Constraints**:
-- gRPC protocol compliance (must not break CostSourceService interface)
-- AWS Cost Explorer API rate limits (caching required)
-- Memory bounded operation (pagination for large result sets)
-- 24-hour cache TTL with manual invalidation support
-- Exponential backoff retry (3 attempts max) for network failures
-**Scale/Scope**:
-- Support 100+ concurrent RPC calls
-- Handle multi-account AWS cost queries
-- E2E tests limited to 7-day date ranges (cost/time optimization)
+
+- Preserve the gRPC `CostSourceService` interface
+- Cache responses to respect AWS Cost Explorer API rate limits
+- Bound memory usage through pagination of large result sets
+- Use a 24-hour cache lifetime with manual invalidation support
+- Retry network failures with exponential backoff, with up to 3 attempts
+
+**Scale and scope**:
+
+- Support at least 100 concurrent remote procedure calls
+- Handle AWS cost queries across accounts
+- Limit end-to-end tests to 7-day date ranges to reduce cost and execution time
 
 ## Constitution Check
 

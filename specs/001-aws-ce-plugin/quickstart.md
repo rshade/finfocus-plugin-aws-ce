@@ -227,4 +227,4 @@ aws ce get-cost-and-usage --time-period Start=2024-12-01,End=2024-12-02 --granul
 
 - **Issues**: GitHub repository issues
 - **Documentation**: Full API reference in `/specs/001-aws-ce-plugin/contracts/`
-- **Logs**: Check plugin stderr output for detailed error information
+- **Logs**: check plugin stderr output for detailed error information

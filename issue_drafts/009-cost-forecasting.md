@@ -1,37 +1,37 @@
-# Issue: Feature - Cost Forecasting (#9)
+# Cost forecasting, issue 9
 
-**Status:** Planned
-**Type:** Feature
-**Priority:** High
+**Status:** planned
+**Type:** feature
+**Priority:** high
 
-## User Story
+## User story
 
-As a FinOps practitioner, I want to see projected costs for the coming months directly in FinFocus, so that I can anticipate budget overruns without leaving my workflow.
+A FinOps practitioner needs projected costs for the coming months in FinFocus to anticipate budget overruns.
 
-## Technical Thesis
+## Technical approach
 
-Implement the `GetProjectedCost` RPC by acting as a direct proxy to the AWS Cost Explorer `GetCostForecast` API.
+Implement the `GetProjectedCost` remote procedure call as a direct proxy for the AWS Cost Explorer `GetCostForecast` API.
 
-### API Mapping
+### API mapping
 
-* **RPC:** `GetProjectedCost(GetProjectedCostRequest)`
-* **AWS API:** `costexplorer.GetCostForecast`
-* **Input Mapping:**
-  * `Request.StartTime` / `Request.EndTime` -> `TimePeriod` (Start/End)
-  * `Request.Granularity` -> `Granularity` (DAILY/MONTHLY only)
-  * `Request.Filter` -> `Filter` (Service, Region, Tag)
+- **Remote procedure call:** `GetProjectedCost(GetProjectedCostRequest)`.
+- **AWS API:** `costexplorer.GetCostForecast`.
+- **Input mapping:**
+  - `Request.StartTime` and `Request.EndTime` to `TimePeriod` for the start and end dates.
+  - `Request.Granularity` to `Granularity`. Support only `DAILY` and `MONTHLY`.
+  - `Request.Filter` to `Filter`, for service, region, and tag.
 
-## Boundary Guardrails (Hard Constraints)
+## Constraints
 
-1. **No Internal Math:** We strictly forbid implementing custom forecasting algorithms (e.g., linear regression, moving averages).
-2. **API Limits:**
-    * If the user requests `HOURLY` granularity, return `codes.InvalidArgument` (AWS does not support it).
-    * If the user requests a date range > 3 months (Daily) or > 18 months (Monthly), return `codes.InvalidArgument`.
-3. **Error Handling:** If AWS returns `DataUnavailableException` (not enough historical data), return a clean gRPC error explaining why, rather than a zero value.
+1. Don't implement custom forecasting algorithms such as linear regression or moving averages.
+2. Enforce API limits:
+   - Return `codes.InvalidArgument` for `HOURLY` granularity, which AWS doesn't support.
+   - Return `codes.InvalidArgument` for ranges longer than 3 months with daily granularity or 18 months with monthly granularity.
+3. If AWS returns `DataUnavailableException` because historical data is insufficient, return a gRPC error that explains the cause instead of a zero value.
 
-## Acceptance Criteria
+## Acceptance criteria
 
-* [ ] `GetProjectedCost` returns valid forecasted values for DAILY granularity (up to 3 months).
-* [ ] `GetProjectedCost` returns valid forecasted values for MONTHLY granularity (up to 12 months).
-* [ ] Requests for HOURLY granularity return a clear "Not Supported" error.
-* [ ] Response includes the "Prediction Interval" (80% confidence) if available from AWS.
+- [ ] `GetProjectedCost` returns valid forecasts for `DAILY` granularity for up to 3 months.
+- [ ] `GetProjectedCost` returns valid forecasts for `MONTHLY` granularity for up to 12 months.
+- [ ] Requests for `HOURLY` granularity return a clear unsupported-granularity error.
+- [ ] Include the prediction interval at 80% confidence when AWS provides it.

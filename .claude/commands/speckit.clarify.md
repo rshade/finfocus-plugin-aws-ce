@@ -112,7 +112,7 @@ Execution steps:
        |--------|-------------|
        | A | `<Option A description>` |
        | B | `<Option B description>` |
-       | C | `<Option C description>` (add D/E as needed up to 5) |
+       | C | `<Option C description>` and add D/E as needed up to 5 |
        | Short | Provide a different short answer (<=5 words) (Include only if free-form alternative is appropriate) |
 
        - After the table, add: `You can reply with the option letter (e.g., "A"), accept the recommendation by saying "yes" or "recommended", or provide your own short answer.`

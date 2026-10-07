@@ -11,8 +11,8 @@ make install-local
 
 The installed path uses the version from `manifest.json`. Set `FINFOCUS_HOME`
 when using a separate FinFocus registry. Published releases provide archives
-for Linux, Darwin and Windows with `checksums.txt`; unpack the binary into the
-same versioned registry directory. For an unreleased source checkout, use the source build above.
+for Linux, Darwin, and Windows with `checksums.txt`. Unpack the binary into the
+same versioned registry directory. For an unreleased source checkout, use the preceding source build.
 
 ## Authenticate
 
@@ -38,7 +38,7 @@ resource-level opt-in before querying individual EC2 instances.
 Wait for `PORT=<assigned-port>` on standard output. The process accepts gRPC requests
 at that local port and emits structured logs on stderr. Ctrl+C or SIGTERM
 cancels the server and shuts it down. Use `--port 50051` for a fixed port.
-The CLI flag takes precedence over `FINFOCUS_PLUGIN_PORT`, including zero.
+The command-line flag takes precedence over `FINFOCUS_PLUGIN_PORT`, including zero.
 
 For normal use, let an installed FinFocus core discover and start the binary:
 
@@ -50,10 +50,10 @@ finfocus plugin validate --plugin aws-ce
 The repository includes [a sample Pulumi plan](../examples/plan.json) with
 synthetic EC2 identity values. Replace its id and ARN with an existing instance
 from your account before requesting live costs. A newly previewed resource
-has no billed usage yet. Choose UTC dates within the last 14 days and allow
+has no billed usage yet. Choose Coordinated Universal Time dates within the last 14 days and allow
 at least 24 hours for billing data, or up to 48 hours for resource-level data.
 
-For example, on Linux with GNU date:
+For example, on Linux with the `date` command from `GNU coreutils`:
 
 ```bash
 START_DATE=$(date -u -d '7 days ago' +%F)
@@ -62,8 +62,8 @@ finfocus cost actual --pulumi-json examples/plan.json --from "$START_DATE" --to 
 ```
 
 On macOS use `date -u -v-7d +%F` and `date -u -v-2d +%F` to assign those dates.
-The end date is exclusive. The core commands match the sibling core source;
-this run does not build or execute core or perform live-account verification.
+The end date is exclusive. The core commands match the sibling core source.
+This run doesn't build or execute core or perform live-account verification.
 Each paginated Cost Explorer request costs $0.01 in real use.
 
 ## Troubleshooting
@@ -73,15 +73,15 @@ Each paginated Cost Explorer request costs $0.01 in real use.
 | Missing AWS region | Set `AWS_REGION=us-east-1` or configure your profile's region |
 | `PermissionDenied` | Grant `ce:GetCostAndUsage` and, for EC2, `ce:GetCostAndUsageWithResources` |
 | `Unauthenticated` | Refresh expired session credentials and include `AWS_SESSION_TOKEN` |
-| `InvalidArgument` with `ERROR_CODE_INVALID_CREDENTIALS` | Check supported key names, matching key pair and role ARN |
+| `InvalidArgument` with `ERROR_CODE_INVALID_CREDENTIALS` | Check supported key names, matching key pair, and role ARN |
 | Resource query has no data | Confirm resource opt-in, instance id, 14-day window and 24-to-48-hour data lag |
-| Unsupported non-EC2 ARN | Resource attribution for that service is not implemented; do not substitute a guessed id |
+| Unsupported non-EC2 ARN | This service lacks resource attribution. Don't substitute a guessed id |
 | `ResourceExhausted` | Wait for the rate limit to reset or reduce CE page requests |
-| Projected RPC is `Unimplemented` | This release serves actual costs; use a plugin with projected-cost support |
+| `GetProjectedCost` returns `Unimplemented` | This release serves actual costs. Use a plugin with projected-cost support |
 | Invalid startup port or batch setting | Use port 0 to 65535 and the documented batch limits |
 
 The plugin returns explicit errors for invalid requests, missing data, AWS
-failures and unsupported resource queries. It does not turn failures into
+failures and unsupported resource queries. It doesn't turn failures into
 successful zero-cost responses.
 
 ## Verify without AWS access
@@ -93,5 +93,5 @@ FINFOCUS_E2E=true go test -count=1 -v ./test/e2e/...
 
 These commands use synthetic credentials and local fake CE endpoints. They
 prove the protocol and request handling, including a real server's discovery
-RPCs, actual costs and shutdown. They do not verify permissions or billed
-amounts for a real AWS account. No AWS account is needed for these tests.
+remote procedure calls, actual costs, and shutdown. They don't verify permissions or billed
+amounts for a real AWS account. These tests require no AWS account.

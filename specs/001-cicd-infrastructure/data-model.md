@@ -55,4 +55,4 @@ builds:
 ## State Management
 
 - Version tracking via .release-please-manifest.json
-- No persistent state required for CI/CD operations
+- Continuous integration and delivery need no persistent state

@@ -214,4 +214,4 @@ ResourceDescriptor ──┬─── DateRange ───┬─── CostQuery 
 - **No AWS Credentials**: Clear authentication error
 - **Rate Limited**: Implement exponential backoff retry
 - **No Data Available**: Return empty results with RECOMMENDED fallback
-- **API Errors**: Translate to appropriate FinFocus error codes
+- **API Errors**: translate to appropriate FinFocus error codes

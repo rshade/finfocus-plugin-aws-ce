@@ -68,7 +68,7 @@ func getCacheDir() (string, error) {
 
 ### Decision: Cache Key Structure
 
-#### Chosen: Versioned structured keys
+#### Chosen: versioned structured keys
 
 **Pattern:** `cost:v1:RESOURCE:SERVICE:REGION:START:END`
 
@@ -138,7 +138,7 @@ if time.Since(info.ModTime()) > cm.ttl {
 
 ### Decision: Manual Invalidation Mechanism
 
-#### Chosen: Environment variable for force-refresh
+#### Chosen: environment variable for force-refresh
 
 **Implementation:**
 
@@ -204,7 +204,7 @@ func TestE2E(t *testing.T) {
     aws-region: us-east-1
 ```
 
-#### Local Development: AWS Profile
+#### Local development with an AWS profile
 
 ```bash
 export AWS_PROFILE=your-profile
@@ -227,7 +227,7 @@ func skipIfNoAWSCreds(t *testing.T) {
 
 ### Decision: E2E Test Data Strategy
 
-#### Chosen: Last 7 days with structure-focused assertions
+#### Chosen: last 7 days with structure-focused assertions
 
 **Date Range Selection:**
 
@@ -401,7 +401,7 @@ func classifyRetryable(err error) bool {
 
 ### Decision: Backoff Algorithm
 
-#### Chosen: Exponential backoff with uniform jitter
+#### Chosen: exponential backoff with uniform jitter
 
 **Formula:** `delay = (2^attempt * baseDelay) * jitter`
 **Jitter range:** 0.9 - 1.1 (10% variation)
@@ -517,7 +517,7 @@ case strings.HasPrefix(errorType, "dns:"):
 
 ### Decision: Logging-Only Approach (No Proto Changes)
 
-#### Chosen: Structured logging with existing SDK infrastructure
+#### Chosen: structured logging with existing SDK infrastructure
 
 **Rationale:**
 
@@ -549,7 +549,7 @@ message ErrorDetail {
 
 ### Logging Pattern for Partial Data
 
-#### Scenario 1: No cost data found
+#### Scenario 1: no cost data found
 
 ```go
 if len(clientCosts) == 0 {
@@ -569,7 +569,7 @@ if len(clientCosts) == 0 {
 }
 ```
 
-#### Scenario 2: Identifier mismatch
+#### Scenario 2: identifier mismatch
 
 ```go
 if !strings.HasSuffix(parsed.Resource, resourceID) {
@@ -583,7 +583,7 @@ if !strings.HasSuffix(parsed.Resource, resourceID) {
 }
 ```
 
-#### Scenario 3: Cache write failures
+#### Scenario 3: cache write failures
 
 ```go
 if c.cache != nil {

@@ -1,31 +1,31 @@
-# Issue: Chore - Plugin Conformance Testing (#107)
+# Plugin conformance testing, issue 107
 
-**Status:** Planned
-**Type:** Technical Debt / Quality
-**Priority:** High
+**Status:** planned
+**Type:** technical debt and quality
+**Priority:** high
 
-## User Story
+## User story
 
-As a plugin maintainer, I want to verify that my plugin strictly adheres to the `finfocus-spec` contract, so that it guarantees interoperability with the Core engine.
+A plugin maintainer needs to verify compliance with the `finfocus-spec` contract to ensure interoperability with the core engine.
 
-## Technical Thesis
+## Technical approach
 
-Integrate the official `Plugin Conformance Test Suite` provided by `github.com/rshade/finfocus-spec/sdk/go/conformance`.
+Integrate the official plugin conformance test suite from `github.com/rshade/finfocus-spec/sdk/go/conformance`.
 
-### Implementation Plan
+### Implementation plan
 
-1. Create `cmd/conformance/main.go` or a test file `conformance_test.go`.
+1. Create `cmd/conformance/main.go` or `conformance_test.go`.
 2. Import the conformance suite.
-3. Configure the suite to run against the running `aws-ce` plugin binary.
+3. Run the suite against the `aws-ce` plugin binary.
 4. Add a `make conformance` target.
 
-## Boundary Guardrails (Hard Constraints)
+## Constraints
 
-1. **No Spec Modifications:** If a test fails, we must fix the *Plugin code*, not change the *Spec tests*.
-2. **Standard Environment:** Tests must pass using the standard Mock AWS Client (no live AWS calls required for basic conformance).
+1. Fix plugin code when a conformance test fails. Don't change the specification tests.
+2. Tests must pass with a mock AWS client. Basic conformance doesn't require live AWS calls.
 
-## Acceptance Criteria
+## Acceptance criteria
 
 - [ ] `make conformance` runs the official test suite.
 - [ ] All mandatory compliance tests pass.
-- [ ] CI pipeline runs conformance tests on every PR.
+- [ ] Continuous integration runs conformance tests on every pull request.

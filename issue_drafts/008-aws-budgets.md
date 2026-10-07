@@ -1,35 +1,35 @@
-# Issue: Feature - AWS Budgets Support (#8)
+# AWS Budgets support, issue 8
 
-**Status:** Planned
-**Type:** Feature
-**Priority:** High
+**Status:** planned
+**Type:** feature
+**Priority:** high
 
-## User Story
+## User story
 
-As an engineering manager, I want to view the status of my AWS Budgets alongside my actual costs, so that I can see if my current spending is tracking against my defined limits.
+An engineering manager needs to view AWS Budgets alongside actual costs to compare spending with defined limits.
 
-## Technical Thesis
+## Technical approach
 
-Implement the `getbudgets` RPC (defined in `finfocus-spec` v0.5.0) by proxying the AWS Budgets API.
+Implement the `getbudgets` remote procedure call from `finfocus-spec` v0.5.0 as a proxy for the AWS Budgets API.
 
-### API Mapping
+### API mapping
 
-* **RPC:** `GetBudgets(GetBudgetsRequest)`
-* **AWS API:** `budgets.DescribeBudgets` (List) & `budgets.GetBudget` (Detail)
-* **Data Transformation:**
-  * `AWS BudgetLimit` -> `FocusBudget.Amount`
-  * `AWS CalculatedSpend` -> `FocusBudget.Actual`
-  * `AWS ForecastedSpend` -> `FocusBudget.Forecast`
+- **Remote procedure call:** `GetBudgets(GetBudgetsRequest)`.
+- **AWS API:** `budgets.DescribeBudgets` for lists and `budgets.GetBudget` for details.
+- **Data mapping:**
+  - `AWS BudgetLimit` to `FocusBudget.Amount`.
+  - `AWS CalculatedSpend` to `FocusBudget.Actual`.
+  - `AWS ForecastedSpend` to `FocusBudget.Forecast`.
 
-## Boundary Guardrails (Hard Constraints)
+## Constraints
 
-1. **Read-Only:** We never Create, Update, or Delete budgets.
-2. **No Alerting Logic:** We do not implement "If cost > budget, send email." That is the responsibility of the Core engine or AWS itself.
-3. **No "Remaining" Math:** If AWS provides the `CalculatedSpend`, we use it. We do not manually subtract `Actual` from `Limit` to determine `Remaining` to avoid rounding errors or misunderstanding of credit application.
+1. Keep access read-only. Never create, update, or delete budgets.
+2. Leave alerts to the core engine or AWS. The plugin doesn't send email when costs exceed a budget.
+3. Use AWS `CalculatedSpend` when available. Don't subtract `Actual` from `Limit` to derive `Remaining`, because rounding and credits can affect the result.
 
-## Acceptance Criteria
+## Acceptance criteria
 
-* [ ] `GetBudgets` lists all budgets for the configured account.
-* [ ] Budget details include Limit, Actual Spend, and Forecasted Spend.
-* [ ] Supports both "Cost" and "Usage" budget types (filtering appropriately if needed).
-* [ ] Unit tests mock `DescribeBudgets` response.
+- [ ] `GetBudgets` lists all budgets for the configured account.
+- [ ] Budget details include the limit, actual spend, and forecast spend.
+- [ ] Support cost and usage budget types, with appropriate filters when needed.
+- [ ] Unit tests mock the `DescribeBudgets` response.
