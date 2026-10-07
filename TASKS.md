@@ -1316,14 +1316,14 @@ its absence, and complete CE-3.1 under the revised owner requirements.
 **ID:** CE-R.5
 
 **Description:** Add an explicitly gated live AWS check and offline comparison
-guards. Use the owner-selected tailscale-phase-2/aws-oidc environment to
+guards. Use the owner-selected `tailscale-phase-2/aws-oidc` environment to
 verify identity, real plugin discovery and AWS error mapping. Compare actual
 billing rows only when the role can read Cost Explorer; never substitute
 fixtures for denied live data. No resources or IAM policies are changed.
 
 ### CE-R.6: Count custom retry attempts against the request budget
 
-**Status:** DONE, `go test -count=1 ./internal/client ./internal/pricing && golangci-lint run ./... && markdownlint-cli2 TASKS.md`, exit 0; break check: removing attempt hooks makes both retryable fake endpoint tests send two requests and fail; restored hooks stop the retry.
+**Status:** DONE, `go test -count=1 ./internal/client ./internal/pricing && golangci-lint run ./... && markdownlint-cli2 TASKS.md`, exit 0; break check: removing attempt hooks makes both throttled fake endpoint tests send two requests and fail; restored hooks stop the retry.
 
 **ID:** CE-R.6
 
@@ -1333,8 +1333,16 @@ transport retries are separately disabled for the opt-in live check.
 
 ### CE-R.7: Format the recorded Pulumi environment name
 
-**Status:** DONE, `vale docs/AWS-VERIFICATION.md && markdownlint-cli2 docs/AWS-VERIFICATION.md TASKS.md`, exit 0; break check: plain-text aws in the recorded environment name triggered Vale.Terms; inline-code identifier has zero errors.
+**Status:** DONE, `vale docs/AWS-VERIFICATION.md && markdownlint-cli2 docs/AWS-VERIFICATION.md TASKS.md`, exit 0; break check: plain-text `aws` in the recorded environment name triggered `Vale.Terms`; inline-code identifier has zero errors.
 
 Use inline code for the environment identifier so Vale treats it as a literal
 name. This corrects documentation lint after CE-R.5 without changing the live
 check or its captured AWS evidence.
+
+### CE-R.8: Correct Vale errors in follow-up task descriptions
+
+**Status:** DONE, `python3 .superpowers/verify_followup_vale.py && markdownlint-cli2 TASKS.md`, exit 0; break check: the captured Vale scan rejected plain environment and rule identifiers; formatted literals and corrected spelling pass.
+
+Format literal environment and lint-rule identifiers as code and use the
+accepted spelling in the retry-guard description. Verify that the follow-up
+section introduces no Vale errors; historical errors remain recorded.
