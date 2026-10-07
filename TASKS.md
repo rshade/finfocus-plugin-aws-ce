@@ -28,7 +28,7 @@ Every release-please config needs these on the `.` package, and a test that fail
 5. `.release-please-manifest.json` keeps `"."` at `0.0.0` until the first release PR merges. A `0.1.0` before then
    records 0.1.0 as already shipped. After that, release PRs bump it every time, so a test must accept any valid
    `MAJOR.MINOR.PATCH` equal to or later than 0.1.0 and never pin an exact version.
-6. The generated `CHANGELOG.md` fails markdownlint with rules `MD012` and `MD004`. Put it in `.markdownlintignore`.
+6. The generated `CHANGELOG.md` fails markdownlint with rules `MD012` and `MD004`. Exclude it in `.markdownlint-cli2.jsonc`.
 7. Wrap commit bodies to 72 columns: commitlint `body-max-line-length` is 100 and continuous integration checks every commit in the PR.
 
 Use `googleapis/release-please-action@v5.0.0`, not v4.
@@ -283,8 +283,9 @@ ok      github.com/rshade/finfocus-plugin-aws-ce/test/e2e               0.005s
    fields not present in queried AWS data remain unset.
 4. Container packaging, health endpoint, full deployment docs, and contribution
    guide await the PM. Release workflows publish archives only.
-5. Whole-repository Markdown lint retains frozen-history errors. Vulnerability
-   scanning retains the known gRPC `GO-2026-6443` finding.
+5. Whole-repository Markdown lint passes. The vulnerability scanner flags
+   stable gRPC `v1.84.0`, which the maintainer lists as patched. See the
+   [audit correction](docs/audit-2026-10-07.md#security-correction-on-2026-10-07).
 
 ---
 
@@ -841,7 +842,8 @@ has none, read the SDK for `BaseEndpoint`. Keep the fixture files unchanged.
 becomes 0, and the parser reads the amount pointer without a nil check. `calculator.go:270-271` sets
 `UsageAmount` to 0 and `UsageUnit` to the currency code, though the query requests `UsageQuantity`.
 Parse with a decimal type, return an explicit error for a missing or invalid amount, return
-mixed currencies as an error, fill `UsageAmount` and its unit from `UsageQuantity` when present.
+mixed currencies as an error. Fill usage only when a single usage-type filter
+establishes a common unit. Omit quantities from unconstrained totals.
 
 **Acceptance Criteria.** the `amount_missing`, `amount_unparseable`, `mixed_currencies`,
 `precision_small_and_large` and `real_zero` contract cases pass.
@@ -1353,15 +1355,15 @@ verify identity, real plugin discovery, and AWS error mapping. Compare actual
 billing rows only when the role can read Cost Explorer. Never substitute
 fixtures for denied live data. The check changes no resources or IAM policies.
 
-### `CE-R.6` - count custom retry attempts against the request budget
+### `CE-R.6` - count all CE attempts against the request budget
 
 **Status.** `DONE`, `go test -count=1 ./internal/client ./internal/pricing && golangci-lint run ./... && markdownlint-cli2 TASKS.md`, exit 0. Break check: removing attempt hooks makes both throttled fake endpoint tests send two requests and fail. Restored hooks stop the retry.
 
 **ID.** `CE-R.6`
 
 **Description.** Enforce `CE-R.5` live-check request bounds for service and
-resource queries. Check the budget before each custom retry attempt. AWS SDK
-the opt-in live check separately turns off transport retries for its queries.
+resource queries. Check the budget before discovery, each page, and each retry.
+The CE client turns off SDK retries and uses one budgeted retry loop.
 
 ### `CE-R.7` - format the recorded Pulumi environment name
 
@@ -1378,3 +1380,30 @@ check or its captured AWS evidence.
 Format literal environment and lint-rule identifiers as code and use the
 accepted spelling in the retry-guard description. Verify that the follow-up
 section introduces no Vale errors. Historical errors remain recorded.
+
+### Audit fixes - 2026-10-07
+
+The branch `fix/audit-findings` addresses the findings in the
+[repository audit](docs/audit-2026-10-07.md).
+
+- `CE-1.2` and `CE-6.7`: `Supports` and actual cost use the same resource
+  classification. Unknown resource ids return an error. Account and service
+  totals require an explicit query type. EC2 support explains the opt-in and
+  14-day window.
+- `CE-6.2`: unconstrained totals omit usage quantities. Aggregation also
+  suppresses mixed units while preserving cost.
+- `CE-6.4`: the public query discovers commitment ids with pagination, queries
+  disjoint filtered partitions and selects the amortized metric when present.
+  Synthetic commitment grouping tests no longer stand in for the public path.
+- `CE-6.8`: default caching stays in memory within one calculator session.
+  Keys use the exact Coordinated Universal Time API date range, including partial final days.
+- `CE-R.6`: discovery, pages, and retries share the request budget.
+- Release binaries report the version injected by `goreleaser` in discovery
+  metadata and startup logs.
+
+The release workflow remains blocked by the missing `RELEASE_PLEASE_TOKEN`.
+An owner must provision it. The audit and fixes neither accessed nor changed secrets. The earlier live
+comparison predates commitment discovery. Rerun the gated AWS check before
+claiming live billing verification of the new query path. Upstream
+conformance suite integration remains pending. Custom protocol checks pass
+when the local test suite passes.

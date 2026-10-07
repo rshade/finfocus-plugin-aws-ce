@@ -30,7 +30,7 @@ func TestSupports_LogTraceID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Supports: %v", err)
 	}
-	if resp == nil || !resp.GetSupported() || resp.GetReason() != "" {
+	if resp == nil || !resp.GetSupported() || !strings.Contains(resp.GetReason(), "14 days") {
 		t.Fatalf("Supports decision changed: %#v", resp)
 	}
 	assertLogTraceID(t, buf, traceCE14)
@@ -93,11 +93,12 @@ func TestGetActualCost_MalformedARNLogTraceID(t *testing.T) {
 	ctx := pluginsdk.ContextWithTraceID(context.Background(), traceCE14)
 	req := serviceCostRequest()
 	req.Arn = "invalid-arn-format"
-	req.ResourceId = "i-fallback"
+	req.ResourceId = bareInstanceID
+	req.Resource = nil
 	if _, err := calc.GetActualCost(ctx, req); err != nil {
 		t.Fatalf("GetActualCost: %v", err)
 	}
-	if !strings.Contains(buf.String(), "querying service totals") {
+	if !strings.Contains(buf.String(), "Malformed ARN; using ResourceId") {
 		t.Fatalf("malformed ARN log missing: %s", buf.String())
 	}
 	assertLogTraceID(t, buf, traceCE14)
@@ -140,6 +141,7 @@ func actualCostCalculatorWithLogBuffer() (*Calculator, *bytes.Buffer) {
 func serviceCostRequest() *pbc.GetActualCostRequest {
 	return &pbc.GetActualCostRequest{
 		ResourceId: "AmazonS3",
+		Resource:   &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:account", Id: "AmazonS3"},
 		Start:      timestamppb.New(time.Now().Add(-24 * time.Hour)),
 		End:        timestamppb.New(time.Now()),
 	}

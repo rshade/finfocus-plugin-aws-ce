@@ -30,7 +30,8 @@ shared cache, so another request can't reuse its costs or credentials.
 
 ## Permissions and failure handling
 
-Allow `ce:GetCostAndUsage` for service totals and
+Allow `ce:GetDimensionValues` for commitment discovery,
+`ce:GetCostAndUsage` for service totals and
 `ce:GetCostAndUsageWithResources` for EC2 resource queries. Resource-level
 queries require the account's Cost Explorer resource opt-in and cover only
 the last 14 days. Assuming a role also requires `sts:AssumeRole` permission

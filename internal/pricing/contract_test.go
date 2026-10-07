@@ -95,6 +95,11 @@ func newFakeCE(t *testing.T, pages []json.RawMessage) *fakeCE {
 	t.Helper()
 	f := &fakeCE{}
 	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.Header.Get("X-Amz-Target"), ".GetDimensionValues") {
+			w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+			_, _ = w.Write([]byte(`{"DimensionValues":[]}`))
+			return
+		}
 		body, _ := io.ReadAll(r.Body)
 		f.mu.Lock()
 		f.calls = append(f.calls, capturedCall{Target: r.Header.Get("X-Amz-Target"), Body: append([]byte(nil), body...)})
@@ -460,6 +465,7 @@ func callActual(t *testing.T, f *fakeCE, id, arn string, start, end time.Time) (
 	}
 	return ts.Client().GetActualCost(ctx, &pbc.GetActualCostRequest{
 		ResourceId:       resourceID,
+		Resource:         &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:account", Id: resourceID, Arn: arn},
 		BillingAccountId: "contract-billing-account",
 		Arn:              arn,
 		Start:            timestamppb.New(start),
@@ -617,70 +623,12 @@ func errorRow(row contractRow, tc contractCase, resp *pbc.GetActualCostResponse,
 	return row
 }
 
-func usageMatches(tc contractCase, got map[string]*pbc.ActualCostResult) (string, bool) {
-	type agg struct {
-		sum     *big.Rat
-		unit    string
-		present bool
-	}
-	want := map[string]*agg{}
-	for _, page := range tc.Pages {
-		var body struct {
-			ResultsByTime []struct {
-				Groups []struct {
-					Keys    []string
-					Metrics map[string]struct {
-						Amount *string
-						Unit   *string
-					}
-				}
-			}
-		}
-		if err := json.Unmarshal(page, &body); err != nil {
-			return "usage fixture: " + err.Error(), true
-		}
-		for _, period := range body.ResultsByTime {
-			for _, g := range period.Groups {
-				if len(g.Keys) == 0 {
-					continue
-				}
-				key := g.Keys[0]
-				a := want[key]
-				if a == nil {
-					a = &agg{}
-					want[key] = a
-				}
-				u := g.Metrics["UsageQuantity"]
-				if u.Amount == nil {
-					continue
-				}
-				r, ok := new(big.Rat).SetString(*u.Amount)
-				if !ok {
-					continue
-				}
-				if a.sum == nil {
-					a.sum = r
-				} else {
-					a.sum.Add(a.sum, r)
-				}
-				a.present = true
-				if u.Unit != nil {
-					a.unit = *u.Unit
-				}
-			}
-		}
-	}
+// Service/resource fixture quantities may combine incompatible usage types.
+// Public queries deliberately omit those quantities, even if fixtures contain them.
+func usageMatches(_ contractCase, got map[string]*pbc.ActualCostResult) (string, bool) {
 	for key, res := range got {
-		a := want[key]
-		if a == nil || !a.present {
-			if res.GetUsageAmount() != 0 || res.GetUsageUnit() != "" {
-				return fmt.Sprintf("%s usage %v %q, want 0 and empty", key, res.GetUsageAmount(), res.GetUsageUnit()), true
-			}
-			continue
-		}
-		f, _ := a.sum.Float64()
-		if res.GetUsageAmount() != f || res.GetUsageUnit() != a.unit {
-			return fmt.Sprintf("%s usage %v %q, want %v %q", key, res.GetUsageAmount(), res.GetUsageUnit(), f, a.unit), true
+		if res.GetUsageAmount() != 0 || res.GetUsageUnit() != "" {
+			return fmt.Sprintf("%s exposed unconstrained usage %v %q", key, res.GetUsageAmount(), res.GetUsageUnit()), true
 		}
 	}
 	return "", false

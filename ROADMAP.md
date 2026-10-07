@@ -23,12 +23,15 @@ This roadmap outlines the development path for `finfocus-plugin-aws-ce`, priorit
 | ✅ Done | [#2](https://github.com/rshade/finfocus-plugin-aws-ce/issues/2) | Initial plugin creation for real AWS billing data |
 | ✅ Done | [#7](https://github.com/rshade/finfocus-plugin-aws-ce/issues/7) | Establish continuous delivery infrastructure |
 
-Offline verification covers release plumbing, actual-cost behavior, integration, and conformance tests.
+Offline verification covers release plumbing, actual-cost behavior, integration, and custom protocol conformance tests.
 Pulumi Environments, Secrets, and Configuration also supplied AWS credentials. Live service
 cost comparison passed after the owner granted Cost Explorer read permission.
 Resource-level verification is separate, and core E2E remains outside this run.
-The whole-repository Markdown check retains frozen-history errors. Vulnerability
-scanning retains the known gRPC finding. The owner removed Docker support.
+The whole-repository Markdown check passes. Vulnerability
+scanning reports gRPC v1.84.0 through a vulnerability database version-range mismatch.
+The upstream advisory lists this stable version as patched. See the
+[audit security correction](./docs/audit-2026-10-07.md#security-correction-on-2026-10-07).
+The owner removed Docker support.
 Local delivery labels don't close GitHub issues.
 
 ## Foundation and continuous delivery for v0.1.0
@@ -37,7 +40,7 @@ Local delivery labels don't close GitHub issues.
 |--------|-------|------------------|-------------------|
 | 🔄 In Progress | [#11](https://github.com/rshade/finfocus-plugin-aws-ce/issues/11) | Core Cost Plugin - `GetActualCost` with FOCUS 1.2 records | Use values directly from `GetCostAndUsage` |
 | ✅ Implemented | [#12](https://github.com/rshade/finfocus-plugin-aws-ce/issues/12) | Installation & Documentation polish | Ready to use after installation |
-| ✅ Implemented | [#31](https://github.com/rshade/finfocus-plugin-aws-ce/issues/31) | Plugin Conformance Test Suite integration | Don't modify test suite to pass |
+| 🔄 Partial | [#31](https://github.com/rshade/finfocus-plugin-aws-ce/issues/31) | Custom protocol checks and SDK FOCUS validation implemented. Upstream conformance suite integration pending | Don't modify test suite to pass |
 | 📋 Planned | [#23](https://github.com/rshade/finfocus-plugin-aws-ce/issues/23) | Use `finfocus-spec` v0.7.5 | Dependency update only |
 
 ## Core features for v0.2.0

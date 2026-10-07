@@ -56,10 +56,9 @@ func TestPerResourceCostClassification(t *testing.T) {
 
 	t.Run("other_non_instance_id", func(t *testing.T) {
 		calc, mockAPI := newClassifiedCalc()
-		if _, err := calc.GetActualCost(context.Background(), costRequest("example-bucket", "", start, end, nil)); err != nil {
-			t.Fatalf("GetActualCost: %v", err)
-		}
-		assertServiceTotalQuery(t, mockAPI)
+		_, err := calc.GetActualCost(context.Background(), costRequest("example-bucket", "", start, end, nil))
+		assertInvalidArgument(t, err, "EC2")
+		assertNoCostExplorerCall(t, mockAPI)
 	})
 
 	t.Run("s3_arn", func(t *testing.T) {
@@ -147,13 +146,17 @@ func newClassifiedCalc() (*Calculator, *mockCostExplorerAPI) {
 }
 
 func costRequest(resourceID, arn string, start, end time.Time, tags map[string]string) *pbc.GetActualCostRequest {
-	return &pbc.GetActualCostRequest{
+	req := &pbc.GetActualCostRequest{
 		ResourceId: resourceID,
 		Arn:        arn,
 		Start:      timestamppb.New(start),
 		End:        timestamppb.New(end),
 		Tags:       tags,
 	}
+	if arn == "" && (strings.HasPrefix(resourceID, "contract-") || resourceID == "AmazonS3") {
+		req.Resource = &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:account", Id: resourceID}
+	}
+	return req
 }
 
 func recentCostWindow() (time.Time, time.Time) {

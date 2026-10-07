@@ -43,7 +43,7 @@ func compareLiveCost(periods []types.ResultByTime, response *pbc.GetActualCostRe
 				return fmt.Errorf("duplicate AWS group")
 			}
 			seen[unique] = true
-			metric, ok := group.Metrics["UnblendedCost"]
+			metric, ok := group.Metrics["AmortizedCost"]
 			if !ok || metric.Amount == nil || aws.ToString(metric.Unit) == "" {
 				return fmt.Errorf("missing AWS metric")
 			}
@@ -72,9 +72,13 @@ func compareLiveCost(periods []types.ResultByTime, response *pbc.GetActualCostRe
 	if len(wanted) == 0 {
 		return fmt.Errorf("no grouped AWS costs to compare")
 	}
-	if len(response.GetResults()) != len(wanted) {
-		return fmt.Errorf("result count differs: got %d want %d", len(response.GetResults()), len(wanted))
+	type actual struct {
+		amount     *big.Rat
+		cost       float64
+		estimated  bool
+		start, end time.Time
 	}
+	got := map[string]*actual{}
 	for _, row := range response.GetResults() {
 		if row == nil || row.GetTimestamp() == nil || row.GetFocusRecord() == nil {
 			return fmt.Errorf("missing plugin record")
@@ -83,23 +87,56 @@ func compareLiveCost(periods []types.ResultByTime, response *pbc.GetActualCostRe
 		service := focus.GetServiceName()
 		want, ok := wanted[service]
 		if !ok {
-			return fmt.Errorf("unexpected or duplicate plugin service")
+			return fmt.Errorf("unexpected plugin service")
 		}
-		if !row.GetTimestamp().AsTime().Equal(want.start) || focus.GetChargePeriodStart() == nil || focus.GetChargePeriodEnd() == nil || !focus.GetChargePeriodStart().AsTime().Equal(want.start) || !focus.GetChargePeriodEnd().AsTime().Equal(want.end) {
+		if focus.GetChargePeriodStart() == nil || focus.GetChargePeriodEnd() == nil {
+			return fmt.Errorf("missing plugin charge period")
+		}
+		start, end := focus.GetChargePeriodStart().AsTime(), focus.GetChargePeriodEnd().AsTime()
+		if !row.GetTimestamp().AsTime().Equal(start) || !end.After(start) || start.Before(want.start) || end.After(want.end) {
 			return fmt.Errorf("plugin charge period differs from AWS")
 		}
-		amount, _ := want.amount.Float64()
-		if math.IsNaN(row.GetCost()) || math.IsInf(row.GetCost(), 0) || math.Abs(row.GetCost()-amount) > 1e-9*math.Max(1, math.Abs(amount)) {
-			return fmt.Errorf("plugin amount differs from AWS")
+		if math.IsNaN(row.GetCost()) || math.IsInf(row.GetCost(), 0) {
+			return fmt.Errorf("invalid plugin amount")
 		}
 		exact, ok := new(big.Rat).SetString(focus.GetExtendedColumns()["amount_decimal"])
-		if !ok || exact.Cmp(want.amount) != 0 {
-			return fmt.Errorf("plugin exact decimal differs from AWS")
+		if !ok {
+			return fmt.Errorf("invalid plugin exact decimal")
 		}
-		if focus.GetBillingAccountId() != account || focus.GetBillingCurrency() != want.currency || focus.GetExtendedColumns()["estimated"] != strconv.FormatBool(want.estimated) || row.GetSource() != "aws-ce" {
+		estimated, err := strconv.ParseBool(focus.GetExtendedColumns()["estimated"])
+		if err != nil || focus.GetBillingAccountId() != account || focus.GetBillingCurrency() != want.currency || row.GetSource() != "aws-ce" {
 			return fmt.Errorf("plugin provenance, currency or estimate differs")
 		}
-		delete(wanted, service)
+		sum := got[service]
+		if sum == nil {
+			sum = &actual{amount: new(big.Rat), start: start, end: end}
+			got[service] = sum
+		}
+		sum.amount.Add(sum.amount, exact)
+		sum.cost += row.GetCost()
+		sum.estimated = sum.estimated || estimated
+		if start.Before(sum.start) {
+			sum.start = start
+		}
+		if end.After(sum.end) {
+			sum.end = end
+		}
+	}
+	if len(got) != len(wanted) {
+		return fmt.Errorf("service count differs: got %d want %d", len(got), len(wanted))
+	}
+	for service, want := range wanted {
+		sum := got[service]
+		if sum == nil || !sum.start.Equal(want.start) || !sum.end.Equal(want.end) || sum.estimated != want.estimated {
+			return fmt.Errorf("plugin period or estimate differs from AWS for %s", service)
+		}
+		amount, _ := want.amount.Float64()
+		if math.IsNaN(sum.cost) || math.IsInf(sum.cost, 0) || math.Abs(sum.cost-amount) > 1e-9*math.Max(1, math.Abs(amount)) {
+			return fmt.Errorf("plugin amount differs from AWS for %s", service)
+		}
+		if sum.amount.Cmp(want.amount) != 0 {
+			return fmt.Errorf("plugin exact decimal differs from AWS for %s", service)
+		}
 	}
 	return nil
 }

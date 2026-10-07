@@ -16,17 +16,30 @@ Replace the environment name when verifying another account. Don't use
 and doesn't change the Pulumi environment or IAM policies.
 
 The check reads STS identity, then requests seven days of service costs ending
-two Coordinated Universal Time days ago. It compares one Cost Explorer page with a newly built plugin
-served over gRPC. The comparison sums daily groups into one row per service for the
-window. The comparison checks period boundaries, exact decimal sums, protocol
+two Coordinated Universal Time days ago. It compares one independent Cost Explorer
+`AmortizedCost` page with a newly built plugin served over gRPC. The comparison
+sums daily baseline groups and plugin commitment partitions by service for the
+window. It adds every partition rather than overwriting repeated service names.
+The comparison checks period boundaries, exact decimal sums, protocol
 amounts, currency, caller billing account, and `Estimated`. It also verifies Supports,
 GetPluginInfo, invalid-request status and clean shutdown.
 
-The baseline stops if the response requires another page. The plugin has a one-page
-request budget. The check turns off AWS SDK retries. Cost Explorer requests are
-billable. This check can make two CE page attempts. Identity requests are
-separate. A successful comparison requires grouped billing data in the
+The baseline stops if the response requires another page. The plugin has a
+20-attempt request budget to cover Reserved Instance and Savings Plan discovery,
+their cost partitions, the residual cost query, and any pagination or plugin retries.
+The check turns off AWS SDK retries. Cost Explorer requests are billable. This
+check can make at most 21 CE attempts: one baseline and 20 plugin attempts within
+the 40-second check deadline. Identity requests are separate. A successful comparison requires grouped billing data in the
 selected period. An empty or incomplete response doesn't prove cost accuracy.
+
+[AWS describes amortized costs](https://docs.aws.amazon.com/cost-management/latest/userguide/ce-advanced.html)
+as spreading upfront and recurring commitment fees over their applicable period.
+Comparing the plugin's mixed metrics with the global amortized baseline assumes
+that discovery finds all relevant commitments and that residual charges have equal
+Unblended and amortized amounts. The check tests that assumption against the
+selected account and period. A mismatch fails the comparison. it doesn't switch
+metrics or treat unmatched fees as successful verification. Offline partition
+tests don't prove this equivalence for every AWS fee or account configuration.
 
 ## AWS permissions
 
@@ -40,6 +53,7 @@ Attach this policy to the IAM role used by the Pulumi environment:
       "Sid": "FinFocusCostExplorerReadOnly",
       "Effect": "Allow",
       "Action": [
+        "ce:GetDimensionValues",
         "ce:GetCostAndUsage",
         "ce:GetCostAndUsageWithResources"
       ],
@@ -49,7 +63,8 @@ Attach this policy to the IAM role used by the Pulumi environment:
 }
 ```
 
-The service-cost comparison requires `GetCostAndUsage`. The second action
+The plugin requires `GetDimensionValues` for commitment discovery and
+`GetCostAndUsage` for service costs. The resource action
 supports EC2 resource-cost queries, which are outside this check and also
 require resource data opt-in. See the [AWS permission reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ce.html).
 The plugin needs no IAM write permission or forecasting action.
@@ -68,7 +83,9 @@ go test -count=1 -tags awslive ./test/live
 
 With FINFOCUS_AWS_LIVE unset, both commands are offline. The unit tests reject
 wrong amounts, periods, accounts, currency, estimates, and missing or duplicate
-rows. Synthetic comparison data is separate from live AWS evidence.
+partitions. They also verify that Reserved Instance, Savings Plan, and residual
+rows for the same service contribute to both exact and protocol totals. Synthetic
+comparison data is separate from live AWS evidence.
 
 ## Recorded verification
 
@@ -78,3 +95,7 @@ PermissionDenied. The owner granted Cost Explorer read permission. A rerun
 then matched nine service totals for 2026-09-27 through 2026-10-04, including
 exact decimal sums and period metadata. This result doesn't verify EC2
 resource-level data, FinFocus core E2E, or another account.
+
+The audit fixes add commitment discovery to actual-cost queries. The earlier
+live result in this document predates that query path. Run the gated live check again with
+the updated policy to verify the new path against AWS.

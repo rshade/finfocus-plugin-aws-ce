@@ -15,7 +15,7 @@ builds:
     main: ./cmd/plugin
     binary: finfocus-plugin-aws-ce
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+      - -s -w -X github.com/rshade/finfocus-plugin-aws-ce/internal/version.Version={{.Version}}
 
 archives:
   - formats: [tar.gz]

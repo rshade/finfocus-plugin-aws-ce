@@ -17,7 +17,7 @@ func TestCostRetryRespectsRequestBudget(t *testing.T) {
 			name = "resource"
 		}
 		t.Run(name, func(t *testing.T) {
-			t.Setenv("AWS_MAX_ATTEMPTS", "1")
+			t.Setenv("AWS_MAX_ATTEMPTS", "3")
 			var calls, hooks atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/x-amz-json-1.1")
