@@ -69,15 +69,16 @@ var (
 	ErrInvalidTimeRange = errors.New("start must be before end")
 	// ErrPageCap is returned when Cost Explorer still has a NextPageToken after 100 pages.
 	ErrPageCap = errors.New("cost explorer results exceed 100 pages")
-	// ErrRateLimited is returned when the next page would exceed the caller's
-	// per-minute budget. The Cost Explorer request is not made.
+	// ErrRateLimited is returned when the next custom request attempt exceeds
+	// the caller's per-minute budget. The Cost Explorer request is not made.
 	ErrRateLimited = errors.New("cost explorer request limit reached")
 )
 
 type pageHookKey struct{}
 
-// WithPageHook runs hook before each Cost Explorer page.
-// A non-nil error skips that page and stops the query. A nil hook returns ctx.
+// WithPageHook runs hook before each custom Cost Explorer attempt, including retries.
+// A non-nil error skips that attempt and stops the query. A nil hook returns ctx.
+// AWS SDK internal transport retries are separate; AWS_MAX_ATTEMPTS=1 disables them.
 func WithPageHook(ctx context.Context, hook func() error) context.Context {
 	if hook == nil {
 		return ctx
@@ -366,6 +367,9 @@ func (c *Client) GetCost(ctx context.Context, filter *types.Expression, dimensio
 			Filter:        filter,
 		}
 		output, err := WithRetry(ctx, DefaultRetryConfig(), func(ctx context.Context) (*costexplorer.GetCostAndUsageOutput, error, bool) {
+			if err := runPageHook(ctx); err != nil {
+				return nil, err, false
+			}
 			out, err := c.ceClient.GetCostAndUsage(ctx, input)
 			if err != nil {
 				return nil, err, isRetryableError(err)
@@ -426,6 +430,9 @@ func (c *Client) GetCostWithResources(ctx context.Context, resourceID, accountID
 			Filter:        filter,
 		}
 		output, err := WithRetry(ctx, DefaultRetryConfig(), func(ctx context.Context) (*costexplorer.GetCostAndUsageWithResourcesOutput, error, bool) {
+			if err := runPageHook(ctx); err != nil {
+				return nil, err, false
+			}
 			out, err := c.ceClient.GetCostAndUsageWithResources(ctx, input)
 			if err != nil {
 				return nil, err, isRetryableError(err)
@@ -446,9 +453,6 @@ func (c *Client) collectCosts(ctx context.Context, dimensions []string, fetch fu
 	var all []CostResult
 	var token *string
 	for page := 0; page < 100; page++ {
-		if err := runPageHook(ctx); err != nil {
-			return nil, err
-		}
 		periods, next, err := fetch(ctx, token)
 		if err != nil {
 			return nil, err

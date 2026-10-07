@@ -1306,3 +1306,13 @@ and the fake Cost Explorer endpoint. Refresh the CE-1.1 verification for REL-4.
 
 **Description:** Remove the Docker Makefile target and support plan, verify
 its absence, and complete CE-3.1 under the revised owner requirements.
+
+### CE-R.6: Count custom retry attempts against the request budget
+
+**Status:** DONE, `go test -count=1 ./internal/client ./internal/pricing && golangci-lint run ./... && markdownlint-cli2 TASKS.md`, exit 0; break check: removing attempt hooks makes both retryable fake endpoint tests send two requests and fail; restored hooks stop the retry.
+
+**ID:** CE-R.6
+
+**Description:** Enforce CE-R.5 live-check request bounds for service and
+resource queries. Check the budget before each custom retry attempt. AWS SDK
+transport retries are separately disabled for the opt-in live check.
