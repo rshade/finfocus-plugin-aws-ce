@@ -18,20 +18,21 @@ Implement the core AWS Cost Explorer integration for the PulumiCost plugin, enab
 **Target Platform**: Linux server (gRPC plugin, loopback-only serving)
 **Project Type**: Single (Go plugin)
 **Performance Goals**:
-  - Plugin startup: < 500ms
-  - PORT announcement: < 1s
-  - GetActualCost() RPC: < 10s for 30-day ranges
-  - E2E test execution: < 2min with 7-day max queries
+
+- Plugin startup: < 500ms
+- PORT announcement: < 1s
+- GetActualCost() RPC: < 10s for 30-day ranges
+- E2E test execution: < 2min with 7-day max queries
 **Constraints**:
-  - gRPC protocol compliance (must not break CostSourceService interface)
-  - AWS Cost Explorer API rate limits (caching required)
-  - Memory bounded operation (pagination for large result sets)
-  - 24-hour cache TTL with manual invalidation support
-  - Exponential backoff retry (3 attempts max) for network failures
+- gRPC protocol compliance (must not break CostSourceService interface)
+- AWS Cost Explorer API rate limits (caching required)
+- Memory bounded operation (pagination for large result sets)
+- 24-hour cache TTL with manual invalidation support
+- Exponential backoff retry (3 attempts max) for network failures
 **Scale/Scope**:
-  - Support 100+ concurrent RPC calls
-  - Handle multi-account AWS cost queries
-  - E2E tests limited to 7-day date ranges (cost/time optimization)
+- Support 100+ concurrent RPC calls
+- Handle multi-account AWS cost queries
+- E2E tests limited to 7-day date ranges (cost/time optimization)
 
 ## Constitution Check
 
@@ -189,6 +190,7 @@ The following unknowns from Technical Context require investigation:
 **Gate Result**: ✅ ALL CHECKS PASS - Phase 1 complete, ready for implementation
 
 **Key Design Validations:**
+
 - ✅ No premature abstraction (cache uses simple JSON + filesystem)
 - ✅ Explicit error handling (retry logic with type-based classification)
 - ✅ No magic behavior (cache bypass via explicit env var)

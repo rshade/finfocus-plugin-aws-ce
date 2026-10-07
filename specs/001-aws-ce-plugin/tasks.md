@@ -5,12 +5,14 @@
 **Status**: Pending
 
 ## Phase 1: Setup
+
 *Goal: Initialize project dependencies and environment.*
 
 - [x] T001 Verify project structure and `go.mod` dependencies (aws-sdk-go-v2) in `go.mod`
 - [x] T002 Configure `Makefile` for build and test commands in `Makefile`
 
 ## Phase 2: Foundational
+
 *Goal: Implement core data models, caching, and infrastructure.*
 
 - [x] T003 Implement `CostEntry`, `ResourceDescriptor`, `DateRange` structs in `internal/pricing/data.go`
@@ -20,6 +22,7 @@
 - [x] T007 Update `CostResult` in `internal/client/client.go` to match `CostEntry` requirements
 
 ## Phase 3: User Story 1 - Retrieve Historical Billing Data (P1)
+
 *Goal: Retrieve actual cost data from AWS Cost Explorer.*
 
 - [x] T008 [US1] Update `GetResourceCost` in `internal/client/client.go` to support `DateRange` and `Granularity`
@@ -30,6 +33,7 @@
 - [x] T012 [US1] Integrate `CacheManager` into `GetActualCost` flow in `internal/pricing/calculator.go`
 
 ## Phase 4: User Story 2 - Query Costs by Dimensions (P2)
+
 *Goal: Group and filter costs by service, account, tags, and AZ.*
 
 - [x] T013 [P] [US2] Update `client.go` to support generic dimension grouping in `internal/client/client.go`
@@ -38,6 +42,7 @@
 - [x] T016 [P] [US2] Implement `GetAccountActualCost` using generic client method in `internal/pricing/calculator.go`
 
 ## Phase 5: User Story 3 - View Reserved Instance/Savings Plan Discounts (P3)
+
 *Goal: See impact of RIs and SPs.*
 
 - [x] T017 [US3] Add `GetReservationUtilization` method to `internal/client/client.go`
@@ -45,12 +50,14 @@
 - [x] T019 [US3] Update `GetActualCost` response to populate `reservation_arn`/`savings_plan_arn` in `internal/pricing/calculator.go`
 
 ## Phase 6: User Story 4 - Handle API Rate Limits Gracefully (P4)
+
 *Goal: robust retry logic.*
 
 - [x] T020 [US4] Integrate `retry.go` logic into all `client.go` API calls in `internal/client/client.go`
 - [x] T021 [US4] Verify error mapping for RateLimitExceeded in `internal/client/client.go`
 
 ## Phase 7: Polish & Cross-Cutting
+
 *Goal: Logging, security, and final verification.*
 
 - [x] T022 Implement zero-log structured logging in `internal/pricing/calculator.go`
@@ -79,4 +86,5 @@ graph TD
 - **T015 (Service Cost)** and **T016 (Account Cost)** are parallelizable.
 
 ## Implementation Strategy
+
 Start with **Phase 2** to establish the data structures and caching layer. Then move to **Phase 3** to get the basic "Happy Path" of fetching costs working. **Phase 4** extends this with grouping, which is critical for the "Finance" persona. **Phase 5** and **Phase 6** add depth and reliability.

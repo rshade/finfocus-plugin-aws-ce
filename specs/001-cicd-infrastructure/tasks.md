@@ -4,22 +4,26 @@
 **Spec**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md)
 
 ## 1. Setup Phase
+>
 > **Goal**: Initialize project structure and prepare for configuration.
 
 - [x] T001 Verify project root and git initialization `.`
 
 ## 2. Foundational Phase
+>
 > **Goal**: Essential prerequisites for CI/CD.
 
 - [x] T002 Ensure Go module files are valid and tidy `go.mod`
 
 ## 3. User Story 1: Automated Testing Pipeline (P1)
+>
 > **Goal**: As a developer, I want code changes to automatically run tests and linting so that I can catch issues before merging.
 > **Independent Test**: Push code to a branch and verify the `test` workflow executes successfully in GitHub Actions.
 
 - [x] T003 [US1] Create GitHub Actions test workflow in `.github/workflows/test.yml`
 
 ## 4. User Story 2: Automated Release Process (P2)
+>
 > **Goal**: As a maintainer, I want releases to be created automatically when pull requests are merged so that new versions are published consistently.
 > **Independent Test**: Merge a release PR and verify binaries are built and published to GitHub Releases.
 
@@ -30,12 +34,14 @@
 - [x] T008 [US2] Create GitHub Actions release-please workflow in `.github/workflows/release-please.yml`
 
 ## 5. User Story 3: Local Development Commands (P3)
+>
 > **Goal**: As a developer, I want consistent local build/test commands so that I can verify changes before pushing.
 > **Independent Test**: Run `make test`, `make lint`, `make build` locally and verify success.
 
 - [x] T009 [US3] Create Makefile with test, lint, build, ensure targets in `Makefile`
 
 ## 6. Polish & Documentation Phase
+>
 > **Goal**: Update documentation and cross-cutting concerns.
 
 - [x] T010 [P] Update Agent documentation with CI/CD commands in `AGENTS.md`

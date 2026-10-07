@@ -12,36 +12,42 @@ assignees:
 projects:
 milestone:      v0.1.0 - Foundation & CI/CD
 number: 7
---
+
+---
+
 ## Objective
+
 Implement a robust CI/CD pipeline for the project, mirroring the standards of `finfocus-plugin-aws-public` but adapted for a single-binary architecture.
 
 ## Research
+
 - [ ] Review `product.md` for the detailed infrastructure plan.
 - [ ] Review `../finfocus-plugin-aws-public/.github/workflows` and config files for reference patterns.
 
 ## Tasks
+
 - [ ] **Configuration Files**:
-    - [ ] Create `.goreleaser.yaml` configured for single-binary builds (linux, darwin, windows; amd64/arm64).
-    - [ ] Create `release-please-config.json` (Go release type).
-    - [ ] Create `.release-please-manifest.json` (init with current version).
-    - [ ] Create `Makefile` with targets: `test`, `lint`, `build`, `ensure`.
+  - [ ] Create `.goreleaser.yaml` configured for single-binary builds (linux, darwin, windows; amd64/arm64).
+  - [ ] Create `release-please-config.json` (Go release type).
+  - [ ] Create `.release-please-manifest.json` (init with current version).
+  - [ ] Create `Makefile` with targets: `test`, `lint`, `build`, `ensure`.
 - [ ] **GitHub Workflows**:
-    - [ ] Create `.github/workflows/test.yml`:
-        - [ ] Checkout code.
-        - [ ] Setup Go 1.25.5
-        - [ ] Run `golangci-lint` - v2.6.2.
-        - [ ] Run `go test ./...`.
-    - [ ] Create `.github/workflows/release.yml`:
-        - [ ] Trigger on `release` (created).
-        - [ ] Use `goreleaser/goreleaser-action`.
-    - [ ] Create `.github/workflows/release-please.yml`:
-        - [ ] Use `googleapis/release-please-action`.
+  - [ ] Create `.github/workflows/test.yml`:
+    - [ ] Checkout code.
+    - [ ] Setup Go 1.25.5
+    - [ ] Run `golangci-lint` - v2.6.2.
+    - [ ] Run `go test ./...`.
+  - [ ] Create `.github/workflows/release.yml`:
+    - [ ] Trigger on `release` (created).
+    - [ ] Use `goreleaser/goreleaser-action`.
+  - [ ] Create `.github/workflows/release-please.yml`:
+    - [ ] Use `googleapis/release-please-action`.
 - [ ] **Documentation**:
-    - [ ] Update `AGENTS.md`, `GEMINI.md`, and `CLAUDE.md` with CI/CD info.
-    - [ ] Update `README.md` with build/test instructions.
+  - [ ] Update `AGENTS.md`, `GEMINI.md`, and `CLAUDE.md` with CI/CD info.
+  - [ ] Update `README.md` with build/test instructions.
 
 ## Verification
+
 - [ ] Verify `Makefile` targets run locally.
 - [ ] (Optional) Trigger a dummy workflow run if possible, or verify syntax. "
 

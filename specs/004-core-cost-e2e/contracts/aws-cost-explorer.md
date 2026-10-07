@@ -17,12 +17,14 @@ This document defines the integration contract between the PulumiCost AWS CE plu
 **Method**: AWS SDK credential chain
 
 **Resolution order:**
+
 1. Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`)
 2. Shared credentials file (`~/.aws/credentials`)
 3. IAM role (for EC2 instances, ECS tasks, Lambda functions)
 4. GitHub OIDC federation (for CI/CD)
 
 **Required permissions:**
+
 ```json
 {
   "Version": "2012-10-17",
@@ -46,6 +48,7 @@ This document defines the integration contract between the PulumiCost AWS CE plu
 **Purpose**: Retrieve historical cost data for resources.
 
 **Request:**
+
 ```go
 input := &costexplorer.GetCostAndUsageInput{
     TimePeriod: &types.DateInterval{
@@ -66,6 +69,7 @@ input := &costexplorer.GetCostAndUsageInput{
 ```
 
 **Response:**
+
 ```go
 type GetCostAndUsageOutput struct {
     ResultsByTime []types.ResultByTime
@@ -86,16 +90,19 @@ type ResultByTime struct {
 ```
 
 **Rate limits:**
+
 - 5 requests per second per account
 - 100 requests per account per day for Cost Anomaly Detection APIs (not used)
 - GetCostAndUsage has no documented daily limit
 
 **Latency:**
+
 - Typical: 2-5 seconds
 - With grouping: 5-10 seconds
 - Large date ranges (1+ year): 10-30 seconds
 
 **Data freshness:**
+
 - Cost data updated 3 times per day (approximately 8-hour lag)
 - Data for current day is preliminary and subject to change
 - Finalized data available after ~48 hours
@@ -143,6 +150,7 @@ filter := &types.Expression{
 ```
 
 **Example ResourceId values:**
+
 - EC2 instance: `i-12345`
 - RDS instance: `db-ABC123DEF456`
 - S3 bucket: `my-bucket-name`
@@ -163,6 +171,7 @@ filter := &types.Expression{
 ```
 
 **Common service names:**
+
 - EC2: `"Amazon Elastic Compute Cloud - Compute"`
 - RDS: `"Amazon Relational Database Service"`
 - S3: `"Amazon Simple Storage Service"`
@@ -221,6 +230,7 @@ input := &costexplorer.GetCostAndUsageInput{
 ```
 
 **Response structure:**
+
 ```go
 type ResultByTime struct {
     Groups []types.Group
@@ -240,6 +250,7 @@ type Group struct {
 **Note**: Cost Explorer API does not use traditional pagination (no NextToken).
 
 **Date range handling:**
+
 - Maximum: 12 months of data per request
 - If requesting > 12 months, split into multiple requests
 - Plugin limitation: E2E tests restricted to 7-day queries
@@ -259,11 +270,13 @@ type Group struct {
 ### Data Lag
 
 **Current day:**
+
 - Data available but preliminary
 - Subject to change as usage data arrives
 - Typically 8-12 hour lag
 
 **Previous days:**
+
 - Data mostly finalized after 24 hours
 - Fully finalized after 48 hours
 - May have minor adjustments for up to 3 days
@@ -286,6 +299,7 @@ type Group struct {
 | With grouping (2+ dimensions) | < 10s | Additional processing overhead |
 
 **Timeout recommendations:**
+
 - Per-request: 30 seconds
 - E2E test overall: 2 minutes (per spec)
 

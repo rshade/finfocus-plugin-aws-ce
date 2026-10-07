@@ -17,7 +17,6 @@ jobs:
 
       - uses: jdx/mise-action@v2
         with:
-          install_only: true
           install_args: vale aqua:reviewdog/reviewdog
 
       - name: Fetch Vale styles
@@ -43,7 +42,6 @@ jobs:
 
       - uses: jdx/mise-action@v2
         with:
-          install_only: true
           install_args: node npm:markdownlint-cli2
 
       - name: Run markdownlint

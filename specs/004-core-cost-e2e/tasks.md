@@ -20,11 +20,13 @@ This document provides a dependency-ordered task breakdown for implementing the 
 ### MVP-First Approach
 
 **MVP = User Story 1 only** (Tasks T001-T011)
+
 - Delivers core AWS Cost Explorer integration with retry logic
 - Provides immediately testable value
 - Estimated completion: 2-3 days
 
 **Post-MVP Increments**:
+
 - **User Story 2** (Tasks T012-T017): CI/CD automation
 - **User Story 3** (Tasks T018-T021): Performance optimization via caching
 
@@ -76,6 +78,7 @@ Each user story has tasks that can execute in parallel within that story's phase
 **Dependencies**: Phase 2 complete
 
 **Independent Test**: Run plugin locally with AWS credentials and execute `GetActualCost` query to verify:
+
 1. Valid credentials return cost data
 2. Invalid credentials return clear authentication error
 3. Service filtering works correctly
@@ -95,6 +98,7 @@ Each user story has tasks that can execute in parallel within that story's phase
 - [ ] T016 [US1] Manual smoke test: Run plugin with AWS credentials and verify GetActualCost returns data for last 7 days
 
 **Completion Criteria**:
+
 - ✅ GetActualCost successfully retrieves data from real AWS account (SC-001)
 - ✅ All unit tests pass with retry and partial data coverage
 - ✅ Structured logging includes warning_type fields
@@ -114,6 +118,7 @@ Each user story has tasks that can execute in parallel within that story's phase
 **Dependencies**: Phase 3 complete (requires working GetActualCost implementation)
 
 **Independent Test**: Push a commit to main branch and verify:
+
 1. E2E tests execute in GitHub Actions
 2. Tests use OIDC federation (no secrets)
 3. Fork PRs skip E2E tests gracefully
@@ -130,6 +135,7 @@ Each user story has tasks that can execute in parallel within that story's phase
 - [ ] T023 [US2] Push to feature branch and verify E2E workflow executes in GitHub Actions (may skip if OIDC not yet configured)
 
 **Completion Criteria**:
+
 - ✅ E2E tests pass in GitHub Actions for main branch (SC-002)
 - ✅ `make e2e` executes successfully locally with AWS credentials (SC-004)
 - ✅ E2E tests complete within 2 minutes (FR-004a)
@@ -151,6 +157,7 @@ Each user story has tasks that can execute in parallel within that story's phase
 **Dependencies**: Phase 3 complete (requires working GetActualCost implementation)
 
 **Independent Test**: Run same query twice and verify:
+
 1. First request fetches from AWS (cache miss)
 2. Second request returns from cache (< 100ms)
 3. Cache persists across plugin restarts
@@ -172,6 +179,7 @@ Each user story has tasks that can execute in parallel within that story's phase
 - [ ] T034 [US3] Manual verification: Run same query twice and confirm second request is < 100ms (cache hit)
 
 **Completion Criteria**:
+
 - ✅ Caching persists data across plugin restarts (SC-003)
 - ✅ Cache hits return results in < 100ms
 - ✅ 24-hour TTL expires stale data automatically
@@ -197,6 +205,7 @@ Each user story has tasks that can execute in parallel within that story's phase
 - [ ] T039 Create PR with conventional commit message referencing feature 004 and all completed user stories
 
 **Completion Criteria**:
+
 - ✅ All success criteria met (SC-001 through SC-004)
 - ✅ Documentation complete and accurate
 - ✅ Code quality standards met
@@ -221,11 +230,13 @@ All Phases ──→ Phase 6 (Polish)
 ```
 
 **User Story Dependencies**:
+
 - US1 (P1): No dependencies - can start after foundational phase
 - US2 (P1): Depends on US1 (needs working GetActualCost for E2E tests)
 - US3 (P2): Depends on US1 (needs working GetActualCost to cache results)
 
 **Suggested Execution Order**:
+
 1. MVP: Complete Phase 1, 2, 3 (US1)
 2. Post-MVP Increment 1: Complete Phase 4 (US2) - CI automation
 3. Post-MVP Increment 2: Complete Phase 5 (US3) - Performance optimization
@@ -236,25 +247,31 @@ All Phases ──→ Phase 6 (Polish)
 ## Parallelization Opportunities
 
 ### Phase 1: Setup (2 parallel tracks)
+
 - T001 (dependencies) + T002 (CLAUDE.md) + T003 (Makefile)
 
 ### Phase 2: Foundational (3 parallel tracks)
+
 - T004 (structs) → T005 (error classification) + T006 (backoff) + T007 (tests)
 
 ### Phase 3: User Story 1 (4 parallel tracks)
+
 - T008 (client retry) + T009 (client logging) + T010 (calculator partial data) + T011 (calculator logging)
 - Then: T012 (client tests) + T013 (calculator tests)
 - Finally: T014 → T015 → T016 (sequential validation)
 
 ### Phase 4: User Story 2 (5 parallel tracks)
+
 - T017 (test skeleton) + T018 (test cases) + T019 (skip logic) + T020 (workflow) + T021 (fork PR skip)
 - Then: T022 → T023 (sequential validation)
 
 ### Phase 5: User Story 3 (6 parallel tracks)
+
 - T024 (structs) + T025 (key gen) + T026 (directory) + T027 (get/set) + T028 (bypass) + T029 (tests)
 - Then: T030 → T031 → T032 → T033 → T034 (sequential integration)
 
 ### Phase 6: Polish (2 parallel tracks)
+
 - T035 (README) → T036 (lint) + T037 (test)
 - Then: T038 → T039 (sequential validation)
 
@@ -279,16 +296,19 @@ All Phases ──→ Phase 6 (Polish)
 ## Testing Strategy
 
 ### Unit Tests (Phases 2, 3, 5)
+
 - **Retry logic**: Test error classification, backoff calculation, max retries
 - **Partial data handling**: Test warning logs, structured logging fields
 - **Cache operations**: Test get/set, TTL expiration, bypass, directory creation
 
 ### E2E Tests (Phase 4)
+
 - **AWS integration**: Real API calls with 7-day queries, < 2min timeout
 - **Credential handling**: Skip logic when credentials unavailable
 - **Cache behavior**: Verify cache hit/miss, persistence, expiration
 
 ### Manual Testing (Phases 3, 5)
+
 - **Smoke test**: Run plugin with AWS credentials, verify cost data retrieval
 - **Cache verification**: Run same query twice, confirm second is fast (< 100ms)
 
@@ -308,21 +328,25 @@ All Phases ──→ Phase 6 (Polish)
 ## Implementation Notes
 
 ### Retry Logic Best Practices
+
 - Use type assertions for error classification (not string matching)
 - Include error_type in structured logs for observability
 - Cap backoff at 20 seconds per AWS SDK defaults
 
 ### Cache Implementation Best Practices
+
 - Use JSON for debuggability (human-readable)
 - Store cache in os.UserCacheDir for cross-platform compatibility
 - Lazy eviction (no background cleanup needed)
 
 ### E2E Testing Best Practices
+
 - Limit queries to 7 days max (minimize AWS costs)
 - Use context.WithTimeout for 2-minute overall constraint
 - Skip gracefully when credentials unavailable
 
 ### CI/CD Best Practices
+
 - GitHub OIDC eliminates long-lived secrets
 - Fork PRs skip E2E (no credentials by design)
 - Workflow should document IAM role ARN requirement

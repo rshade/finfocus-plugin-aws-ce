@@ -89,40 +89,40 @@ As an operator managing plugin lifecycle, I want the plugin to shut down cleanly
 
 ### Functional Requirements
 
-**Environment Variables**
+#### Environment Variables
 
 - **FR-001**: Plugin MUST read port configuration from `FINFOCUS_PLUGIN_PORT` environment variable using SDK helpers.
 - **FR-002**: Plugin MUST read log file path from `FINFOCUS_LOG_FILE` environment variable using SDK helpers.
 - **FR-003**: Plugin MUST read log level from `FINFOCUS_LOG_LEVEL` environment variable using SDK helpers.
 
-**CLI Flags**
+#### CLI Flags
 
 - **FR-004**: Plugin MUST support `--port` CLI flag for specifying the gRPC server port.
 - **FR-005**: CLI flag values MUST take precedence over environment variable values when both are specified.
 
-**Logging**
+#### Logging
 
 - **FR-006**: Plugin MUST use `pluginsdk.NewPluginLogger()` for creating the main logger instance.
 - **FR-007**: Plugin MUST use `pluginsdk.NewLogWriter()` to configure log output destination.
 - **FR-008**: Plugin MUST use `pluginsdk.LogOperation()` for timing and logging RPC operations.
 
-**Validation**
+#### Validation
 
 - **FR-009**: Plugin MUST use `pluginsdk.ValidateActualCostRequest()` for validating incoming actual cost requests.
 - **FR-010**: Plugin MUST return SDK-standard validation errors (e.g., `ErrActualCostTimeRangeInvalid`) rather than custom error messages.
 
-**Safety**
+#### Safety
 
 - **FR-011**: Plugin MUST NOT use `log.Fatal()` or `os.Exit()` in any code path.
 - **FR-012**: Plugin MUST use context cancellation and error returns for shutdown signaling.
 - **FR-013**: Plugin MUST handle startup errors by returning from main, not by calling Fatal.
 
-**Robustness**
+#### Robustness
 
 - **FR-014**: Plugin MUST handle zero/missing numeric values gracefully without panics.
 - **FR-015**: Plugin MUST handle nil pointer access in cost parsing without crashing.
 
-**Documentation**
+#### Documentation
 
 - **FR-016**: `CLAUDE.md` MUST be updated with new SDK dependency version and helper usage patterns.
 - **FR-017**: `README.md` MUST document environment variables and CLI flags for configuration.

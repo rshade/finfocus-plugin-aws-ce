@@ -8,6 +8,7 @@
 1. **AWS Account** with Cost Explorer enabled
 2. **AWS Credentials** configured (environment variables, shared credentials file, or IAM roles)
 3. **IAM Permissions**:
+
    ```json
    {
      "Version": "2012-10-17",
@@ -30,6 +31,7 @@
 ## Installation
 
 ### Option 1: Build from Source
+
 ```bash
 git clone <repository-url>
 cd finfocus-plugin-aws-ce
@@ -38,6 +40,7 @@ make install
 ```
 
 ### Option 2: Download Binary
+
 ```bash
 # Download from releases page
 # Place binary in ~/.finfocus/plugins/aws-ce/1.0.0/
@@ -48,6 +51,7 @@ make install
 ### AWS Credentials (choose one method)
 
 **Environment Variables**:
+
 ```bash
 export AWS_ACCESS_KEY_ID=your-access-key
 export AWS_SECRET_ACCESS_KEY=your-secret-key
@@ -55,6 +59,7 @@ export AWS_DEFAULT_REGION=us-east-1
 ```
 
 **Shared Credentials File** (`~/.aws/credentials`):
+
 ```ini
 [default]
 aws_access_key_id = your-access-key
@@ -63,12 +68,14 @@ region = us-east-1
 ```
 
 **IAM Roles** (for EC2/ECS/EKS):
+
 - Attach the IAM policy above to your instance/role
 - No additional configuration needed
 
 ## Usage Examples
 
 ### Basic Cost Query
+
 ```go
 // Query costs for the last 30 days for an EC2 instance
 resource := &pluginsdk.ResourceDescriptor{
@@ -85,6 +92,7 @@ response, err := plugin.GetActualCost(ctx, &pluginsdk.GetActualCostRequest{
 ```
 
 ### Cost Query with Dimensions
+
 ```go
 // Query costs grouped by service and region
 response, err := plugin.GetActualCost(ctx, &pluginsdk.GetActualCostRequest{
@@ -96,6 +104,7 @@ response, err := plugin.GetActualCost(ctx, &pluginsdk.GetActualCostRequest{
 ```
 
 ### Service-Level Cost Query
+
 ```go
 // Get costs for EC2 service across all accounts
 response, err := plugin.GetServiceActualCost(ctx, &pluginsdk.GetServiceActualCostRequest{
@@ -106,6 +115,7 @@ response, err := plugin.GetServiceActualCost(ctx, &pluginsdk.GetServiceActualCos
 ```
 
 ### Account-Level Cost Query
+
 ```go
 // Get costs for specific AWS account
 response, err := plugin.GetAccountActualCost(ctx, &pluginsdk.GetAccountActualCostRequest{
@@ -118,6 +128,7 @@ response, err := plugin.GetAccountActualCost(ctx, &pluginsdk.GetAccountActualCos
 ## Response Format
 
 ### Successful Response
+
 ```json
 {
   "entries": [
@@ -140,6 +151,7 @@ response, err := plugin.GetAccountActualCost(ctx, &pluginsdk.GetAccountActualCos
 ```
 
 ### No Data Response
+
 ```json
 {
   "entries": [],
@@ -152,18 +164,22 @@ response, err := plugin.GetAccountActualCost(ctx, &pluginsdk.GetAccountActualCos
 ## Common Issues
 
 ### Authentication Failed
+
 **Error**: `AWS authentication failed: NoCredentialProviders`
 **Solution**: Configure AWS credentials using one of the methods above
 
 ### Cost Explorer Not Enabled
+
 **Error**: `AWS Cost Explorer must be enabled for this account`
 **Solution**: Enable Cost Explorer in AWS Console → Billing → Cost Explorer
 
 ### Rate Limit Exceeded
+
 **Behavior**: Plugin automatically retries with exponential backoff
 **Solution**: Wait for retry, or reduce query frequency
 
 ### Date Range Too Large
+
 **Error**: `Date range exceeds AWS Cost Explorer limits`
 **Solution**: Limit queries to maximum 14 months historical data
 
@@ -185,11 +201,13 @@ The plugin logs structured JSON to stderr. Monitor for:
 ## Troubleshooting
 
 ### Enable Debug Logging
+
 ```bash
 export FINFOCUS_LOG_LEVEL=debug
 ```
 
 ### Check Plugin Status
+
 ```bash
 # Verify plugin is installed
 ls -la ~/.finfocus/plugins/aws-ce/1.0.0/
@@ -199,6 +217,7 @@ ls -la ~/.finfocus/plugins/aws-ce/1.0.0/
 ```
 
 ### Test AWS Credentials
+
 ```bash
 aws sts get-caller-identity
 aws ce get-cost-and-usage --time-period Start=2024-12-01,End=2024-12-02 --granularity=DAILY --metrics=BlendedCost
@@ -208,5 +227,4 @@ aws ce get-cost-and-usage --time-period Start=2024-12-01,End=2024-12-02 --granul
 
 - **Issues**: GitHub repository issues
 - **Documentation**: Full API reference in `/specs/001-aws-ce-plugin/contracts/`
-- **Logs**: Check plugin stderr output for detailed error information</content>
-<parameter name="filePath">$GOPATH/src/github.com/rshade/finfocus-plugin-aws-ce/specs/001-aws-ce-plugin/quickstart.md
+- **Logs**: Check plugin stderr output for detailed error information

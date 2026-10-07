@@ -15,6 +15,7 @@ This feature establishes CI/CD infrastructure and does not introduce new data en
 ## Configuration Schema
 
 ### Goreleaser Configuration
+
 ```yaml
 # .goreleaser.yaml structure (for reference)
 project_name: finfocus-plugin-aws-ce
@@ -33,6 +34,7 @@ builds:
 ```
 
 ### Release Please Configuration
+
 ```json
 {
   "packages": {

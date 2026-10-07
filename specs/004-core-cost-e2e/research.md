@@ -23,12 +23,14 @@ This document consolidates research findings for implementing the core AWS Cost 
 **Chosen: JSON** (Current implementation optimal)
 
 **Rationale:**
+
 - **Human-readable debugging**: Cost data caching is not performance-critical; readability for debugging is more valuable than marginal speed gains
 - **KISS principle**: JSON avoids dependencies, uses Go stdlib, requires no code generation
 - **Adequate performance**: Cost queries typically take 2-5 seconds; JSON serialization overhead is < 1ms
 - **24-hour TTL context**: Cache volume modest (typically <100 entries max)
 
 **Performance comparison:**
+
 | Format | Speed | File Size | Debuggability | Complexity |
 |--------|-------|-----------|---------------|------------|
 | JSON | ✓ Adequate | Baseline | ✓✓✓ Excellent | ✓✓✓ Simple |
@@ -40,11 +42,13 @@ This document consolidates research findings for implementing the core AWS Cost 
 **Chosen: `os.UserCacheDir()` with application subdirectory**
 
 **Platform resolution:**
+
 - **Linux/Unix**: `$XDG_CACHE_HOME/finfocus/aws-ce` (default: `~/.cache/finfocus/aws-ce`)
 - **macOS**: `~/Library/Caches/finfocus/aws-ce`
 - **Windows**: `%LocalAppData%\finfocus\aws-ce`
 
 **Implementation:**
+
 ```go
 func getCacheDir() (string, error) {
     baseDir, err := os.UserCacheDir()
@@ -56,6 +60,7 @@ func getCacheDir() (string, error) {
 ```
 
 **Advantages over current approach** (`~/.finfocus/cache/aws-ce`):
+
 - Cross-platform without dependencies
 - Respects platform conventions (macOS Library/Caches)
 - Follows XDG Base Directory Specification on Unix
@@ -63,11 +68,12 @@ func getCacheDir() (string, error) {
 
 ### Decision: Cache Key Structure
 
-**Chosen: Versioned structured keys**
+#### Chosen: Versioned structured keys
 
 **Pattern:** `cost:v1:RESOURCE:SERVICE:REGION:START:END`
 
 **Implementation:**
+
 ```go
 type CacheKeyComponents struct {
     ResourceID  string
@@ -89,6 +95,7 @@ func (c *CacheKeyComponents) String() string {
 ```
 
 **Advantages:**
+
 - **Versioning**: `v1` allows schema evolution without breaking existing cache
 - **Structured**: Separates concerns (resource, filtering, time)
 - **Debuggable**: Human-readable in log files
@@ -100,6 +107,7 @@ func (c *CacheKeyComponents) String() string {
 **Chosen: Dual-layer lazy eviction** (Current approach optimal)
 
 **Layer 1 - Embedded Timestamp** (Primary):
+
 ```go
 type CacheEntry struct {
     Results   []CostEntry
@@ -113,6 +121,7 @@ if time.Now().After(entry.ExpiresAt) {
 ```
 
 **Layer 2 - File Modification Time** (Fallback):
+
 ```go
 if time.Since(info.ModTime()) > cm.ttl {
     _ = os.Remove(path)  // Lazy cleanup
@@ -121,6 +130,7 @@ if time.Since(info.ModTime()) > cm.ttl {
 ```
 
 **Rationale:**
+
 - Plugin runs as short-lived process (no persistent background cleanup needed)
 - Lazy eviction sufficient for stateless plugin model
 - Embedded timestamp fastest check (no filesystem syscall)
@@ -128,9 +138,10 @@ if time.Since(info.ModTime()) > cm.ttl {
 
 ### Decision: Manual Invalidation Mechanism
 
-**Chosen: Environment variable for force-refresh**
+#### Chosen: Environment variable for force-refresh
 
 **Implementation:**
+
 ```go
 // In calculator.go GetActualCost()
 if os.Getenv("FINFOCUS_CACHE_BYPASS") == "true" {
@@ -142,6 +153,7 @@ if os.Getenv("FINFOCUS_CACHE_BYPASS") == "true" {
 ```
 
 **Usage:**
+
 ```bash
 FINFOCUS_CACHE_BYPASS=true finfocus-plugin-aws-ce
 ```
@@ -155,6 +167,7 @@ FINFOCUS_CACHE_BYPASS=true finfocus-plugin-aws-ce
 **Chosen: Environment variable gating** (Current approach)
 
 **Current structure:**
+
 ```
 test/
 └── e2e/
@@ -162,6 +175,7 @@ test/
 ```
 
 **Gating mechanism:**
+
 ```go
 func TestE2E(t *testing.T) {
     if os.Getenv("FINFOCUS_E2E") != "true" {
@@ -172,6 +186,7 @@ func TestE2E(t *testing.T) {
 ```
 
 **Rationale:**
+
 - Simpler than build tags for typical use case
 - Prevents accidental E2E execution (AWS API calls)
 - Works well for gated CI/CD environments
@@ -189,13 +204,15 @@ func TestE2E(t *testing.T) {
     aws-region: us-east-1
 ```
 
-**Local Development: AWS Profile**
+#### Local Development: AWS Profile
+
 ```bash
 export AWS_PROFILE=your-profile
 FINFOCUS_E2E=true make e2e
 ```
 
 **Test Skipping Logic:**
+
 ```go
 func skipIfNoAWSCreds(t *testing.T) {
     // Skip if neither credentials file nor env vars present
@@ -210,9 +227,10 @@ func skipIfNoAWSCreds(t *testing.T) {
 
 ### Decision: E2E Test Data Strategy
 
-**Chosen: Last 7 days with structure-focused assertions**
+#### Chosen: Last 7 days with structure-focused assertions
 
 **Date Range Selection:**
+
 ```go
 now := time.Now()
 start := now.AddDate(0, 0, -7)  // Last 7 days (minimizes cost)
@@ -220,6 +238,7 @@ end := now
 ```
 
 **Assertion Pattern** (handle non-deterministic AWS data):
+
 ```go
 // DON'T: Assert specific cost values (non-deterministic)
 // if len(resp.Results) != 5 { t.Error("expected 5 results") }
@@ -243,6 +262,7 @@ for _, r := range resp.Results {
 **Overall test suite timeout:** 2 minutes (per spec)
 
 **Implementation:**
+
 ```go
 func TestE2E(t *testing.T) {
     // Overall test timeout (2 minutes as per spec)
@@ -266,6 +286,7 @@ func TestE2E(t *testing.T) {
 ```
 
 **Makefile enhancement:**
+
 ```makefile
 e2e:
     @echo "Running E2E tests (2-minute timeout)..."
@@ -275,6 +296,7 @@ e2e:
 ### Decision: CI Integration Pattern
 
 **Workflow configuration** (`.github/workflows/e2e.yml`):
+
 ```yaml
 permissions:
   contents: read
@@ -307,9 +329,10 @@ jobs:
 
 ### Decision: Retry Configuration
 
-**Chosen: 3 attempts max with conservative parameters**
+#### Chosen: 3 attempts max with conservative parameters
 
 **Parameters:**
+
 ```go
 RetryConfig{
     MaxRetries: 3,                      // 3 total attempts (AWS SDK default)
@@ -319,6 +342,7 @@ RetryConfig{
 ```
 
 **Rationale:**
+
 - Cost Explorer typically returns quickly (under 5 seconds)
 - 3 attempts covers 99%+ of transient failures
 - 100ms base allows rapid recovery from brief blips
@@ -327,6 +351,7 @@ RetryConfig{
 ### Decision: Error Classification
 
 **Retryable errors:**
+
 ```go
 func classifyRetryable(err error) bool {
     // AWS API errors
@@ -361,12 +386,14 @@ func classifyRetryable(err error) bool {
 ```
 
 **Throttle error codes:**
+
 - `Throttling`, `ThrottlingException`, `ThrottledException`
 - `TooManyRequestsException`, `RequestThrottledException`
 - `LimitExceededException`, `RequestLimitExceeded`
 - `RequestThrottled`
 
 **Non-retryable errors:**
+
 - `ValidationException`, `InvalidParameterException`
 - `AccessDeniedException`, `UnauthorizedOperation`
 - HTTP 400 (Bad Request), 401 (Unauthorized), 403 (Forbidden)
@@ -374,12 +401,13 @@ func classifyRetryable(err error) bool {
 
 ### Decision: Backoff Algorithm
 
-**Chosen: Exponential backoff with uniform jitter**
+#### Chosen: Exponential backoff with uniform jitter
 
 **Formula:** `delay = (2^attempt * baseDelay) * jitter`
 **Jitter range:** 0.9 - 1.1 (10% variation)
 
 **Implementation:**
+
 ```go
 func calculateDelay(attempt int, baseDelay, maxDelay time.Duration) time.Duration {
     exp := math.Pow(2, float64(attempt))
@@ -397,6 +425,7 @@ func calculateDelay(attempt int, baseDelay, maxDelay time.Duration) time.Duratio
 ```
 
 **Backoff progression** (with jitter range):
+
 | Attempt | Min Delay | Max Delay | Cap |
 |---------|-----------|-----------|-----|
 | 1 | 90ms | 110ms | - |
@@ -407,6 +436,7 @@ func calculateDelay(attempt int, baseDelay, maxDelay time.Duration) time.Duratio
 ### Decision: Network Diagnostics
 
 **Structured logging for retry attempts:**
+
 ```go
 logger.Info().
     Int("attempt", attempt).
@@ -418,6 +448,7 @@ logger.Info().
 ```
 
 **Error type classification:**
+
 ```go
 func classifyError(err error) string {
     var dnsErr *net.DNSError
@@ -463,6 +494,7 @@ func classifyError(err error) string {
 ```
 
 **Actionable error messages:**
+
 ```go
 switch {
 case strings.HasPrefix(errorType, "aws:"):
@@ -485,9 +517,10 @@ case strings.HasPrefix(errorType, "dns:"):
 
 ### Decision: Logging-Only Approach (No Proto Changes)
 
-**Chosen: Structured logging with existing SDK infrastructure**
+#### Chosen: Structured logging with existing SDK infrastructure
 
 **Rationale:**
+
 - **gRPC protocol compatibility**: No breaking changes to CostSourceService
 - **Backward compatible**: Clients unaware of warnings still function
 - **Rich context**: Structured logging preserves all warning metadata
@@ -496,6 +529,7 @@ case strings.HasPrefix(errorType, "dns:"):
 ### SDK Error Infrastructure
 
 **ErrorDetail message** (from costsource.proto):
+
 ```protobuf
 message ErrorDetail {
   ErrorCode code = 1;
@@ -508,13 +542,15 @@ message ErrorDetail {
 ```
 
 **Error categories:**
+
 - `ERROR_CATEGORY_TRANSIENT` (1): Temporary failures eligible for retry
 - `ERROR_CATEGORY_PERMANENT` (2): Failures requiring changes
 - `ERROR_CATEGORY_CONFIGURATION` (3): Invalid setup/credentials
 
 ### Logging Pattern for Partial Data
 
-**Scenario 1: No cost data found**
+#### Scenario 1: No cost data found
+
 ```go
 if len(clientCosts) == 0 {
     c.logger.Warn().
@@ -533,7 +569,8 @@ if len(clientCosts) == 0 {
 }
 ```
 
-**Scenario 2: Identifier mismatch**
+#### Scenario 2: Identifier mismatch
+
 ```go
 if !strings.HasSuffix(parsed.Resource, resourceID) {
     c.logger.Warn().
@@ -546,7 +583,8 @@ if !strings.HasSuffix(parsed.Resource, resourceID) {
 }
 ```
 
-**Scenario 3: Cache write failures**
+#### Scenario 3: Cache write failures
+
 ```go
 if c.cache != nil {
     if err := c.cache.Set(cacheKey, costs); err != nil {
@@ -576,6 +614,7 @@ const (
 ### When Proto Changes Become Necessary
 
 Proto changes should only be considered for:
+
 - **New capabilities** requiring client awareness (e.g., confidence scores)
 - **Data structure changes** that impact response interpretation
 - **Standard compliance** (e.g., FinOps FOCUS 1.2 additions)
@@ -589,11 +628,13 @@ Proto changes should only be considered for:
 ### Decision: OIDC Provider Configuration
 
 **AWS OIDC Provider:**
+
 - **URL**: `https://token.actions.githubusercontent.com`
 - **Thumbprint** (Jan 2025): `1b511abead59c6ce207077c0ef0caf8f82b5b5ee`
 - **Audience**: `sts.amazonaws.com`
 
 **Creation command:**
+
 ```bash
 aws iam create-open-id-connect-provider \
   --url https://token.actions.githubusercontent.com \
@@ -604,6 +645,7 @@ aws iam create-open-id-connect-provider \
 ### Decision: IAM Role Trust Policy
 
 **Trust policy template:**
+
 ```json
 {
   "Version": "2012-10-17",
@@ -628,6 +670,7 @@ aws iam create-open-id-connect-provider \
 ```
 
 **For main branch only (tighter security):**
+
 ```json
 "Condition": {
   "StringEquals": {
@@ -640,6 +683,7 @@ aws iam create-open-id-connect-provider \
 ### Decision: IAM Permissions (Least Privilege)
 
 **Minimal Cost Explorer permissions:**
+
 ```json
 {
   "Version": "2012-10-17",
@@ -661,6 +705,7 @@ aws iam create-open-id-connect-provider \
 ```
 
 **For CI/CD testing only (even more restrictive):**
+
 ```json
 {
   "Version": "2012-10-17",
@@ -683,6 +728,7 @@ aws iam create-open-id-connect-provider \
 ### Decision: GitHub Actions Workflow
 
 **Complete workflow with OIDC:**
+
 ```yaml
 name: E2E Tests
 
@@ -730,6 +776,7 @@ jobs:
 **Security Note:** OIDC credentials are NOT available for fork PRs by design.
 
 **Workflow pattern:**
+
 - Fork PRs: Skip E2E tests (no credentials)
 - Non-fork PRs: Run E2E tests with OIDC
 - Push to main: Always run E2E tests with OIDC
@@ -737,11 +784,13 @@ jobs:
 ### Session Configuration
 
 **Session duration:**
+
 - Default: 1 hour (3600 seconds)
 - Range: 15 minutes to 12 hours
 - Configured via `role-session-duration` in workflow
 
 **Session naming:** Automatically generated by aws-actions:
+
 - Includes GitHub actor username
 - Repository name
 - Run ID
@@ -749,6 +798,7 @@ jobs:
 ### Validation
 
 **Validation script** (`scripts/validate-oidc-setup.sh`):
+
 ```bash
 #!/bin/bash
 set -e
