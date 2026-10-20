@@ -22,15 +22,16 @@ jobs:
       - name: Fetch Vale styles
         run: vale sync
 
-      - name: Vale -> reviewdog
+      - name: Vale -> reviewdog annotations
         env:
           REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # OpenSpec specs remain in Vale; only generated Claude templates are excluded.
+          # OpenSpec specs remain in Vale; generated Claude templates are excluded.
+          # Annotations avoid GitHub's PR review body limit and review POST failures.
           vale . --glob '!{CHANGELOG.md,.claude/**}' --output=line 2>/dev/null | reviewdog \
             -efm="%f:%l:%c:%m" \
             -name="vale" \
-            -reporter=github-pr-review \
+            -reporter=github-annotations \
             -filter-mode=added \
             -level=warning \
             -fail-level=none
