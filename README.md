@@ -53,6 +53,9 @@ credential values into source files or logs.
 | `FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` | CE request attempt budget per minute | Unlimited when unset or `0` |
 | `FINFOCUS_HEALTH_ENDPOINT` | Serve SDK `/healthz` on the plugin port. `true` also enables Connect | `false` |
 | `FINFOCUS_WEB_ENABLED` | Serve Connect and gRPC-Web beside gRPC on the plugin port | `false` |
+| `FINFOCUS_CORS_ALLOWED_ORIGINS` | Comma-separated browser origins. Empty allows none | Empty |
+| `FINFOCUS_CORS_ALLOW_CREDENTIALS` | Allow credentialed cross-origin requests | `false` |
+| `FINFOCUS_CORS_ALLOWED_HEADERS` | Comma-separated allowed request headers. Empty uses the SDK set | SDK default |
 
 `FINFOCUS_HEALTH_ENDPOINT=true` turns Connect on even when
 `FINFOCUS_WEB_ENABLED=false`. The SDK serves `/healthz` only in Connect mode,
@@ -60,6 +63,9 @@ and only on the plugin listener. There is no separate health port. Connect
 mode leaves the gRPC trace header unread, so leave both off unless you need
 HTTP health checks or a Connect client. `true` and `false` are the only
 accepted values. Any other value stops startup and names the setting.
+A wildcard origin together with `FINFOCUS_CORS_ALLOW_CREDENTIALS=true`
+stops startup. The SDK rejects that combination. An empty entry in a
+comma-separated list does too.
 
 For a log file in the current directory, set
 `FINFOCUS_LOG_FILE="$(pwd)/aws-ce.log"`. Empty batch settings use defaults.
