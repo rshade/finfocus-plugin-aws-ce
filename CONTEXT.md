@@ -1,5 +1,18 @@
 # Architectural context
 
+## Change process
+
+Current tested behavior lives in `openspec/specs/`. For behavior changes,
+propose an OpenSpec change, apply it, verify it, and archive it. The `specs/`
+and `.specify/` directories are frozen Spec Kit history. Do not add new work to
+them.
+
+The still-applicable development rules from the historical constitution are:
+keep code focused and explicit, handle errors, document exported Go symbols,
+write unit tests for new functionality, test gRPC paths where applicable, mock
+AWS clients in unit tests, keep stdout reserved for the port announcement, and
+run `make test` and `make lint` before committing.
+
 ## Core architectural identity
 
 **Lightweight gRPC plugin and adapter**

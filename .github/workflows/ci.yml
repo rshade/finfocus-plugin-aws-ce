@@ -20,10 +20,13 @@ jobs:
       - name: Set up tools with mise
         uses: jdx/mise-action@v5
         with:
-          install_args: go golangci-lint go:golang.org/x/vuln/cmd/govulncheck
+          install_args: go golangci-lint go:golang.org/x/vuln/cmd/govulncheck node npm:@fission-ai/openspec
 
       - name: Run golangci-lint
         run: make lint
+
+      - name: Validate OpenSpec
+        run: openspec validate --all --strict
 
       - name: Run vulnerability check
         run: make vuln

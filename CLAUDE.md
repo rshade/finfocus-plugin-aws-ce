@@ -3,6 +3,10 @@
 This file provides guidance to Claude Code at `claude.ai/code` when working with
 code in this repository.
 
+For behavior changes, use OpenSpec: propose, apply, verify, and archive. Current
+tested behavior lives in `openspec/specs/`. The `specs/` and `.specify/`
+directories preserve frozen Spec Kit history; do not add new work there.
+
 ## Build commands
 
 ```bash

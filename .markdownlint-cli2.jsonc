@@ -2,5 +2,5 @@
   // Match CI's checkout when running locally with dependencies and build artifacts.
   "gitignore": true,
   // release-please owns the formatting of the generated changelog.
-  "ignores": ["CHANGELOG.md"]
+  "ignores": ["CHANGELOG.md", ".claude/**"]
 }
