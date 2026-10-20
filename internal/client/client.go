@@ -257,7 +257,7 @@ func (c *Client) GetCostForecast(ctx context.Context, filter *types.Expression, 
 	input := &costexplorer.GetCostForecastInput{
 		TimePeriod:              interval,
 		Granularity:             types.Granularity(granularity),
-		Metric:                  types.MetricUnblendedCost,
+		Metric:                  types.MetricAmortizedCost,
 		Filter:                  filter,
 		PredictionIntervalLevel: aws.Int32(forecastIntervalLevel),
 	}
@@ -278,6 +278,53 @@ func (c *Client) GetCostForecast(ctx context.Context, filter *types.Expression, 
 	}
 
 	return c.parseForecastResults(output)
+}
+
+// GetPeriodCost returns the AmortizedCost total for [startTime, endTime) in one
+// MONTHLY request. It reports a zero total with an empty currency when Cost
+// Explorer returns no rows, which is a period with no spend yet.
+func (c *Client) GetPeriodCost(ctx context.Context, filter *types.Expression, startTime, endTime time.Time) (float64, string, error) {
+	interval, err := dateInterval(startTime, endTime)
+	if err != nil {
+		return 0, "", err
+	}
+	input := &costexplorer.GetCostAndUsageInput{
+		TimePeriod:  interval,
+		Granularity: types.GranularityMonthly,
+		Metrics:     []string{metricAmortizedCost},
+		Filter:      filter,
+	}
+	output, err := WithRetry(ctx, DefaultRetryConfig(), func(ctx context.Context) (*costexplorer.GetCostAndUsageOutput, error, bool) {
+		if err := runPageHook(ctx); err != nil {
+			return nil, err, false
+		}
+		out, err := c.ceClient.GetCostAndUsage(ctx, input)
+		if err != nil {
+			return nil, err, isRetryableError(err)
+		}
+		return out, nil, false
+	})
+	if err != nil {
+		return 0, "", fmt.Errorf("getting period cost: %w", err)
+	}
+	total := new(big.Rat)
+	currency := ""
+	for _, row := range output.ResultsByTime {
+		mv, ok := row.Total[metricAmortizedCost]
+		if !ok {
+			return 0, "", fmt.Errorf("%w: %s", ErrAmountMissing, metricAmortizedCost)
+		}
+		amount, unit, err := parseDecimalAmount(mv)
+		if err != nil {
+			return 0, "", err
+		}
+		total.Add(total, amount)
+		if unit != "" {
+			currency = unit
+		}
+	}
+	value, _ := total.Float64()
+	return value, currency, nil
 }
 
 // GetAnomalies reads one page of Cost Explorer anomalies. The caller supplies

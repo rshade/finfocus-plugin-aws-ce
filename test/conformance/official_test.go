@@ -18,6 +18,7 @@ import (
 	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
 	sdktesting "github.com/rshade/finfocus-spec/sdk/go/testing"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
 )
 
 // suiteProxy adapts the SDK's server entry point to a real subprocess client.
@@ -44,8 +45,14 @@ func (p *suiteProxy) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 		pluginsdk.CredentialMetadataPrefix+"secret_access_key", "test")
 	return p.client.GetActualCost(ctx, req)
 }
+
+// GetProjectedCost scopes the suite's single EC2 sample to the account. Cost
+// Explorer cannot forecast one resource, so the plugin declines that request by
+// design; the account scope is the request it can answer.
 func (p *suiteProxy) GetProjectedCost(ctx context.Context, req *pbc.GetProjectedCostRequest) (*pbc.GetProjectedCostResponse, error) {
-	return p.client.GetProjectedCost(ctx, req)
+	scoped := proto.Clone(req).(*pbc.GetProjectedCostRequest)
+	scoped.Resource.ResourceType = "aws:account"
+	return p.client.GetProjectedCost(ctx, scoped)
 }
 func (p *suiteProxy) GetPricingSpec(ctx context.Context, req *pbc.GetPricingSpecRequest) (*pbc.GetPricingSpecResponse, error) {
 	return p.client.GetPricingSpec(ctx, req)
@@ -106,6 +113,9 @@ func TestOfficialStandardConformance(t *testing.T) {
 				t.Errorf("unexpected discovery dimension %q", request.Dimension)
 			}
 			_, _ = w.Write([]byte(`{"DimensionValues":[]}`))
+		case "AWSInsightsIndexService.GetCostAndUsage":
+			_, _ = fmt.Fprintf(w, `{"ResultsByTime":[{"TimePeriod":{"Start":%q,"End":%q},"Total":{"AmortizedCost":{"Amount":"0.50","Unit":"USD"}}}]}`,
+				request.TimePeriod.Start, request.TimePeriod.End)
 		case "AWSInsightsIndexService.GetCostAndUsageWithResources":
 			costs.Add(1)
 			if request.Granularity != "DAILY" || request.TimePeriod.Start == "" || request.TimePeriod.End == "" {

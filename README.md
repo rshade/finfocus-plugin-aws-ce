@@ -3,10 +3,13 @@
 `finfocus-plugin-aws-ce` retrieves actual AWS costs through Cost Explorer for
 FinFocus. The plugin name is `aws-ce`, and it implements the `finfocus-spec`
 v0.7.8 protocol. It advertises actual costs, Cost Explorer forecasts, and optimization recommendations.
-`GetProjectedCost` proxies `GetCostForecast` for the next 30 Coordinated
-Universal Time days. A single forecast row copies AWS prediction bounds and
-the requested 80 percent interval. Several rows sum the means and leave the
-interval unset. The plugin doesn't calculate its own forecast.
+`GetProjectedCost` answers for `aws:account` and `aws:service` only. It
+returns the projected total for the current Coordinated Universal Time
+calendar month: the amortized cost already billed before today plus the Cost
+Explorer forecast from today to the last day of the month. Cost Explorer cannot
+forecast a single resource, so any other resource gets `InvalidArgument`
+instead of a service or account total. The plugin doesn't calculate its own
+forecast.
 
 ## Quick start
 

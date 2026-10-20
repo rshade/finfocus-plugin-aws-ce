@@ -37,7 +37,7 @@ Explorer. It implements the `finfocus-spec` plugin SDK interface.
 
 - `cmd/plugin/main.go` sets up the gRPC server at the plugin entry point
 - `internal/pricing/calculator.go` contains the core `Calculator` struct
-  - `GetProjectedCost()` proxies `ce:GetCostForecast` for the next 30 Coordinated Universal Time days and copies AWS interval bounds from a single row
+  - `GetProjectedCost()` serves `aws:account` and `aws:service` only and declines other resources with `InvalidArgument`. It returns month-to-date `AmortizedCost` (`ce:GetCostAndUsage`) plus the `ce:GetCostForecast` to the first of next month, and shifts the AWS interval bounds by the month-to-date amount
   - `GetActualCost()` retrieves historical costs from the Cost Explorer API
   - `GetServiceActualCost()` and `GetAccountActualCost()` handle service and account queries
 - `internal/client/client.go` wraps the AWS Cost Explorer API client
