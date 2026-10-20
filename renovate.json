@@ -1,36 +1,47 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:base",
-    "helpers:pinGitCommits"
+    "config:recommended"
   ],
-  "vulnerabilityAlerts": {
-    "enabled": true,
-    "labels": ["security", "dependencies"]
-  },
-  "go": {
-    "enabled": true
-  },
   "postUpdateOptions": [
     "gomodTidy"
   ],
-  "npm": {
-    "enabled": true
-  },
+  "schedule": [
+    "before 4am on monday"
+  ],
+  "timezone": "UTC",
   "packageRules": [
     {
-      "matchUpdateTypes": ["minor", "patch"],
-      "automerge": true,
-      "automergeType": "pr",
-      "automergeStrategy": "squash"
+      "matchDepNames": ["go"],
+      "allowedVersions": "~1.27"
     },
     {
-      "matchDatasources": ["go"],
-      "extends": ["schedule:weekly"]
+      "description": "testdata go.mod files are fixtures whose pinned versions are what the tests assert, so Renovate must not bump them.",
+      "matchFileNames": [
+        "**/testdata/**"
+      ],
+      "enabled": false
+    },
+    {
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "go dependencies",
+      "groupSlug": "go-deps"
+    },
+    {
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "groupName": "go major dependencies",
+      "groupSlug": "go-major-deps"
     }
-  ],
-  "ignoreDeps": [
-    "golang",
-    "golang.org/x/vuln/cmd/govulncheck"
   ]
 }

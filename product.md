@@ -62,7 +62,7 @@ At the planning baseline, the project lacked the infrastructure present in `finf
 Required configuration:
 
 1. **Workflows in `.github/workflows/`:**
-   - `test.yml` for standard Go tests.
+   - `ci.yml` for Go lint, tests, and build verification.
    - `release.yml` for automated releases through `goreleaser/goreleaser-action`.
    - `release-please.yml` for changelog generation and version updates.
 2. **Release configuration:**

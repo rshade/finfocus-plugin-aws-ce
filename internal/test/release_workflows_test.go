@@ -40,7 +40,9 @@ func TestReleaseWorkflows(t *testing.T) {
 		Jobs map[string]struct {
 			Steps []struct {
 				Uses string         `yaml:"uses"`
+				Run  string         `yaml:"run"`
 				With map[string]any `yaml:"with"`
+				Env  map[string]any `yaml:"env"`
 			} `yaml:"steps"`
 		} `yaml:"jobs"`
 	}
@@ -60,8 +62,8 @@ func TestReleaseWorkflows(t *testing.T) {
 	require.Equal(t, "actions/checkout@v7", steps[0].Uses)
 	require.Equal(t, "${{ inputs.tag || github.event.release.tag_name }}", steps[0].With["ref"])
 	require.Equal(t, 0, steps[0].With["fetch-depth"])
-	require.Equal(t, "actions/setup-go@v7", steps[1].Uses)
-	require.Equal(t, "go.mod", steps[1].With["go-version-file"])
-	require.Equal(t, "goreleaser/goreleaser-action@v7", steps[2].Uses)
-	require.Equal(t, "release --clean", strings.TrimSpace(steps[2].With["args"].(string)))
+	require.Equal(t, "jdx/mise-action@v5", steps[1].Uses)
+	require.Equal(t, "go goreleaser", steps[1].With["install_args"])
+	require.Equal(t, "goreleaser release --clean", strings.TrimSpace(steps[2].Run))
+	require.Equal(t, "${{ secrets.GITHUB_TOKEN }}", steps[2].Env["GITHUB_TOKEN"])
 }
