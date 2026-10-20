@@ -56,8 +56,8 @@ finished and the duplicates listed under [Rejected and out of scope](#rejected-a
 | ✅ Done | [#40](https://github.com/rshade/finfocus-plugin-aws-ce/issues/40) | Add `GetPluginInfo()` remote procedure call | Return plugin metadata for discovery |
 | ✅ Done | [#41](https://github.com/rshade/finfocus-plugin-aws-ce/issues/41) | Add `Supports()` remote procedure call | Validate resource/provider support |
 | ⏭️ Closed | [#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42) | Docker support | Owner decision: binary archives only |
-| 📋 Planned | [#43](https://github.com/rshade/finfocus-plugin-aws-ce/issues/43) | HTTP health endpoint | Container orchestration support |
-| 📋 Planned | [#44](https://github.com/rshade/finfocus-plugin-aws-ce/issues/44) | Documentation directory | API and deployment guides |
+| ✅ Done | [#43](https://github.com/rshade/finfocus-plugin-aws-ce/issues/43) | HTTP health endpoint | `/healthz` on the plugin listener. Default off so gRPC tracing stays intact |
+| ✅ Done | [#44](https://github.com/rshade/finfocus-plugin-aws-ce/issues/44) | Documentation directory | API, deployment, configuration, and troubleshooting guides |
 | ✅ Done | [#45](https://github.com/rshade/finfocus-plugin-aws-ce/issues/45) | Integration tests for gRPC server | Server behavior verification |
 | ✅ Done | [#46](https://github.com/rshade/finfocus-plugin-aws-ce/issues/46) | Trace ID propagation | Distributed tracing support |
 | ✅ Done | [#47](https://github.com/rshade/finfocus-plugin-aws-ce/issues/47) | Proto ErrorCode enum | Standardized error handling |
@@ -77,10 +77,10 @@ rule sets requiring a status-check migration when the workflow changed.
 
 | Status | Issue | Technical Thesis | Boundary Guardrail |
 |--------|-------|------------------|-------------------|
-| 📋 Planned | [#8](https://github.com/rshade/finfocus-plugin-aws-ce/issues/8) | AWS Budgets - Proxy `budgets:DescribeBudgets` | Read-only. No alerting logic |
-| 📋 Planned | [#36](https://github.com/rshade/finfocus-plugin-aws-ce/issues/36) | Cost Forecasting - `GetProjectedCost` with prediction intervals from `ce:GetCostForecast` | **Boundary:** no custom forecasting math. Use AWS forecast intervals |
+| ✅ Done | [#8](https://github.com/rshade/finfocus-plugin-aws-ce/issues/8) | AWS Budgets - Proxy `budgets:DescribeBudgets` | Read-only. No alerting logic |
+| ✅ Done | [#36](https://github.com/rshade/finfocus-plugin-aws-ce/issues/36) | Cost Forecasting - `GetProjectedCost` with prediction intervals from `ce:GetCostForecast` | No custom forecasting math. Use AWS forecast intervals |
 | ✅ Done | [#37](https://github.com/rshade/finfocus-plugin-aws-ce/issues/37) | Enrich GetActualCost with RI/SP data for `CE-6.4` | Map existing CE data |
-| 🔬 Research | [#38](https://github.com/rshade/finfocus-plugin-aws-ce/issues/38) | Anomaly Detection - Map `ce:GetAnomalies` | **Boundary:** no local machine learning models |
+| ✅ Done | [#38](https://github.com/rshade/finfocus-plugin-aws-ce/issues/38) | Anomaly Detection - Map `ce:GetAnomalies` | No local machine learning models |
 
 ## Advanced features for v0.3.0+
 
@@ -88,9 +88,9 @@ rule sets requiring a status-check migration when the workflow changed.
 
 | Status | Issue | Technical Thesis | Boundary Guardrail |
 |--------|-------|------------------|-------------------|
-| 🔬 Research | [#49](https://github.com/rshade/finfocus-plugin-aws-ce/issues/49) | Web/Connect protocol support | Browser client access |
+| ✅ Done | [#49](https://github.com/rshade/finfocus-plugin-aws-ce/issues/49) | Web/Connect protocol support | Browser client access |
 | ✅ Done | [#52](https://github.com/rshade/finfocus-plugin-aws-ce/issues/52) | Metadata enrichment | FOCUS source, granularity, metric, estimate and `lookback` columns |
-| 🔬 Research | [#54](https://github.com/rshade/finfocus-plugin-aws-ce/issues/54) | Cross-origin resource sharing support | Browser-based access |
+| ✅ Done | [#54](https://github.com/rshade/finfocus-plugin-aws-ce/issues/54) | Cross-origin resource sharing support | Browser-based access |
 | ✅ Done | [#55](https://github.com/rshade/finfocus-plugin-aws-ce/issues/55) | Batch configuration | Validated SDK batch limits and safe shared client initialization |
 
 ### Optimization recommendations
