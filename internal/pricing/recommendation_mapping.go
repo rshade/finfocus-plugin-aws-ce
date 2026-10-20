@@ -171,16 +171,24 @@ func mapSavingsPlansRecommendations(pages []costexplorer.GetSavingsPlansPurchase
 		}
 		for _, d := range p.SavingsPlansPurchaseRecommendationDetails {
 			account := aws.ToString(d.AccountId)
-			if account == "" {
+			if account == "" && p.AccountScope != types.AccountScopePayer {
 				return nil, fmt.Errorf("missing savings plan account")
+			}
+			// AWS may omit AccountId for payer-scoped details, so label them by scope.
+			label := account
+			if label == "" {
+				label = "payer"
 			}
 			currency := aws.ToString(d.CurrencyCode)
 			if currency == "" && p.SavingsPlansPurchaseRecommendationSummary != nil {
 				currency = aws.ToString(p.SavingsPlansPurchaseRecommendationSummary.CurrencyCode)
 			}
-			r, e := newAWSRecommendation(account, "account:"+account+":savings-plan", "savingsplans:Account", aws.ToString(d.EstimatedMonthlySavingsAmount), currency)
+			r, e := newAWSRecommendation(label, "account:"+label+":savings-plan", "savingsplans:Account", aws.ToString(d.EstimatedMonthlySavingsAmount), currency)
 			if e != nil {
 				return nil, e
+			}
+			if account == "" {
+				delete(r.Metadata, "account_id")
 			}
 			r.ActionType = pbc.RecommendationActionType_RECOMMENDATION_ACTION_TYPE_PURCHASE_COMMITMENT
 			r.ActionDetail = &pbc.Recommendation_Commitment{Commitment: &pbc.CommitmentAction{CommitmentType: "savings_plan", Term: string(p.TermInYears), PaymentOption: string(p.PaymentOption), Scope: "account"}}
@@ -207,9 +215,9 @@ func mapSavingsPlansRecommendations(pages []costexplorer.GetSavingsPlansPurchase
 			}
 			detailID := aws.ToString(d.RecommendationDetailId)
 			if detailID != "" {
-				r.Id = recommendationSource + ":" + account + ":" + detailID
+				r.Id = recommendationSource + ":" + label + ":" + detailID
 			} else {
-				r.Id = recommendationID(account, recommendationSource, r.Resource.Id, r.ActionType.String(), string(p.SavingsPlansType), r.Resource.Region, r.Resource.Sku, offering, string(p.TermInYears), string(p.PaymentOption), aws.ToString(d.HourlyCommitmentToPurchase), aws.ToString(d.UpfrontCost))
+				r.Id = recommendationID(label, recommendationSource, r.Resource.Id, r.ActionType.String(), string(p.SavingsPlansType), r.Resource.Region, r.Resource.Sku, offering, string(p.TermInYears), string(p.PaymentOption), aws.ToString(d.HourlyCommitmentToPurchase), aws.ToString(d.UpfrontCost))
 			}
 			if page.Metadata != nil {
 				if e = setRecommendationTime(r, aws.ToString(page.Metadata.GenerationTimestamp)); e != nil {
