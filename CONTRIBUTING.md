@@ -71,16 +71,27 @@ constraints, read [AGENTS.md](AGENTS.md) and [architectural context](CONTEXT.md)
 ### Markdown and prose
 
 Use descriptive headings, fenced code blocks with language names, and relative
-links to repository files. Check Markdown formatting and prose before submitting:
+links to repository files. Run Vale after each documentation edit, including
+specification and implementation-plan edits. Fix findings before starting the
+next implementation step, then rerun the checks before committing or pushing:
 
 ```bash
 make lint-md
 vale sync
-vale CONTRIBUTING.md
+vale --minAlertLevel=suggestion CONTRIBUTING.md
 ```
 
 Replace `CONTRIBUTING.md` with the files you changed. `make lint-md` checks all
 Markdown files using the repository configuration, including its exclusions.
+Require zero errors, warnings, and suggestions in changed documents. Vale can
+exit successfully with suggestions, and reviewdog posts those suggestions to
+the pull request. Inspect the diagnostic counts instead of relying on the exit
+status. Keep the configured rules active and correct the prose.
+
+For a specification change, also compare each acceptance criterion with the
+implementation and its tests. Distinguish implemented test infrastructure from
+executed verification, especially for live AWS checks. Vale checks writing style,
+so a clean report alone doesn't establish technical accuracy.
 
 ### Commit messages
 

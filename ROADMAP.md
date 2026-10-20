@@ -29,22 +29,22 @@ official SDK Standard conformance suite.
 Pulumi Environments, Secrets, and Configuration also supplied AWS credentials. Live service
 cost comparison passed after the owner granted Cost Explorer read permission.
 That earlier comparison predates the current commitment-discovery path.
-The current live harness remains unverified; resource-level verification is separate.
+The current live harness remains unverified. Resource-level verification is separate.
 The whole-repository Markdown check passes. Vulnerability
 scanning reports gRPC v1.84.0 through a vulnerability database version-range mismatch.
 The upstream advisory lists this stable version as patched. See the
 [audit security correction](./docs/audit-2026-10-07.md#security-correction-on-2026-10-07).
 The owner removed Docker support.
-v0.1.0 is released with binary archives and checksums. On 2026-10-19 the owner closed the issues this release
+The v0.1.0 release includes binary archives and checksums. On 2026-10-19 the owner closed the issues this release
 finished and the duplicates listed under [Rejected and out of scope](#rejected-and-out-of-scope).
 
 ## Foundation and continuous delivery for v0.1.0
 
 | Status | Issue | Technical Thesis | Boundary Guardrail |
 |--------|-------|------------------|-------------------|
-| 🔄 Partial | [#11](https://github.com/rshade/finfocus-plugin-aws-ce/issues/11) | Actual-cost translation and real core testing implemented offline. Manual live workflow and bounded comparison implemented; current live verification outstanding | Use values directly from `GetCostAndUsage` |
+| 🔄 Partial | [#11](https://github.com/rshade/finfocus-plugin-aws-ce/issues/11) | Actual-cost translation and real core testing implemented offline. Manual live workflow and bounded comparison implemented. Current live verification outstanding | Use values directly from `GetCostAndUsage` |
 | ✅ Done | [#12](https://github.com/rshade/finfocus-plugin-aws-ce/issues/12) | Installation & Documentation polish | Ready to use after installation |
-| ✅ Done | [#31](https://github.com/rshade/finfocus-plugin-aws-ce/issues/31) | Official Standard suite passes through the plugin process, using the pinned capability-aware SDK commit. Pull-request checks run the suite | Preserve mandatory checks; never fabricate pricing or discard failures |
+| ✅ Done | [#31](https://github.com/rshade/finfocus-plugin-aws-ce/issues/31) | Official Standard suite passes through the plugin process, using the pinned capability-aware SDK commit. Pull-request checks run the suite | Preserve mandatory checks. Never fabricate pricing or discard failures |
 | ✅ Done | [#23](https://github.com/rshade/finfocus-plugin-aws-ce/issues/23) | Use `finfocus-spec` v0.7.5 | Dependency update only |
 
 ## Core features for v0.2.0
@@ -79,7 +79,7 @@ rule sets requiring a status-check migration when the workflow changed.
 |--------|-------|------------------|-------------------|
 | 📋 Planned | [#8](https://github.com/rshade/finfocus-plugin-aws-ce/issues/8) | AWS Budgets - Proxy `budgets:DescribeBudgets` | Read-only. No alerting logic |
 | 📋 Planned | [#36](https://github.com/rshade/finfocus-plugin-aws-ce/issues/36) | Cost Forecasting - `GetProjectedCost` with prediction intervals from `ce:GetCostForecast` | **Boundary:** no custom forecasting math. Use AWS forecast intervals |
-| ✅ Done | [#37](https://github.com/rshade/finfocus-plugin-aws-ce/issues/37) | Enrich GetActualCost with RI/SP data (`CE-6.4`) | Map existing CE data |
+| ✅ Done | [#37](https://github.com/rshade/finfocus-plugin-aws-ce/issues/37) | Enrich GetActualCost with RI/SP data for `CE-6.4` | Map existing CE data |
 | 🔬 Research | [#38](https://github.com/rshade/finfocus-plugin-aws-ce/issues/38) | Anomaly Detection - Map `ce:GetAnomalies` | **Boundary:** no local machine learning models |
 
 ## Advanced features for v0.3.0+

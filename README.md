@@ -122,9 +122,9 @@ and each additional page adds requests. The request budget bounds this work.
 
 On actual-cost requests, the descriptor identity takes precedence over legacy
 identifiers. The identity can be an id or ARN. A descriptor without either identity falls back to `resource_id`
-and `arn`. When a descriptor ID is a Pulumi URN, the plugin uses a non-empty
+and `arn`. When a descriptor ID is a Pulumi Uniform Resource Name (URN), the plugin uses a non-empty
 `resource.tags["pulumi:cloudId"]` as its cloud identity. Ordinary descriptor IDs
-retain precedence over that metadata. This identity metadata does not enable
+retain precedence over that metadata. This identity metadata doesn't enable
 Cost Explorer tag filtering. The SDK still requires `resource_id` on every request.
 
 Pass `billing_account_id` to receive FOCUS records. The plugin copies that
@@ -162,7 +162,7 @@ make vuln
 `make develop` fetches Go modules and prepares the build directory.
 `make test-integration` launches plugin processes against local fake Cost Explorer
 endpoints. All Go test recipes use `-count=1`. Releases contain binary archives
-and checksums; Docker support remains outside scope.
+and checksums. Docker support remains outside scope.
 
 Run the real FinFocus core test and official SDK conformance suite with:
 
@@ -176,7 +176,7 @@ make conformance
 `FINFOCUS_CORE_VERSION` to build another revision, or set `FINFOCUS_CORE_BINARY`
 to an existing executable. `make e2e`, also available as `make test-e2e`, uses
 an isolated registry, synthetic credentials, and a local fake AWS endpoint.
-It asserts actual cost results from core; a successful exit with no data fails.
+It asserts actual cost results from core. A successful exit with no data fails.
 `make conformance` runs the official Standard suite against the plugin's
 actual-only capabilities. Ordinary tests never query live AWS services.
 
@@ -188,14 +188,14 @@ unsupported methods. It retains mandatory checks without fabricated responses.
 [Live AWS verification](docs/AWS-VERIFICATION.md) has a separate `make e2e-live`
 target, explicit build and environment gates, and bounded AWS requests. It uses
 the existing Pulumi environment for credentials. The current foundation has
-no new live verification result; the recorded earlier check predates commitment
+no new live verification result. The recorded earlier check predates commitment
 discovery. Monthly grouping, tag filtering, and persistent cache reuse remain
 outside this change.
 
 The vulnerability check reports the known `GO-2026-6443` finding in
 gRPC v1.84.0. The plugin retains the stable dependency. This verification environment
-has no fixed stable release. The frozen `specs/` history also has pre-existing
-Markdown lint errors. Documentation checks cover changed files separately.
+has no fixed stable release. Markdown checks cover the repository, including specifications. Run Vale on
+each document you edit, as described in the contributor guide.
 
 ## License and support
 
