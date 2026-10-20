@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -52,24 +53,45 @@ func (p *suiteProxy) GetPricingSpec(ctx context.Context, req *pbc.GetPricingSpec
 func (p *suiteProxy) GetBudgets(ctx context.Context, req *pbc.GetBudgetsRequest) (*pbc.GetBudgetsResponse, error) {
 	return p.client.GetBudgets(ctx, req)
 }
+func (p *suiteProxy) GetRecommendations(ctx context.Context, req *pbc.GetRecommendationsRequest) (*pbc.GetRecommendationsResponse, error) {
+	return p.client.GetRecommendations(ctx, req)
+}
 
 func TestOfficialStandardConformance(t *testing.T) {
 	const resourceID = "i-0123456789abcdef0"
 	var costs, reservations, savings atomic.Int32
 	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read AWS request: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
 		var request struct {
 			Dimension   string
 			Granularity string
 			TimePeriod  struct{ Start, End string }
 			Filter      json.RawMessage
 		}
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		target := r.Header.Get("X-Amz-Target")
+		switch target {
+		case "AWSInsightsIndexService.GetCostForecast":
+			_, _ = w.Write([]byte(`{"Total":{"Amount":"1.25","Unit":"USD"},"ForecastResultsByTime":[{"TimePeriod":{"Start":"2026-10-20","End":"2026-10-21"},"MeanValue":"1.25","PredictionIntervalLowerBound":"1","PredictionIntervalUpperBound":"2"}]}`))
+			return
+		case "AWSInsightsIndexService.GetAnomalies":
+			_, _ = w.Write([]byte(`{"Anomalies":[]}`))
+			return
+		case "AWSBudgetServiceGateway.DescribeBudgets":
+			_, _ = w.Write([]byte(`{"Budgets":[]}`))
+			return
+		}
+		if err := json.Unmarshal(body, &request); err != nil {
 			t.Errorf("decode Cost Explorer request: %v", err)
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
-		switch r.Header.Get("X-Amz-Target") {
+		switch target {
 		case "AWSInsightsIndexService.GetDimensionValues":
 			switch request.Dimension {
 			case "RESERVATION_ID":
@@ -152,6 +174,7 @@ func conformanceEnvironment(t *testing.T, endpoint string) map[string]string {
 		"AWS_ACCESS_KEY_ID": "test", "AWS_SECRET_ACCESS_KEY": "test", "AWS_EC2_METADATA_DISABLED": "true",
 		"AWS_CONFIG_FILE": emptyConfig, "AWS_SHARED_CREDENTIALS_FILE": emptyConfig, "AWS_MAX_ATTEMPTS": "1",
 		"FINFOCUS_LOG_FILE": "", "FINFOCUS_PLUGIN_PORT": "0", "FINFOCUS_TEST_MODE": "true",
+		"FINFOCUS_AWS_ACCOUNT_ID": "123456789012",
 	} {
 		env[key] = value
 	}

@@ -52,13 +52,14 @@ var (
 	_ pluginsdk.PluginInfoProvider           = (*Calculator)(nil)
 	_ pluginsdk.PerRequestCredentialConsumer = (*Calculator)(nil)
 	_ pluginsdk.BudgetsProvider              = (*Calculator)(nil)
+	_ pluginsdk.RecommendationsProvider      = (*Calculator)(nil)
 )
 
 const (
 	pluginName = "aws-ce"
 	// specVersion must keep the leading v. pluginsdk.ValidateSpecVersion rejects "0.7.0".
 	specVersion   = "v0.7.8"
-	supportedRPCs = "GetActualCost,GetProjectedCost,GetBudgets,Supports,GetPluginInfo,BatchCost"
+	supportedRPCs = "GetActualCost,GetProjectedCost,GetBudgets,GetRecommendations,Supports,GetPluginInfo,BatchCost"
 )
 
 // NewCalculator creates a new AWS Cost Explorer cost calculator plugin.
@@ -113,6 +114,7 @@ func (c *Calculator) GetPluginInfo(ctx context.Context, _ *pbc.GetPluginInfoRequ
 			pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS,
 			pbc.PluginCapability_PLUGIN_CAPABILITY_PROJECTED_COSTS,
 			pbc.PluginCapability_PLUGIN_CAPABILITY_BUDGETS,
+			pbc.PluginCapability_PLUGIN_CAPABILITY_RECOMMENDATIONS,
 		},
 		Settings: pluginSettings(),
 	}, nil
@@ -138,6 +140,7 @@ func (c *Calculator) Supports(ctx context.Context, req *pbc.SupportsRequest) (*p
 		pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS,
 		pbc.PluginCapability_PLUGIN_CAPABILITY_PROJECTED_COSTS,
 		pbc.PluginCapability_PLUGIN_CAPABILITY_BUDGETS,
+		pbc.PluginCapability_PLUGIN_CAPABILITY_RECOMMENDATIONS,
 	}}
 	resource := req.GetResource()
 	switch {
