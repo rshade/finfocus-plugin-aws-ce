@@ -8,8 +8,8 @@ This roadmap outlines the development path for `finfocus-plugin-aws-ce`, priorit
 
 | Milestone | Area | Status |
 |-----------|-------|--------|
-| v0.1.0 | Foundation and continuous delivery | 🔄 Offline readiness verified. Release pending |
-| v0.2.0 | Core Features | 📋 Planned |
+| v0.1.0 | Foundation and continuous delivery | ✅ Released |
+| v0.2.0 | Core Features | 🔄 Infrastructure done. Health endpoint, docs, and AWS cost features remain |
 | v0.3.0 | Advanced Features | 🔬 Research |
 
 ## Completed milestones
@@ -32,16 +32,17 @@ scanning reports gRPC v1.84.0 through a vulnerability database version-range mis
 The upstream advisory lists this stable version as patched. See the
 [audit security correction](./docs/audit-2026-10-07.md#security-correction-on-2026-10-07).
 The owner removed Docker support.
-Local delivery labels don't close GitHub issues.
+v0.1.0 is released with binary archives and checksums. On 2026-10-19 the owner closed the issues this release
+finished and the duplicates listed under [Rejected and out of scope](#rejected-and-out-of-scope).
 
 ## Foundation and continuous delivery for v0.1.0
 
 | Status | Issue | Technical Thesis | Boundary Guardrail |
 |--------|-------|------------------|-------------------|
-| 🔄 In Progress | [#11](https://github.com/rshade/finfocus-plugin-aws-ce/issues/11) | Core Cost Plugin - `GetActualCost` with FOCUS 1.2 records | Use values directly from `GetCostAndUsage` |
-| ✅ Implemented | [#12](https://github.com/rshade/finfocus-plugin-aws-ce/issues/12) | Installation & Documentation polish | Ready to use after installation |
+| 🔄 Partial | [#11](https://github.com/rshade/finfocus-plugin-aws-ce/issues/11) | Core Cost Plugin - `GetActualCost` with FOCUS 1.2 records. Plugin released. E2E test against `finfocus` core and a live re-check of commitment discovery remain | Use values directly from `GetCostAndUsage` |
+| ✅ Done | [#12](https://github.com/rshade/finfocus-plugin-aws-ce/issues/12) | Installation & Documentation polish | Ready to use after installation |
 | 🔄 Partial | [#31](https://github.com/rshade/finfocus-plugin-aws-ce/issues/31) | Custom protocol checks and SDK FOCUS validation implemented. Upstream conformance suite integration pending | Don't modify test suite to pass |
-| 📋 Planned | [#23](https://github.com/rshade/finfocus-plugin-aws-ce/issues/23) | Use `finfocus-spec` v0.7.5 | Dependency update only |
+| ✅ Done | [#23](https://github.com/rshade/finfocus-plugin-aws-ce/issues/23) | Use `finfocus-spec` v0.7.5 | Dependency update only |
 
 ## Core features for v0.2.0
 
@@ -49,28 +50,27 @@ Local delivery labels don't close GitHub issues.
 
 | Status | Issue | Technical Thesis | Boundary Guardrail |
 |--------|-------|------------------|-------------------|
-| ✅ Implemented | [#40](https://github.com/rshade/finfocus-plugin-aws-ce/issues/40) | Add `GetPluginInfo()` remote procedure call | Return plugin metadata for discovery |
-| ✅ Implemented | [#41](https://github.com/rshade/finfocus-plugin-aws-ce/issues/41) | Add `Supports()` remote procedure call | Validate resource/provider support |
-| ⏭️ Removed | [#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42) | Docker support | Owner decision: binary archives only |
+| ✅ Done | [#40](https://github.com/rshade/finfocus-plugin-aws-ce/issues/40) | Add `GetPluginInfo()` remote procedure call | Return plugin metadata for discovery |
+| ✅ Done | [#41](https://github.com/rshade/finfocus-plugin-aws-ce/issues/41) | Add `Supports()` remote procedure call | Validate resource/provider support |
+| ⏭️ Closed | [#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42) | Docker support | Owner decision: binary archives only |
 | 📋 Planned | [#43](https://github.com/rshade/finfocus-plugin-aws-ce/issues/43) | HTTP health endpoint | Container orchestration support |
 | 📋 Planned | [#44](https://github.com/rshade/finfocus-plugin-aws-ce/issues/44) | Documentation directory | API and deployment guides |
-| ✅ Implemented | [#45](https://github.com/rshade/finfocus-plugin-aws-ce/issues/45) | Integration tests for gRPC server | Server behavior verification |
-| ✅ Implemented | [#46](https://github.com/rshade/finfocus-plugin-aws-ce/issues/46) | Trace ID propagation | Distributed tracing support |
-| ✅ Implemented | [#47](https://github.com/rshade/finfocus-plugin-aws-ce/issues/47) | Proto ErrorCode enum | Standardized error handling |
+| ✅ Done | [#45](https://github.com/rshade/finfocus-plugin-aws-ce/issues/45) | Integration tests for gRPC server | Server behavior verification |
+| ✅ Done | [#46](https://github.com/rshade/finfocus-plugin-aws-ce/issues/46) | Trace ID propagation | Distributed tracing support |
+| ✅ Done | [#47](https://github.com/rshade/finfocus-plugin-aws-ce/issues/47) | Proto ErrorCode enum | Standardized error handling |
 | 📋 Planned | [#48](https://github.com/rshade/finfocus-plugin-aws-ce/issues/48) | Standardize workflow names | Continuous delivery consistency |
-| ✅ Implemented | [#50](https://github.com/rshade/finfocus-plugin-aws-ce/issues/50) | Makefile targets | Developer workflows. Binary archives only |
-| ✅ Implemented | [#51](https://github.com/rshade/finfocus-plugin-aws-ce/issues/51) | Configuration parsing tests | Configuration reliability |
+| ✅ Done | [#50](https://github.com/rshade/finfocus-plugin-aws-ce/issues/50) | Makefile targets | Developer workflows. Binary archives only |
+| ✅ Done | [#51](https://github.com/rshade/finfocus-plugin-aws-ce/issues/51) | Configuration parsing tests | Configuration reliability |
 | 📋 Planned | [#53](https://github.com/rshade/finfocus-plugin-aws-ce/issues/53) | CONTRIBUTING.md | Contributor setup |
 
 ### AWS cost features
 
 | Status | Issue | Technical Thesis | Boundary Guardrail |
 |--------|-------|------------------|-------------------|
-| 📋 Planned | [#8](https://github.com/rshade/finfocus-plugin-aws-ce/issues/8) / [#24](https://github.com/rshade/finfocus-plugin-aws-ce/issues/24) | AWS Budgets - Proxy `budgets:DescribeBudgets` | Read-only. No alerting logic |
-| 📋 Planned | [#25](https://github.com/rshade/finfocus-plugin-aws-ce/issues/25) | Cost Forecasting - Proxy `ce:GetCostForecast` | **Boundary:** no custom forecasting math |
-| 📋 Planned | [#36](https://github.com/rshade/finfocus-plugin-aws-ce/issues/36) | GetProjectedCost with prediction intervals | Use AWS forecast intervals |
-| 📋 Planned | [#37](https://github.com/rshade/finfocus-plugin-aws-ce/issues/37) | Enrich GetActualCost with RI/SP data | Map existing CE data |
-| 🔬 Research | [#26](https://github.com/rshade/finfocus-plugin-aws-ce/issues/26) / [#38](https://github.com/rshade/finfocus-plugin-aws-ce/issues/38) | Anomaly Detection - Map `ce:GetAnomalies` | **Boundary:** no local machine learning models |
+| 📋 Planned | [#8](https://github.com/rshade/finfocus-plugin-aws-ce/issues/8) | AWS Budgets - Proxy `budgets:DescribeBudgets` | Read-only. No alerting logic |
+| 📋 Planned | [#36](https://github.com/rshade/finfocus-plugin-aws-ce/issues/36) | Cost Forecasting - `GetProjectedCost` with prediction intervals from `ce:GetCostForecast` | **Boundary:** no custom forecasting math. Use AWS forecast intervals |
+| ✅ Done | [#37](https://github.com/rshade/finfocus-plugin-aws-ce/issues/37) | Enrich GetActualCost with RI/SP data (`CE-6.4`) | Map existing CE data |
+| 🔬 Research | [#38](https://github.com/rshade/finfocus-plugin-aws-ce/issues/38) | Anomaly Detection - Map `ce:GetAnomalies` | **Boundary:** no local machine learning models |
 
 ## Advanced features for v0.3.0+
 
@@ -91,14 +91,11 @@ Local delivery labels don't close GitHub issues.
 | 🔬 Research | [#27](https://github.com/rshade/finfocus-plugin-aws-ce/issues/27) | Rightsizing - `ce:GetRightsizingRecommendation` | Don't calculate utilization locally |
 | 🔬 Research | [#32](https://github.com/rshade/finfocus-plugin-aws-ce/issues/32) | Savings Plans Recommendations | Rely on AWS for return on investment and break-even math |
 | 🔬 Research | [#33](https://github.com/rshade/finfocus-plugin-aws-ce/issues/33) | Reserved Instance Recommendations | Target non-compute services such as RDS and Redshift |
-| 🔬 Research | [#22](https://github.com/rshade/finfocus-plugin-aws-ce/issues/22) | Combined RI/SP purchase recommendations | Proxy AWS API only |
 
-### Coverage detection
+### Cost comparison
 
 | Status | Issue | Technical Thesis | Boundary Guardrail |
 |--------|-------|------------------|-------------------|
-| 🔬 Research | [#19](https://github.com/rshade/finfocus-plugin-aws-ce/issues/19) | RI Coverage Detection & Pricing | Read coverage data only |
-| 🔬 Research | [#20](https://github.com/rshade/finfocus-plugin-aws-ce/issues/20) | Savings Plans Coverage Detection | Read coverage data only |
 | 🔬 Research | [#21](https://github.com/rshade/finfocus-plugin-aws-ce/issues/21) | Blended vs Unblended Cost Comparison | Map existing CE data fields |
 
 ### Pricing and estimation
@@ -112,7 +109,6 @@ Local delivery labels don't close GitHub issues.
 
 | Status | Issue | Technical Thesis | Boundary Guardrail |
 |--------|-------|------------------|-------------------|
-| 🔬 Research | [#28](https://github.com/rshade/finfocus-plugin-aws-ce/issues/28) | FOCUS 1.3 transition with commitment columns | Map only what AWS provides explicitly |
 | 🔬 Research | [#29](https://github.com/rshade/finfocus-plugin-aws-ce/issues/29) | Greenops discovery via Carbon API | **Blocked:** no public AWS Carbon API |
 
 ## Icebox and backlog
@@ -131,6 +127,12 @@ Local delivery labels don't close GitHub issues.
 | ❌ Closed | [#4](https://github.com/rshade/finfocus-plugin-aws-ce/issues/4) | Duplicate of #24 |
 | ❌ Closed | [#9](https://github.com/rshade/finfocus-plugin-aws-ce/issues/9) | Duplicate of #25 |
 | ❌ Closed | [#10](https://github.com/rshade/finfocus-plugin-aws-ce/issues/10) | Duplicate of #26 |
+| ❌ Closed | [#42](https://github.com/rshade/finfocus-plugin-aws-ce/issues/42) | Docker support removed by owner decision |
+| ❌ Closed | [#19](https://github.com/rshade/finfocus-plugin-aws-ce/issues/19), [#20](https://github.com/rshade/finfocus-plugin-aws-ce/issues/20), [#28](https://github.com/rshade/finfocus-plugin-aws-ce/issues/28) | Duplicates of #37, delivered as `CE-6.4` |
+| ❌ Closed | [#22](https://github.com/rshade/finfocus-plugin-aws-ce/issues/22) | Duplicate of #13 |
+| ❌ Closed | [#24](https://github.com/rshade/finfocus-plugin-aws-ce/issues/24) | Duplicate of #8 |
+| ❌ Closed | [#25](https://github.com/rshade/finfocus-plugin-aws-ce/issues/25) | Duplicate of #36 |
+| ❌ Closed | [#26](https://github.com/rshade/finfocus-plugin-aws-ce/issues/26) | Duplicate of #38 |
 
 ## Legend
 
