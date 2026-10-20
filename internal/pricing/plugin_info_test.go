@@ -11,7 +11,7 @@ import (
 const (
 	pluginInfoName        = "aws-ce"
 	pluginInfoVersion     = "0.1.0"
-	pluginInfoSpecVersion = "v0.7.5"
+	pluginInfoSpecVersion = "v0.7.8"
 	pluginInfoRPCs        = "GetActualCost,Supports,GetPluginInfo,BatchCost"
 )
 

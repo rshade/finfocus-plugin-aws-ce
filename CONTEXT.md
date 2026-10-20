@@ -40,7 +40,7 @@ To prevent scope creep and architectural drift, this project adheres to the foll
 | `GetActualCost` | ✅ Offline protocol/contract verified | `GetCostAndUsage`, `GetCostAndUsageWithResources` |
 | `GetProjectedCost` | ❌ Outside v0.1.0 scope | Returns gRPC `Unimplemented` with task reference CE-6.10 |
 
-### SDK compliance for v0.7.5
+### SDK compliance for v0.7.8
 
 The plugin uses standardized SDK helpers:
 
@@ -49,6 +49,7 @@ The plugin uses standardized SDK helpers:
 * `pluginsdk.ValidateActualCostRequest()` - Input validation
 * `pluginsdk.ParsePortFlag()` / `GetPort()` - Configuration
 * `pluginsdk.Serve()` - gRPC server startup
+* `GetPluginInfoResponse.settings` - Advertises the environment variables the plugin reads (`internal/pricing/settings.go`)
 
 ### Available extension points
 
@@ -59,7 +60,7 @@ The plugin uses standardized SDK helpers:
 
 ### Future work and current limits
 
-The v0.7.5 SDK already provides budgets and recommendations interfaces and
+The v0.7.8 SDK already provides budgets and recommendations interfaces and
 FOCUS commitment fields. Those features need plugin implementations and
 verification. Their presence isn't evidence of a protocol gap. Anomaly
 mapping requires separate design work outside this release.

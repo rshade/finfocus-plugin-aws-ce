@@ -101,6 +101,14 @@ The repository doesn't run the upstream SDK conformance suite.
 make test-integration
 ```
 
+## Spec v0.7.8 features
+
+- `GetPluginInfo` advertises plugin settings from `internal/pricing/settings.go`. Add an entry there when the plugin reads a new
+  environment variable. A test checks the list against the SDK validator.
+- Never add `Parse` (cost parsing) to this plugin. `aws-public` owns `Parse` for the `aws` provider.
+- The plugin also doesn't adopt `GetRecommendationHistory`, the spot on-demand equivalent field, or the `ParsedResource`
+  action hint. They serve projected-cost and recommendation plugins, not an actual-cost plugin.
+
 ## Dependencies
 
 - `github.com/rshade/finfocus-spec` - Plugin SDK and Protocol Buffers definitions

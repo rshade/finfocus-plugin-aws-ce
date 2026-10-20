@@ -52,7 +52,7 @@ var (
 const (
 	pluginName = "aws-ce"
 	// specVersion must keep the leading v. pluginsdk.ValidateSpecVersion rejects "0.7.0".
-	specVersion   = "v0.7.5"
+	specVersion   = "v0.7.8"
 	supportedRPCs = "GetActualCost,Supports,GetPluginInfo,BatchCost"
 )
 
@@ -107,6 +107,7 @@ func (c *Calculator) GetPluginInfo(ctx context.Context, _ *pbc.GetPluginInfoRequ
 		Capabilities: []pbc.PluginCapability{
 			pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS,
 		},
+		Settings: pluginSettings(),
 	}, nil
 }
 
