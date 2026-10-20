@@ -48,7 +48,10 @@ func TestAggregateCosts_FocusPeriodUsesLatestExclusiveEnd(t *testing.T) {
 	if !costs[0].PeriodEnd.Equal(end) {
 		t.Fatalf("period end = %s", costs[0].PeriodEnd)
 	}
-	record := focusFor(costs[0])
+	record, err := focusFor(costs[0], false)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got := record.GetChargePeriodStart().AsTime(); !got.Equal(start) {
 		t.Fatalf("charge start = %s", got)
 	}

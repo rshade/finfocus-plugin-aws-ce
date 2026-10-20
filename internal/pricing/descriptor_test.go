@@ -24,6 +24,8 @@ func TestActualCostResourceDescriptor(t *testing.T) {
 	}{
 		{name: "legacy fallback", id: bareInstanceID, want: bareInstanceID},
 		{name: "descriptor id wins", id: "i-11111111", arn: "arn:aws:s3:::old", resource: &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "ec2", Id: bareInstanceID}, want: bareInstanceID},
+		{name: "Pulumi URN uses cloud id", id: "urn:pulumi:test::stack::aws:ec2/instance:Instance::example", resource: &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:ec2/instance:Instance", Id: "urn:pulumi:test::stack::aws:ec2/instance:Instance::example", Tags: map[string]string{"pulumi:cloudId": bareInstanceID}}, want: bareInstanceID},
+		{name: "normal descriptor ignores cloud id", id: "i-11111111", resource: &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "ec2", Id: bareInstanceID, Tags: map[string]string{"pulumi:cloudId": "i-22222222"}}, want: bareInstanceID},
 		{name: "descriptor arn wins", id: "i-11111111", resource: &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "ec2", Arn: resourceQueryEC2ARN}, want: bareInstanceID},
 		{name: "descriptor without identity uses legacy", id: bareInstanceID, resource: &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "ec2"}, want: bareInstanceID},
 		{name: "unsupported provider", id: bareInstanceID, resource: &pbc.ResourceDescriptor{Provider: "azure", ResourceType: "vm", Id: bareInstanceID}, code: codes.InvalidArgument},
@@ -79,5 +81,26 @@ func TestActualCostBillingAccount(t *testing.T) {
 		if row.GetFocusRecord().GetBillingAccountId() != account {
 			t.Fatalf("account=%q want=%q", row.GetFocusRecord().GetBillingAccountId(), account)
 		}
+	}
+}
+
+func TestActualCostPulumiServiceIdentity(t *testing.T) {
+	calc, api := newClassifiedCalc()
+	start, end := recentCostWindow()
+	urn := "urn:pulumi:test::stack::aws:service::storage"
+	req := costRequest(urn, "", start, end, nil)
+	req.Resource = &pbc.ResourceDescriptor{
+		Provider: "aws", ResourceType: "aws:service", Id: urn,
+		Tags: map[string]string{"pulumi:cloudId": "Amazon Simple Storage Service"},
+	}
+	if _, err := calc.GetActualCost(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	if len(api.costCalls) != 1 || api.costCalls[0].Filter == nil || api.costCalls[0].Filter.Dimensions == nil {
+		t.Fatalf("missing service filter: %#v", api.costCalls)
+	}
+	values := api.costCalls[0].Filter.Dimensions.Values
+	if len(values) != 1 || values[0] != "Amazon Simple Storage Service" {
+		t.Fatalf("service filter = %v, want cloud service name", values)
 	}
 }

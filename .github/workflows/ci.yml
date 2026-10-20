@@ -47,6 +47,15 @@ jobs:
       - name: Run integration tests
         run: make test-integration
 
+      - name: Run official SDK conformance
+        run: make conformance
+
+      - name: Build pinned FinFocus core
+        run: make core-install
+
+      - name: Run core-to-plugin E2E offline
+        run: make e2e
+
   build:
     name: Build
     runs-on: ubuntu-latest

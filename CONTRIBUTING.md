@@ -138,20 +138,32 @@ default integration tests. It doesn't query live AWS services.
 make test-integration
 ```
 
-This runs `test/integration` and `test/conformance`. Tests launch plugin processes
-and use local fake Cost Explorer endpoints. To enable the additional subprocess
-end-to-end test:
+This launches plugin processes and uses local fake Cost Explorer endpoints.
+Run the real FinFocus executable and official SDK suite separately:
 
 ```bash
-FINFOCUS_E2E=true go test -count=1 -v ./test/e2e/...
+make core-install
+make e2e
+make conformance
 ```
+
+`make core-install` builds the revision pinned by the Makefile. Set
+`FINFOCUS_CORE_VERSION` to override that revision, or `FINFOCUS_CORE_BINARY`
+to use a core executable you already built. Tests never download core themselves.
+`make e2e` and its alias `make test-e2e` invoke core with an isolated plugin
+registry, synthetic credentials, and a local fake AWS endpoint. Assertions require
+non-empty cost results with the expected identity, currency, period, and totals.
+`make conformance` runs the official Standard suite against the actual-only
+capabilities advertised by the plugin.
 
 ### Live AWS checks
 
 Follow [AWS verification](docs/AWS-VERIFICATION.md) for credentials, permissions,
-and the live test command. Live checks require both the `awslive` build tag and
-`FINFOCUS_AWS_LIVE=true`. Cost Explorer requests are billable. Keep credentials
-out of source files, test fixtures, logs, and issue reports.
+and `make e2e-live`. Live checks require the `awslive` build tag,
+`FINFOCUS_AWS_LIVE=true`, and a configured core executable. Cost Explorer requests
+are billable. Keep credentials out of source files, fixtures, logs, and reports.
+Live execution is separate from offline acceptance and remains unverified for
+the current foundation change.
 
 ### Coverage and vulnerability checks
 
@@ -179,12 +191,16 @@ The project uses GitHub Copilot for automated code review. Address its findings
 alongside maintainer feedback.
 
 The [continuous integration workflow](.github/workflows/ci.yml) runs separate lint, test, and build
-jobs. The test job runs the suite with race detection and the integration target.
+jobs. The test job runs the suite with race detection, integration checks,
+the real core test, and official conformance.
 Reproduce its checks locally with:
 
 ```bash
 go test -count=1 -v -race ./...
 make test-integration
+make core-install
+make e2e
+make conformance
 ```
 
 The lint job also runs `make vuln`. That scan allows failures, so

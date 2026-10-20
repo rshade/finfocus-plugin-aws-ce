@@ -1,8 +1,8 @@
 package e2e
 
 import (
-	"bufio"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
@@ -10,19 +10,20 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"syscall"
+	"sync"
 	"testing"
 	"time"
 
-	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"github.com/rshade/finfocus-plugin-aws-ce/internal/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-var pluginBinary = flag.String("plugin-binary", "", "Plugin binary; empty builds cmd/plugin")
+var (
+	pluginBinary = flag.String("plugin-binary", "", "Plugin binary; empty builds cmd/plugin")
+	coreBinary   = flag.String("core-binary", "", "Pinned core executable; defaults to FINFOCUS_CORE_BINARY")
+)
 
 func e2eEnabled() bool {
 	if value, set := os.LookupEnv("FINFOCUS_E2E"); set {
@@ -46,88 +47,152 @@ func TestE2EGate(t *testing.T) {
 			t.Setenv("FINFOCUS_E2E", tc.value)
 			t.Setenv("finfocus_E2E", tc.legacy)
 			if tc.unset {
-				if err := os.Unsetenv("FINFOCUS_E2E"); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, os.Unsetenv("FINFOCUS_E2E"))
 			}
-			if got := e2eEnabled(); got != tc.want {
-				t.Fatalf("enabled=%v want=%v", got, tc.want)
-			}
+			assert.Equal(t, tc.want, e2eEnabled())
 		})
 	}
 }
 
 func TestE2E(t *testing.T) {
 	if !e2eEnabled() {
-		t.Skip("Set FINFOCUS_E2E=true for subprocess E2E against a local fake CE endpoint")
+		t.Skip("Set FINFOCUS_E2E=true and FINFOCUS_CORE_BINARY for offline real-core E2E")
 	}
-	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("X-Amz-Target") != "AWSInsightsIndexService.GetCostAndUsage" {
-			t.Errorf("unexpected AWS operation %s", r.Header.Get("X-Amz-Target"))
-		}
-		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
-		_, _ = w.Write([]byte(`{"ResultsByTime":[{"Estimated":false,"TimePeriod":{"Start":"2026-09-20","End":"2026-09-21"},"Groups":[{"Keys":["Amazon Simple Storage Service"],"Metrics":{"UnblendedCost":{"Amount":"1.25","Unit":"USD"}}}]}]}`))
-	}))
-	defer fake.Close()
+	core := *coreBinary
+	if core == "" {
+		core = os.Getenv("FINFOCUS_CORE_BINARY")
+	}
+	require.NotEmpty(t, core, "provide an explicitly built core via -core-binary or FINFOCUS_CORE_BINARY")
 	binary := *pluginBinary
 	if binary == "" {
-		binary = filepath.Join(t.TempDir(), "plugin")
-		cmd := exec.Command("go", "build", "-o", binary, "./cmd/plugin")
+		binary = filepath.Join(t.TempDir(), "finfocus-plugin-aws-ce")
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "go", "build", "-o", binary, "./cmd/plugin")
 		cmd.Dir = filepath.Join("..", "..")
-		if output, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("build: %v\n%s", err, output)
-		}
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, "build local plugin: %s", output)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, binary, "--port", "0")
-	cmd.Env = append(os.Environ(), "AWS_ENDPOINT_URL_COST_EXPLORER="+fake.URL, "AWS_ENDPOINT_URL="+fake.URL, "AWS_IGNORE_CONFIGURED_ENDPOINT_URLS=false", "AWS_REGION=us-east-1", "AWS_ACCESS_KEY_ID=test", "AWS_SECRET_ACCESS_KEY=test", "AWS_SESSION_TOKEN=", "AWS_PROFILE=", "AWS_EC2_METADATA_DISABLED=true", "FINFOCUS_PLUGIN_PORT=0", "FINFOCUS_LOG_FILE=")
-	cmd.Stderr = os.Stderr
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		t.Fatal(err)
+	end := time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -2)
+	start := end.AddDate(0, 0, -2)
+	for _, tc := range []struct {
+		name, resourceType, resourceID, mode string
+		want                                 float64
+	}{
+		{name: "account", resourceType: "aws:account", resourceID: "aws-account-total", want: 4.25},
+		{name: "service", resourceType: "aws:service", resourceID: "Amazon Simple Storage Service", want: 3.75},
+		{name: "empty data is not success", resourceType: "aws:account", resourceID: "aws-account-total", mode: "empty"},
+		{name: "AWS denial is not success", resourceType: "aws:account", resourceID: "aws-account-total", mode: "denied"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := &fakeCE{t: t, mode: tc.mode, service: tc.resourceType == "aws:service", calls: make(map[string]int), start: start, end: end}
+			server := httptest.NewServer(fake)
+			defer server.Close()
+			rows, err := testutil.RunCoreActualCost(t, testutil.CoreActualCostConfig{
+				CoreBinary: core, PluginBinary: binary, Start: start, End: end,
+				ResourceType: tc.resourceType, ResourceID: tc.resourceID, OfflineEndpoint: server.URL,
+			})
+			if tc.mode != "" {
+				require.Error(t, err, "core exit zero or empty JSON must not pass the harness")
+				require.Empty(t, rows)
+			} else {
+				require.NoError(t, err)
+				require.Len(t, rows, 1)
+				assert.Equal(t, tc.want, rows[0].TotalCost)
+				assert.Equal(t, tc.want, rows[0].Breakdown["aws-ce"])
+				assert.Equal(t, "USD", rows[0].Currency)
+				assert.Equal(t, "aws-ce", rows[0].Adapter)
+				assert.Equal(t, "urn:pulumi:e2e::aws-ce::"+tc.resourceType+"::actual-cost", rows[0].ResourceID)
+				assert.Equal(t, start, rows[0].StartDate)
+				assert.Equal(t, end, rows[0].EndDate)
+			}
+			fake.mu.Lock()
+			defer fake.mu.Unlock()
+			assert.Equal(t, map[string]int{"RESERVATION_ID": 1, "SAVINGS_PLAN_ARN": 1, "GetCostAndUsage": 1}, fake.calls)
+		})
 	}
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		_ = cmd.Process.Signal(syscall.SIGTERM)
-		if err := cmd.Wait(); err != nil && ctx.Err() == nil {
-			t.Errorf("plugin exit: %v", err)
-		}
-	}()
-	ports := make(chan string, 1)
-	go func() {
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			if line := scanner.Text(); strings.HasPrefix(line, "PORT=") {
-				ports <- strings.TrimPrefix(line, "PORT=")
-				return
+}
+
+type fakeCE struct {
+	t       *testing.T
+	mu      sync.Mutex
+	calls   map[string]int
+	mode    string
+	service bool
+	start   time.Time
+	end     time.Time
+}
+
+func (f *fakeCE) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var request struct {
+		TimePeriod  struct{ Start, End string }
+		Dimension   string
+		Context     string
+		Granularity string
+		Metrics     []string
+		GroupBy     []struct{ Type, Key string }
+		Filter      *struct {
+			Dimensions struct {
+				Key    string
+				Values []string
 			}
 		}
-		ports <- ""
-	}()
-	var port string
-	select {
-	case port = <-ports:
-	case <-ctx.Done():
-		t.Fatal("plugin startup timed out")
+		NextPageToken string
 	}
-	if number, err := strconv.Atoi(port); err != nil || number < 1 {
-		t.Fatalf("invalid port announcement %q", port)
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		f.t.Errorf("decode AWS request: %v", err)
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
 	}
-	conn, err := grpc.NewClient(fmt.Sprintf("127.0.0.1:%s", port), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		t.Fatal(err)
+	assert.Equal(f.t, http.MethodPost, r.Method)
+	assert.Contains(f.t, r.Header.Get("Authorization"), "Credential=test/", "offline requests must use dummy credentials")
+	assert.Empty(f.t, r.Header.Get("X-Amz-Security-Token"))
+	assert.Equal(f.t, f.start.Format(time.DateOnly), request.TimePeriod.Start)
+	assert.Equal(f.t, f.end.Format(time.DateOnly), request.TimePeriod.End)
+	assert.Empty(f.t, request.NextPageToken)
+	if f.service {
+		if assert.NotNil(f.t, request.Filter) {
+			assert.Equal(f.t, "SERVICE", request.Filter.Dimensions.Key)
+			assert.Equal(f.t, []string{"Amazon Simple Storage Service"}, request.Filter.Dimensions.Values)
+		}
+	} else {
+		assert.Nil(f.t, request.Filter)
 	}
-	defer func() { _ = conn.Close() }()
-	end := time.Now().UTC().Add(-24 * time.Hour)
-	start := end.Add(-24 * time.Hour)
-	resp, err := pbc.NewCostSourceServiceClient(conn).GetActualCost(ctx, &pbc.GetActualCostRequest{ResourceId: "aws-account-total", Start: timestamppb.New(start), End: timestamppb.New(end)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(resp.GetResults()) != 1 || resp.GetResults()[0].GetCost() != 1.25 {
-		t.Fatalf("actual costs=%v", resp)
+	w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+	switch operation := strings.TrimPrefix(r.Header.Get("X-Amz-Target"), "AWSInsightsIndexService."); operation {
+	case "GetDimensionValues":
+		assert.Contains(f.t, []string{"RESERVATION_ID", "SAVINGS_PLAN_ARN"}, request.Dimension)
+		assert.Equal(f.t, "COST_AND_USAGE", request.Context)
+		f.calls[request.Dimension]++
+		_, _ = w.Write([]byte(`{"DimensionValues":[]}`))
+	case "GetCostAndUsage":
+		f.calls[operation]++
+		assert.Equal(f.t, "DAILY", request.Granularity)
+		assert.Equal(f.t, []string{"UnblendedCost"}, request.Metrics)
+		if assert.Len(f.t, request.GroupBy, 1) {
+			assert.Equal(f.t, "DIMENSION", request.GroupBy[0].Type)
+			assert.Equal(f.t, "SERVICE", request.GroupBy[0].Key)
+		}
+		if f.mode == "denied" {
+			w.Header().Set("X-Amzn-Errortype", "AccessDeniedException")
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"__type":"AccessDeniedException","message":"offline denial"}`))
+			return
+		}
+		if f.mode == "empty" {
+			_, _ = w.Write([]byte(`{"ResultsByTime":[]}`))
+			return
+		}
+		extra := ""
+		if !f.service {
+			extra = `,{"Keys":["Amazon Elastic Compute Cloud - Compute"],"Metrics":{"UnblendedCost":{"Amount":"0.50","Unit":"USD"}}}`
+		}
+		middle := f.start.AddDate(0, 0, 1).Format(time.DateOnly)
+		_, _ = fmt.Fprintf(w, `{"ResultsByTime":[{"Estimated":false,"TimePeriod":{"Start":%q,"End":%q},"Groups":[{"Keys":["Amazon Simple Storage Service"],"Metrics":{"UnblendedCost":{"Amount":"1.25","Unit":"USD"}}}%s]},{"Estimated":false,"TimePeriod":{"Start":%q,"End":%q},"Groups":[{"Keys":["Amazon Simple Storage Service"],"Metrics":{"UnblendedCost":{"Amount":"2.50","Unit":"USD"}}}]}]}`, f.start.Format(time.DateOnly), middle, extra, middle, f.end.Format(time.DateOnly))
+	default:
+		f.t.Errorf("unexpected AWS operation %q", operation)
+		http.Error(w, "unexpected AWS operation", http.StatusBadRequest)
 	}
 }

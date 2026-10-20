@@ -1,0 +1,63 @@
+name: Live AWS actual cost
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_live:
+        description: Run billable AWS Cost Explorer verification
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  actual-cost:
+    if: github.ref == 'refs/heads/main' && inputs.run_live && vars.FINFOCUS_AWS_LIVE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go with mise
+        uses: jdx/mise-action@v5
+        with:
+          install_args: go
+
+      - name: Build pinned FinFocus core
+        run: make core-install
+
+      - name: Validate Pulumi configuration
+        env:
+          PULUMI_ORGANIZATION: ${{ vars.PULUMI_ORGANIZATION }}
+          PULUMI_TEAM: ${{ vars.PULUMI_TEAM }}
+          PULUMI_ESC_ENVIRONMENT: ${{ vars.PULUMI_ESC_ENVIRONMENT }}
+        run: |
+          test -n "$PULUMI_ORGANIZATION" || { echo 'Set PULUMI_ORGANIZATION'; exit 1; }
+          test -n "$PULUMI_TEAM" || { echo 'Set PULUMI_TEAM'; exit 1; }
+          test -n "$PULUMI_ESC_ENVIRONMENT" || { echo 'Set PULUMI_ESC_ENVIRONMENT'; exit 1; }
+
+      - name: Authenticate to Pulumi with GitHub OIDC
+        uses: pulumi/auth-actions@v2
+        with:
+          organization: ${{ vars.PULUMI_ORGANIZATION }}
+          requested-token-type: urn:pulumi:token-type:access_token:team
+          scope: team:${{ vars.PULUMI_TEAM }}
+          token-expiration: 900
+
+      - name: Open existing AWS environment
+        uses: pulumi/esc-action@v3
+        with:
+          environment: ${{ vars.PULUMI_ESC_ENVIRONMENT }}
+          keys: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_SESSION_TOKEN,AWS_REGION
+
+      - name: Compare AWS baseline, plugin and core
+        run: make e2e-live
+        env:
+          FINFOCUS_AWS_LIVE: 'true'
+          FINFOCUS_AWS_LIVE_REQUIRED: 'true'

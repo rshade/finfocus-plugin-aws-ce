@@ -15,7 +15,7 @@ func TestCompareLiveCost(t *testing.T) {
 	start := time.Date(2026, 9, 27, 0, 0, 0, 0, time.UTC)
 	periods := []types.ResultByTime{{TimePeriod: &types.DateInterval{Start: aws.String("2026-09-27"), End: aws.String("2026-09-28")}, Groups: []types.Group{{Keys: []string{"Amazon Simple Storage Service"}, Metrics: map[string]types.MetricValue{"AmortizedCost": {Amount: aws.String("12.5"), Unit: aws.String("USD")}}}}}}
 	response := &pbc.GetActualCostResponse{Results: []*pbc.ActualCostResult{{Timestamp: timestamppb.New(start), Cost: 12.5, Source: "aws-ce", FocusRecord: &pbc.FocusCostRecord{BillingAccountId: "caller", ServiceName: "Amazon Simple Storage Service", BillingCurrency: "USD", ChargePeriodStart: timestamppb.New(start), ChargePeriodEnd: timestamppb.New(start.Add(24 * time.Hour)), ExtendedColumns: map[string]string{"estimated": "false", "amount_decimal": "12.5"}}}}}
-	if err := compareLiveCost(periods, response, "caller"); err != nil {
+	if err := compareLiveCost(periods, response, "caller", "AmortizedCost"); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
@@ -34,13 +34,13 @@ func TestCompareLiveCost(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := proto.Clone(response).(*pbc.GetActualCostResponse)
 			tc.mutate(r)
-			if compareLiveCost(periods, r, "caller") == nil {
+			if compareLiveCost(periods, r, "caller", "AmortizedCost") == nil {
 				t.Fatal("accepted incorrect live result")
 			}
 		})
 	}
 	periods[0].Groups[0].Metrics["AmortizedCost"] = types.MetricValue{Amount: aws.String("bad"), Unit: aws.String("USD")}
-	if compareLiveCost(periods, response, "caller") == nil {
+	if compareLiveCost(periods, response, "caller", "AmortizedCost") == nil {
 		t.Fatal("accepted malformed AWS amount")
 	}
 }
@@ -53,7 +53,7 @@ func TestCompareLiveCostAcrossDays(t *testing.T) {
 		periods = append(periods, types.ResultByTime{Estimated: i == 1, TimePeriod: &types.DateInterval{Start: aws.String(day.Format(time.DateOnly)), End: aws.String(day.Add(24 * time.Hour).Format(time.DateOnly))}, Groups: []types.Group{{Keys: []string{"Amazon Simple Storage Service"}, Metrics: map[string]types.MetricValue{"AmortizedCost": {Amount: aws.String(amount), Unit: aws.String("USD")}}}}})
 	}
 	response := &pbc.GetActualCostResponse{Results: []*pbc.ActualCostResult{{Cost: 0.3, Source: "aws-ce", Timestamp: timestamppb.New(start), FocusRecord: &pbc.FocusCostRecord{BillingAccountId: "caller", ServiceName: "Amazon Simple Storage Service", BillingCurrency: "USD", ChargePeriodStart: timestamppb.New(start), ChargePeriodEnd: timestamppb.New(start.Add(48 * time.Hour)), ExtendedColumns: map[string]string{"estimated": "true", "amount_decimal": "0.3"}}}}}
-	if err := compareLiveCost(periods, response, "caller"); err != nil {
+	if err := compareLiveCost(periods, response, "caller", "AmortizedCost"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -74,7 +74,7 @@ func TestCompareLiveCostSumsCommitmentPartitions(t *testing.T) {
 		}
 		response.Results = append(response.Results, &pbc.ActualCostResult{Timestamp: timestamppb.New(start), Cost: []float64{2.5, 4, 1}[i], Source: "aws-ce", FocusRecord: &pbc.FocusCostRecord{BillingAccountId: "caller", ServiceName: "Amazon Elastic Compute Cloud - Compute", BillingCurrency: "USD", ChargePeriodStart: timestamppb.New(start), ChargePeriodEnd: timestamppb.New(start.Add(24 * time.Hour)), ExtendedColumns: columns}})
 	}
-	if err := compareLiveCost(periods, response, "caller"); err != nil {
+	if err := compareLiveCost(periods, response, "caller", "AmortizedCost"); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
@@ -93,7 +93,7 @@ func TestCompareLiveCostSumsCommitmentPartitions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := proto.Clone(response).(*pbc.GetActualCostResponse)
 			tc.mutate(r)
-			if compareLiveCost(periods, r, "caller") == nil {
+			if compareLiveCost(periods, r, "caller", "AmortizedCost") == nil {
 				t.Fatal("accepted incorrect partition total")
 			}
 		})

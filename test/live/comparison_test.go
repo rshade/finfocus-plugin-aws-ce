@@ -12,7 +12,7 @@ import (
 	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
 )
 
-func compareLiveCost(periods []types.ResultByTime, response *pbc.GetActualCostResponse, account string) error {
+func compareLiveCost(periods []types.ResultByTime, response *pbc.GetActualCostResponse, account, metricName string) error {
 	type expected struct {
 		amount     *big.Rat
 		currency   string
@@ -43,7 +43,7 @@ func compareLiveCost(periods []types.ResultByTime, response *pbc.GetActualCostRe
 				return fmt.Errorf("duplicate AWS group")
 			}
 			seen[unique] = true
-			metric, ok := group.Metrics["AmortizedCost"]
+			metric, ok := group.Metrics[metricName]
 			if !ok || metric.Amount == nil || aws.ToString(metric.Unit) == "" {
 				return fmt.Errorf("missing AWS metric")
 			}
