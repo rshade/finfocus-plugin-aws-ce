@@ -4,7 +4,7 @@
 
 **Created:** 2026-10-19
 
-**Status:** design approved in conversation; written specification awaiting review
+**Status:** approved and implemented; `make test`, `make lint`, and `make build` passed on 2026-10-19. Offline HTTP, RPC, and conformance coverage passed. Opt-in live verification is available but was not run.
 
 ## Purpose and scope
 
@@ -62,7 +62,7 @@ account filters to AWS where supported, and region filters for rightsizing
 where supported. Apply remaining selection after mapping: Savings Plans filter
 expressions have different restrictions from rightsizing expressions.
 
-Follow each API's `NextPageToken`, with the existing 100-page safety cap per
+Follow the `NextPageToken` from each API, with the existing 100-page safety cap per
 query. Detect repeated tokens. Every AWS attempt must pass through the existing
 request budget and retry policy, including context cancellation. Exhaustion
 or failure returns an error; do not return an incomplete successful result.
@@ -70,7 +70,7 @@ or failure returns an error; do not return an incomplete successful result.
 ## SDK response mapping
 
 Use `Recommendation` and its action-detail types, rather than cost FOCUS records.
-The pinned SDK uses category/action filters, not the recommendation-type enums
+The pinned SDK uses category/action filters, not the recommendation-type enumeration values
 mentioned in the old issue drafts.
 
 | AWS data | FinFocus representation |
@@ -117,7 +117,7 @@ validate each resource with SDK helpers where available.
 
 Use SDK helpers for recommendation validation, filtering, visibility,
 sorting, pagination, and page summary calculation. Target matching follows the
-pinned protobuf contract: provider and resource type are required matches;
+pinned Protocol Buffers contract: provider and resource type are required matches;
 specified SKU, region, and tags match exactly. Honor supplied resource IDs/ARNs
 as additional identity constraints. Do not broaden unsupported target scopes.
 
@@ -129,7 +129,7 @@ Retrieve and map applicable AWS pages, then apply projection, selection,
 exclusions, deterministic sorting, and SDK pagination. Use ID as a stable
 tie-breaker. The default page size is 50 and the maximum is 1000, following SDK
 behavior. Return `InvalidArgument` for invalid page tokens. Offset pagination
-requeries AWS and does not promise snapshot consistency if AWS regenerates
+queries AWS again and does not promise snapshot consistency if AWS regenerates
 recommendations between calls. Page summaries cover returned records only;
 aggregate savings are potential opportunities and may overlap across rightsizing
 and commitment recommendations.
@@ -162,7 +162,7 @@ Verify per-request credentials and capability discovery over the SDK test server
 Run `make test`, `make lint`, and `make build`. Use an offline HTTP AWS fixture
 to verify serialized requests and real AWS SDK response decoding. Provide an
 opt-in live verification path for accounts with existing recommendation data;
-report live checks as unrun unless actually exercised.
+report live checks as pending unless actually exercised.
 
 Update README permissions, defaults, limitations, examples, and live verification
 instructions. Update `AGENTS.md`, `GEMINI.md`, and `CLAUDE.md` consistently.
