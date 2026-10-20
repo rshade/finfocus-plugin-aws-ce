@@ -2,8 +2,11 @@
 
 `finfocus-plugin-aws-ce` retrieves actual AWS costs through Cost Explorer for
 FinFocus. The plugin name is `aws-ce`, and it implements the `finfocus-spec`
-v0.7.8 protocol. It advertises actual costs only. Projected cost requests
-return gRPC `Unimplemented` with task reference CE-6.10.
+v0.7.8 protocol. It advertises actual costs and Cost Explorer forecasts.
+`GetProjectedCost` proxies `GetCostForecast` for the next 30 UTC days. A single
+forecast row copies AWS prediction bounds and the requested 80 percent
+interval. Several rows sum the means and leave the interval unset. The plugin
+does not calculate its own forecast.
 
 ## Quick start
 

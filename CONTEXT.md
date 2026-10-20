@@ -38,7 +38,7 @@ To prevent scope creep and architectural drift, this project adheres to the foll
 | Remote procedure call | Status | AWS API |
 |-----|--------|---------|
 | `GetActualCost` | ✅ Offline protocol/contract verified | `GetCostAndUsage`, `GetCostAndUsageWithResources` |
-| `GetProjectedCost` | ❌ Outside v0.1.0 scope | Returns gRPC `Unimplemented` with task reference CE-6.10 |
+| `GetProjectedCost` | ✅ Proxies AWS values | `GetCostForecast` for the next 30 UTC days |
 
 ### SDK compliance for v0.7.8
 
