@@ -1,5 +1,9 @@
 # Quick start
 
+For detailed setup, see [deployment](deployment.md) and
+[configuration](configuration.md). Host integrators can use the
+[API reference](api.md) for request fields, responses, and errors.
+
 ## Build and install
 
 Install Go 1.27.2, then run from the repository root:
@@ -89,10 +93,15 @@ successful zero-cost responses.
 
 ```bash
 make test-integration
-FINFOCUS_E2E=true go test -count=1 -v ./test/e2e/...
+make core-install
+make e2e
 ```
 
-These commands use synthetic credentials and local fake CE endpoints. They
+`make core-install` builds the core revision pinned in the Makefile. To use an
+existing compatible executable, set `FINFOCUS_CORE_BINARY` to its absolute path
+and omit that step.
+
+The tests use synthetic credentials and local fake CE endpoints. They
 prove the protocol and request handling, including a real server's discovery
 remote procedure calls, actual costs, and shutdown. They don't verify permissions or billed
 amounts for a real AWS account. These tests require no AWS account.

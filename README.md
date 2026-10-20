@@ -34,6 +34,14 @@ Set `FINFOCUS_HOME` to choose another registry directory. Releases contain
 Linux, Darwin, and Windows archives plus `checksums.txt`. Releases omit container images. See the [quick-start guide](docs/QUICKSTART.md) for authentication,
 core commands, and troubleshooting.
 
+## Documentation
+
+- [API reference](docs/api.md): request fields, query scopes, responses, and errors.
+- [Configuration reference](docs/configuration.md): environment variables, flags,
+  credentials, batch limits, and cache behavior.
+- [Deployment guide](docs/deployment.md): source and release installation,
+  AWS permissions, verification, and troubleshooting.
+
 ## Credentials and configuration
 
 A request with no host-supplied credentials uses the AWS SDK default credential
