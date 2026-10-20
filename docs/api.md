@@ -301,10 +301,17 @@ for `GetProjectedCost`. Batch requests don't retrieve budgets.
 
 ## GetRecommendations
 
-`GetRecommendations` calls Cost Explorer `GetAnomalies` for the last 90 days.
+`GetRecommendations` returns optimization opportunities and account-scoped
+anomalies by default. Category `COST` selects rightsizing and Savings Plans;
+category `ANOMALY` or action `INVESTIGATE` selects anomalies. The shared source
+`aws-cost-explorer` includes both. Target-scoped requests query optimization
+opportunities only. See [recommendation details](../README.md#optimization-recommendations).
+
+Anomaly requests call Cost Explorer `GetAnomalies` for the last 90 days.
 Each row uses category `ANOMALY` and action `INVESTIGATE`. The plugin doesn't
-score or detect anomalies. It passes the page token through. A request for
-another category returns an empty list. Target resources return
+score or detect anomalies. Anomaly-only requests pass the AWS page token through;
+combined requests collect at most 100 anomaly pages and use shared filtering,
+sorting, and SDK pagination. Anomaly-only target resources return
 `InvalidArgument` because the call is account scoped. The plugin copies AWS
 `TotalImpact` to metadata `total_impact` and leaves `EstimatedSavings` unset,
 because that figure records unexpected spend, not a savings estimate. The

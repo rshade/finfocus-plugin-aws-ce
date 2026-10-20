@@ -17,9 +17,8 @@ import (
 
 const anomalyLookbackDays = 90
 
-// GetRecommendations reports Cost Explorer anomalies. It does not score or
-// detect anomalies itself. Other recommendation categories stay empty.
-func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecommendationsRequest) (*pbc.GetRecommendationsResponse, error) {
+// getAnomalyRecommendations reports one account-scoped page of AWS anomalies.
+func (c *Calculator) getAnomalyRecommendations(ctx context.Context, req *pbc.GetRecommendationsRequest) (*pbc.GetRecommendationsResponse, error) {
 	logger := c.traceLogger(ctx)
 	done := pluginsdk.LogOperation(logger, "GetRecommendations")
 	defer done()
@@ -41,7 +40,7 @@ func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 		if _, ok := status.FromError(err); ok {
 			return nil, err
 		}
-		return nil, status.Errorf(codes.Internal, "client initialization failed: %v", err)
+		return nil, status.Error(codes.Internal, "anomaly client initialization failed")
 	}
 	output, err := ce.GetAnomalies(ctx, start, end, req.GetPageToken(), req.GetPageSize())
 	if err != nil {
@@ -138,6 +137,7 @@ func mapAnomaly(row types.Anomaly) *pbc.Recommendation {
 		ActionType:  pbc.RecommendationActionType_RECOMMENDATION_ACTION_TYPE_INVESTIGATE,
 		Description: description,
 		Source:      "aws-cost-explorer",
+		Resource:    &pbc.ResourceRecommendationInfo{Provider: "aws"},
 		Metadata: map[string]string{
 			"monitor_arn": aws.ToString(row.MonitorArn),
 		},
@@ -167,13 +167,10 @@ func mapAnomaly(row types.Anomaly) *pbc.Recommendation {
 	}
 	if len(row.RootCauses) > 0 {
 		cause := row.RootCauses[0]
-		rec.Resource = &pbc.ResourceRecommendationInfo{
-			Provider:     "aws",
-			Name:         aws.ToString(cause.Service),
-			ResourceType: aws.ToString(cause.Service),
-			Region:       aws.ToString(cause.Region),
-			Sku:          aws.ToString(cause.UsageType),
-		}
+		rec.Resource.Name = aws.ToString(cause.Service)
+		rec.Resource.ResourceType = aws.ToString(cause.Service)
+		rec.Resource.Region = aws.ToString(cause.Region)
+		rec.Resource.Sku = aws.ToString(cause.UsageType)
 		var reasons []string
 		for _, item := range row.RootCauses {
 			reasons = append(reasons, strings.TrimSpace(strings.Join([]string{

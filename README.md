@@ -252,7 +252,21 @@ purchases commitments, or modifies resources. Payer visibility and AWS account
 permissions determine which recommendations are available.
 
 An unfiltered request queries EC2 rightsizing and both Compute and EC2 Instance
-Savings Plans. Rightsizing uses `AmazonEC2`, benefits considered, and
+Savings Plans, plus account-scoped anomalies from the last 90 days. The AWS
+identity also needs `ce:GetAnomalies`. Use category `COST` to query only
+optimization opportunities, or `ANOMALY` (or action `INVESTIGATE`) to query only
+anomalies. Target-scoped requests query optimization opportunities only.
+Anomaly-only requests reject target resources and pass AWS page tokens through;
+unfiltered requests collect up to 100 anomaly pages before shared filtering,
+sorting, and pagination. The shared source `aws-cost-explorer` includes both
+optimization opportunities and anomalies.
+
+Anomalies retain actual and expected spend, with unexpected spend in metadata
+`total_impact`. They do not contribute estimated savings, and projection-period
+conversions do not change their impact. The plugin does not detect or score
+anomalies.
+
+Rightsizing uses `AmazonEC2`, benefits considered, and
 same-instance-family targets. The first modify target flagged by AWS as
 `DefaultTargetInstance` becomes a recommendation. If none is flagged, the first
 target is the deterministic fallback. Alternative targets are not added together.
