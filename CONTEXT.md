@@ -38,7 +38,7 @@ To prevent scope creep and architectural drift, this project adheres to the foll
 | Remote procedure call | Status | AWS API |
 |-----|--------|---------|
 | `GetActualCost` | ✅ Offline protocol/contract verified | `GetCostAndUsage`, `GetCostAndUsageWithResources` |
-| `GetProjectedCost` | ✅ Proxies AWS values | `GetCostForecast` for the next 30 UTC days |
+| `GetProjectedCost` | ✅ Proxies AWS values | `GetCostForecast` for the next 30 Coordinated Universal Time days |
 
 ### SDK compliance for v0.7.8
 
@@ -49,7 +49,7 @@ The plugin uses standardized SDK helpers:
 * `pluginsdk.ValidateActualCostRequest()` - Input validation
 * `pluginsdk.ParsePortFlag()` / `GetPort()` - Configuration
 * `pluginsdk.Serve()` - gRPC server startup
-* `GetPluginInfoResponse.settings` - Advertises the environment variables the plugin reads (`internal/pricing/settings.go`)
+* `GetPluginInfoResponse.settings` - Advertises the environment variables the plugin reads in `internal/pricing/settings.go`
 
 ### Available extension points
 
