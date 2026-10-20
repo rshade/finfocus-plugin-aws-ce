@@ -54,16 +54,21 @@ func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 		rights, plans = rights && targetRights, plans && targetPlans
 	}
 	var recs []*pbc.Recommendation
-	if rights || plans {
+	needAnomalies := combinedAnomalyRequest(req)
+	var ce *client.Client
+	if rights || plans || needAnomalies {
 		var pages int
 		ctx = c.withCostBudget(ctx, &pages)
-		ce, _, err := c.clientForCall(ctx, logger)
+		var err error
+		ce, _, err = c.clientForCall(ctx, logger)
 		if err != nil {
 			if _, ok := status.FromError(err); ok {
 				return nil, err
 			}
 			return nil, status.Error(codes.Internal, "recommendation client initialization failed")
 		}
+	}
+	if rights || plans {
 		if rights {
 			in := costexplorer.GetRightsizingRecommendationInput{Service: aws.String("AmazonEC2"), Configuration: &types.RightsizingRecommendationConfiguration{BenefitsConsidered: true, RecommendationTarget: types.RecommendationTargetSameInstanceFamily}, Filter: recommendationAWSFilter(f)}
 			data, err := ce.ListRightsizingRecommendations(ctx, in)
@@ -94,8 +99,8 @@ func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 	if err := projectRecommendationSavings(recs, period); err != nil {
 		return nil, status.Error(codes.DataLoss, "invalid AWS recommendation projection")
 	}
-	if combinedAnomalyRequest(req) {
-		anomalies, err := c.collectAnomalyRecommendations(ctx, req)
+	if needAnomalies {
+		anomalies, err := collectAnomalyRecommendations(ctx, ce)
 		if err != nil {
 			return nil, err
 		}
@@ -328,13 +333,7 @@ func combinedAnomalyRequest(req *pbc.GetRecommendationsRequest) bool {
 }
 
 // collectAnomalyRecommendations collects AWS pages before the shared SDK pagination.
-func (c *Calculator) collectAnomalyRecommendations(ctx context.Context, req *pbc.GetRecommendationsRequest) ([]*pbc.Recommendation, error) {
-	var pages int
-	ctx = c.withCostBudget(ctx, &pages)
-	ce, _, err := c.clientForCall(ctx, c.traceLogger(ctx))
-	if err != nil {
-		return nil, recommendationFailure(err)
-	}
+func collectAnomalyRecommendations(ctx context.Context, ce *client.Client) ([]*pbc.Recommendation, error) {
 	start, end := anomalyWindow(time.Now().UTC())
 	token := ""
 	seen := map[string]bool{}
