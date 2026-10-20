@@ -23,8 +23,10 @@ import (
 // Mock implementation of CostExplorerAPI
 type mockCostExplorerAPI struct {
 	GetCostAndUsageFunc func(ctx context.Context, params *costexplorer.GetCostAndUsageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error)
+	GetCostForecastFunc func(ctx context.Context, params *costexplorer.GetCostForecastInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostForecastOutput, error)
 	costCalls           []*costexplorer.GetCostAndUsageInput
 	resourceCalls       []*costexplorer.GetCostAndUsageWithResourcesInput
+	forecastCalls       []*costexplorer.GetCostForecastInput
 }
 
 func (m *mockCostExplorerAPI) GetDimensionValues(context.Context, *costexplorer.GetDimensionValuesInput, ...func(*costexplorer.Options)) (*costexplorer.GetDimensionValuesOutput, error) {
@@ -40,7 +42,11 @@ func (m *mockCostExplorerAPI) GetCostAndUsage(ctx context.Context, params *coste
 }
 
 func (m *mockCostExplorerAPI) GetCostForecast(ctx context.Context, params *costexplorer.GetCostForecastInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostForecastOutput, error) {
-	return nil, nil
+	m.forecastCalls = append(m.forecastCalls, params)
+	if m.GetCostForecastFunc != nil {
+		return m.GetCostForecastFunc(ctx, params, optFns...)
+	}
+	return &costexplorer.GetCostForecastOutput{}, nil
 }
 
 func (m *mockCostExplorerAPI) GetCostAndUsageWithResources(ctx context.Context, params *costexplorer.GetCostAndUsageWithResourcesInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageWithResourcesOutput, error) {

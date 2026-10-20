@@ -16,14 +16,14 @@ func TestWireCapabilitiesActualOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(info.GetCapabilities()) != 1 || info.GetCapabilities()[0] != pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS {
+	if len(info.GetCapabilities()) != 2 || info.GetCapabilities()[0] != pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS || info.GetCapabilities()[1] != pbc.PluginCapability_PLUGIN_CAPABILITY_PROJECTED_COSTS {
 		t.Fatalf("info capabilities=%v", info.GetCapabilities())
 	}
 	s3, err := srv.Client().Supports(ctx, &pbc.SupportsRequest{Resource: &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:s3/bucket:Bucket"}})
 	if err != nil || !s3.GetSupported() {
 		t.Fatalf("s3 type support=%v err=%v", s3.GetSupported(), err)
 	}
-	if len(s3.GetCapabilitiesEnum()) != 1 || s3.GetCapabilitiesEnum()[0] != pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS {
+	if len(s3.GetCapabilitiesEnum()) != 2 || s3.GetCapabilitiesEnum()[1] != pbc.PluginCapability_PLUGIN_CAPABILITY_PROJECTED_COSTS {
 		t.Fatalf("s3 capabilities=%v", s3.GetCapabilitiesEnum())
 	}
 	for _, provider := range []string{"aws", "azure"} {
@@ -31,11 +31,12 @@ func TestWireCapabilitiesActualOnly(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(resp.GetCapabilitiesEnum()) != 1 || resp.GetCapabilitiesEnum()[0] != pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS {
+		if len(resp.GetCapabilitiesEnum()) != 2 || resp.GetCapabilitiesEnum()[0] != pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS || resp.GetCapabilitiesEnum()[1] != pbc.PluginCapability_PLUGIN_CAPABILITY_PROJECTED_COSTS {
 			t.Fatalf("%s typed capabilities=%v", provider, resp.GetCapabilitiesEnum())
 		}
-		if len(resp.GetCapabilities()) != 1 || !resp.GetCapabilities()["supports_actual_costs"] {
-			t.Fatalf("%s legacy capabilities=%v", provider, resp.GetCapabilities())
+		legacy := resp.GetCapabilities()
+		if len(legacy) != 2 || !legacy["supports_actual_costs"] || !legacy["supports_projected_costs"] {
+			t.Fatalf("%s legacy capabilities=%v", provider, legacy)
 		}
 	}
 }

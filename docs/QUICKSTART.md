@@ -72,13 +72,13 @@ Each paginated Cost Explorer request costs $0.01 in real use.
 | Symptom | Action |
 | --- | --- |
 | Missing AWS region | Set `AWS_REGION=us-east-1` or configure your profile's region |
-| `PermissionDenied` | Grant `ce:GetDimensionValues`, `ce:GetCostAndUsage` and `ce:GetCostAndUsageWithResources` |
+| `PermissionDenied` | Grant `ce:GetDimensionValues`, `ce:GetCostAndUsage`, `ce:GetCostAndUsageWithResources`, and `ce:GetCostForecast` for projections |
 | `Unauthenticated` | Refresh expired session credentials and include `AWS_SESSION_TOKEN` |
 | `InvalidArgument` with `ERROR_CODE_INVALID_CREDENTIALS` | Check supported key names, matching key pair, and role ARN |
 | Resource query has no data | Confirm resource opt-in, the id or ARN, the 14-day window and 24-to-48-hour data lag |
 | Non-EC2 resource returns `NotFound` | Cost Explorer had no row for the ARN or bare name. The id form for that service is unverified |
 | `ResourceExhausted` | Wait for the rate limit to reset or reduce CE page requests |
-| `GetProjectedCost` returns `Unimplemented` | This release serves actual costs. Use a plugin with projected-cost support |
+| `GetProjectedCost` returns `NotFound` | Cost Explorer returned no forecast rows for the next 30 UTC days |
 | Invalid startup port or batch setting | Use port 0 to 65535 and the documented batch limits |
 
 The plugin returns explicit errors for invalid requests, missing data, AWS

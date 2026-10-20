@@ -53,7 +53,7 @@ const (
 	pluginName = "aws-ce"
 	// specVersion must keep the leading v. pluginsdk.ValidateSpecVersion rejects "0.7.0".
 	specVersion   = "v0.7.8"
-	supportedRPCs = "GetActualCost,Supports,GetPluginInfo,BatchCost"
+	supportedRPCs = "GetActualCost,GetProjectedCost,Supports,GetPluginInfo,BatchCost"
 )
 
 // NewCalculator creates a new AWS Cost Explorer cost calculator plugin.
@@ -89,8 +89,8 @@ func (c *Calculator) traceLogger(ctx context.Context) zerolog.Logger {
 }
 
 // GetPluginInfo returns discovery metadata for this plugin.
-// Capabilities lists actual costs only. Leaving it empty would make the server
-// infer projected cost from GetProjectedCost, which still returns an error.
+// Capabilities list actual costs and Cost Explorer forecasts. Leaving the list
+// empty would let the server infer every method the type has.
 func (c *Calculator) GetPluginInfo(ctx context.Context, _ *pbc.GetPluginInfoRequest) (*pbc.GetPluginInfoResponse, error) {
 	logger := c.traceLogger(ctx)
 	done := pluginsdk.LogOperation(logger, "GetPluginInfo")
@@ -106,6 +106,7 @@ func (c *Calculator) GetPluginInfo(ctx context.Context, _ *pbc.GetPluginInfoRequ
 		},
 		Capabilities: []pbc.PluginCapability{
 			pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS,
+			pbc.PluginCapability_PLUGIN_CAPABILITY_PROJECTED_COSTS,
 		},
 		Settings: pluginSettings(),
 	}, nil
@@ -127,7 +128,10 @@ func (c *Calculator) Supports(ctx context.Context, req *pbc.SupportsRequest) (*p
 	logger := c.traceLogger(ctx)
 	done := pluginsdk.LogOperation(logger, "Supports")
 	defer done()
-	response := &pbc.SupportsResponse{CapabilitiesEnum: []pbc.PluginCapability{pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS}}
+	response := &pbc.SupportsResponse{CapabilitiesEnum: []pbc.PluginCapability{
+		pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS,
+		pbc.PluginCapability_PLUGIN_CAPABILITY_PROJECTED_COSTS,
+	}}
 	resource := req.GetResource()
 	switch {
 	case resource == nil:
@@ -205,12 +209,55 @@ func (c *Calculator) initClient(ctx context.Context, logger zerolog.Logger) erro
 	return nil
 }
 
-// GetProjectedCost explicitly rejects an operation this actual-cost plugin cannot answer.
-func (c *Calculator) GetProjectedCost(ctx context.Context, _ *pbc.GetProjectedCostRequest) (*pbc.GetProjectedCostResponse, error) {
+// GetProjectedCost proxies AWS Cost Explorer GetCostForecast.
+// The plugin does not compute a forecast. Interval fields are copied from AWS
+// or left unset. The queried window is the next 30 UTC days.
+func (c *Calculator) GetProjectedCost(ctx context.Context, req *pbc.GetProjectedCostRequest) (*pbc.GetProjectedCostResponse, error) {
 	logger := c.traceLogger(ctx)
 	done := pluginsdk.LogOperation(logger, "GetProjectedCost")
 	defer done()
-	return nil, status.Error(codes.Unimplemented, "CE-6.10: projected costs are unavailable; use the aws-public plugin")
+
+	if err := pluginsdk.ValidateProjectedCostRequest(req); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	resource := req.GetResource()
+	if resource.GetProvider() != "aws" {
+		return nil, status.Error(codes.InvalidArgument, "aws-ce only supports provider aws")
+	}
+	if req.GetDryRun() {
+		return nil, status.Error(codes.InvalidArgument, "dry run is not supported for Cost Explorer forecasts")
+	}
+
+	start, end := forecastWindow(time.Now().UTC())
+	var pages int
+	ctx = c.withCostBudget(ctx, &pages)
+	ce, perRequest, err := c.clientForCall(ctx, logger)
+	if err != nil {
+		if _, ok := status.FromError(err); ok {
+			return nil, err
+		}
+		return nil, status.Errorf(codes.Internal, "client initialization failed: %v", err)
+	}
+	forecasts, err := ce.GetCostForecast(ctx, forecastFilter(resource), start, end, string(types.GranularityDaily))
+	if err != nil {
+		if errors.Is(err, client.ErrRateLimited) {
+			return nil, statusWithDetail(codes.ResourceExhausted, err.Error(), pbc.ErrorCode_ERROR_CODE_RATE_LIMITED)
+		}
+		if errors.Is(err, client.ErrInvalidTimeRange) {
+			return nil, statusWithDetail(codes.InvalidArgument, err.Error(), pbc.ErrorCode_ERROR_CODE_INVALID_TIME_RANGE)
+		}
+		if mapped, ok := mapAWSAPIError(err); ok {
+			if perRequest {
+				logger.Error().Int("ce_requests", pages).Msg(status.Convert(mapped).Message())
+			}
+			return nil, mapped
+		}
+		if errors.Is(err, client.ErrNoCostData) {
+			return nil, statusWithDetail(codes.NotFound, pluginsdk.NoDataError(resource.GetId()).Error(), pbc.ErrorCode_ERROR_CODE_RESOURCE_NOT_FOUND)
+		}
+		return nil, status.Error(codes.Internal, "getting cost forecast failed")
+	}
+	return forecastResponse(forecasts), nil
 }
 
 // GetActualCost retrieves actual historical costs from AWS Cost Explorer.

@@ -220,6 +220,9 @@ type CostResult struct {
 	Metric string
 }
 
+// forecastIntervalLevel is the prediction interval requested from Cost Explorer.
+const forecastIntervalLevel = 80
+
 // ForecastResult represents the cost forecast for a resource.
 type ForecastResult struct {
 	// MeanValue is the mean forecasted cost.
@@ -234,6 +237,9 @@ type ForecastResult struct {
 	PredictionIntervalLowerBound *float64
 	// PredictionIntervalUpperBound is the upper bound of the prediction interval (if available).
 	PredictionIntervalUpperBound *float64
+	// PredictionIntervalLevel is the interval level requested from AWS, set only
+	// when both bounds parsed. It is not a computed confidence.
+	PredictionIntervalLevel *float64
 }
 
 // GetCostForecast retrieves the cost forecast for a given time period.
@@ -252,10 +258,13 @@ func (c *Client) GetCostForecast(ctx context.Context, filter *types.Expression, 
 		Granularity:             types.Granularity(granularity),
 		Metric:                  types.MetricUnblendedCost,
 		Filter:                  filter,
-		PredictionIntervalLevel: aws.Int32(80), // Default to 80% confidence interval
+		PredictionIntervalLevel: aws.Int32(forecastIntervalLevel),
 	}
 
 	output, err := WithRetry(ctx, DefaultRetryConfig(), func(ctx context.Context) (*costexplorer.GetCostForecastOutput, error, bool) {
+		if err := runPageHook(ctx); err != nil {
+			return nil, err, false
+		}
 		out, err := c.ceClient.GetCostForecast(ctx, input)
 		if err != nil {
 			return nil, err, isRetryableError(err)
@@ -272,6 +281,9 @@ func (c *Client) GetCostForecast(ctx context.Context, filter *types.Expression, 
 
 // parseForecastResults converts AWS Cost Explorer forecast output to ForecastResult slice.
 func (c *Client) parseForecastResults(output *costexplorer.GetCostForecastOutput) ([]ForecastResult, error) {
+	if output == nil || len(output.ForecastResultsByTime) == 0 {
+		return nil, ErrNoCostData
+	}
 	var results []ForecastResult
 
 	for _, forecast := range output.ForecastResultsByTime {
@@ -316,6 +328,10 @@ func (c *Client) parseForecastResults(output *costexplorer.GetCostForecastOutput
 			if _, err := fmt.Sscanf(*forecast.PredictionIntervalUpperBound, "%f", &upper); err == nil {
 				result.PredictionIntervalUpperBound = &upper
 			}
+		}
+		if result.PredictionIntervalLowerBound != nil && result.PredictionIntervalUpperBound != nil {
+			level := float64(forecastIntervalLevel)
+			result.PredictionIntervalLevel = &level
 		}
 
 		results = append(results, result)
