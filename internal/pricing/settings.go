@@ -10,6 +10,12 @@ import (
 const (
 	BatchSizeEnv    = "FINFOCUS_AWS_CE_MAX_BATCH_SIZE"
 	BatchWorkersEnv = "FINFOCUS_AWS_CE_BATCH_WORKERS"
+
+	// HealthEndpointEnv enables the SDK /healthz endpoint. The SDK serves it on
+	// the plugin listener, and only while Connect is enabled.
+	HealthEndpointEnv = "FINFOCUS_HEALTH_ENDPOINT"
+	// WebEnabledEnv serves Connect, gRPC-Web, and gRPC on the plugin listener.
+	WebEnabledEnv = "FINFOCUS_WEB_ENABLED"
 )
 
 // pluginSettings lists the environment variables this plugin reads. AWS
@@ -55,6 +61,20 @@ func pluginSettings() []*pbc.PluginSetting {
 			Env:         maxRequestsEnv,
 			Type:        pbc.PluginSettingType_PLUGIN_SETTING_TYPE_INT,
 			Description: "Cost Explorer page budget per minute. Each page costs $0.01. Unset or 0 means no limit.",
+		},
+		{
+			Key:          "health_endpoint",
+			Env:          HealthEndpointEnv,
+			Type:         pbc.PluginSettingType_PLUGIN_SETTING_TYPE_BOOL,
+			DefaultValue: "false",
+			Description:  "Serve SDK /healthz on the plugin listener. Enabling it also enables Connect, because the SDK mounts /healthz only in that mode. Connect does not propagate the gRPC trace header. There is no separate health port.",
+		},
+		{
+			Key:          "web_enabled",
+			Env:          WebEnabledEnv,
+			Type:         pbc.PluginSettingType_PLUGIN_SETTING_TYPE_BOOL,
+			DefaultValue: "false",
+			Description:  "Serve Connect and gRPC-Web beside gRPC. Also turns on when the health endpoint is enabled.",
 		},
 	}
 }

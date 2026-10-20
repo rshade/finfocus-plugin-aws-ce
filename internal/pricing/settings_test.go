@@ -33,6 +33,8 @@ func TestGetPluginInfo_Settings(t *testing.T) {
 		BatchSizeEnv:           strconv.Itoa(pluginsdk.DefaultMaxBatchSize),
 		BatchWorkersEnv:        strconv.Itoa(pluginsdk.DefaultBatchWorkers),
 		maxRequestsEnv:         "",
+		HealthEndpointEnv:      "false",
+		WebEnabledEnv:          "false",
 	}
 	got := make(map[string]string, len(settings))
 	for _, setting := range settings {
