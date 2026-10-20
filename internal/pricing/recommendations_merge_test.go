@@ -175,3 +175,20 @@ func TestRecommendationsProviderRetainsRootlessAnomalies(t *testing.T) {
 	}
 	require.Equal(t, 2, anomalies)
 }
+
+func TestRecommendationsCombinedSourcesShareClient(t *testing.T) {
+	calc := NewCalculator()
+	var apis []*mixedRecommendationAPI
+	calc.openClient = func(context.Context, client.Config) (*client.Client, error) {
+		api := &mixedRecommendationAPI{recommendationAPI: recommendationAPI{rights: rightsizingFixture()}}
+		apis = append(apis, api)
+		return client.NewClientWithAPI(api, "us-east-1"), nil
+	}
+	ctx := credentialContext(t, map[string]string{"access_key_id": "synthetic-access", "secret_access_key": "synthetic-secret", "session_token": "synthetic-token", "role_arn": credentialRole})
+	resp, err := calc.GetRecommendations(ctx, &pbc.GetRecommendationsRequest{})
+	require.NoError(t, err)
+	require.Len(t, resp.GetRecommendations(), 5)
+	require.Len(t, apis, 1)
+	require.Equal(t, []string{"ec2", "COMPUTE_SP", "EC2_INSTANCE_SP"}, apis[0].calls)
+	require.Equal(t, []string{"", "aws-next"}, apis[0].anomalyTokens)
+}
