@@ -16,6 +16,13 @@ const (
 	HealthEndpointEnv = "FINFOCUS_HEALTH_ENDPOINT"
 	// WebEnabledEnv serves Connect, gRPC-Web, and gRPC on the plugin listener.
 	WebEnabledEnv = "FINFOCUS_WEB_ENABLED"
+	// CORSAllowedOriginsEnv is a comma-separated origin list. Empty disables CORS.
+	CORSAllowedOriginsEnv = "FINFOCUS_CORS_ALLOWED_ORIGINS"
+	// CORSAllowCredentialsEnv allows credentialed cross-origin requests.
+	CORSAllowCredentialsEnv = "FINFOCUS_CORS_ALLOW_CREDENTIALS"
+	// CORSAllowedHeadersEnv is a comma-separated Access-Control-Allow-Headers list.
+	// Empty leaves the SDK default headers in place.
+	CORSAllowedHeadersEnv = "FINFOCUS_CORS_ALLOWED_HEADERS"
 )
 
 // pluginSettings lists the environment variables this plugin reads. AWS
@@ -75,6 +82,25 @@ func pluginSettings() []*pbc.PluginSetting {
 			Type:         pbc.PluginSettingType_PLUGIN_SETTING_TYPE_BOOL,
 			DefaultValue: "false",
 			Description:  "Serve Connect and gRPC-Web beside gRPC. Also turns on when the health endpoint is enabled.",
+		},
+		{
+			Key:         "cors_allowed_origins",
+			Env:         CORSAllowedOriginsEnv,
+			Type:        pbc.PluginSettingType_PLUGIN_SETTING_TYPE_STRING,
+			Description: "Comma-separated browser origins for CORS. Empty allows none. Never combine * with credentials.",
+		},
+		{
+			Key:          "cors_allow_credentials",
+			Env:          CORSAllowCredentialsEnv,
+			Type:         pbc.PluginSettingType_PLUGIN_SETTING_TYPE_BOOL,
+			DefaultValue: "false",
+			Description:  "Allow cookies and authorization headers on cross-origin requests. Requires explicit origins.",
+		},
+		{
+			Key:         "cors_allowed_headers",
+			Env:         CORSAllowedHeadersEnv,
+			Type:        pbc.PluginSettingType_PLUGIN_SETTING_TYPE_STRING,
+			Description: "Comma-separated Access-Control-Allow-Headers values. Empty uses the SDK Connect header set.",
 		},
 	}
 }

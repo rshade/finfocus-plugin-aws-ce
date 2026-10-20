@@ -27,14 +27,17 @@ func TestGetPluginInfo_Settings(t *testing.T) {
 	}
 
 	want := map[string]string{
-		"FINFOCUS_PLUGIN_PORT": "",
-		"FINFOCUS_LOG_LEVEL":   "info",
-		"FINFOCUS_LOG_FILE":    "",
-		BatchSizeEnv:           strconv.Itoa(pluginsdk.DefaultMaxBatchSize),
-		BatchWorkersEnv:        strconv.Itoa(pluginsdk.DefaultBatchWorkers),
-		maxRequestsEnv:         "",
-		HealthEndpointEnv:      "false",
-		WebEnabledEnv:          "false",
+		"FINFOCUS_PLUGIN_PORT":  "",
+		"FINFOCUS_LOG_LEVEL":    "info",
+		"FINFOCUS_LOG_FILE":     "",
+		BatchSizeEnv:            strconv.Itoa(pluginsdk.DefaultMaxBatchSize),
+		BatchWorkersEnv:         strconv.Itoa(pluginsdk.DefaultBatchWorkers),
+		maxRequestsEnv:          "",
+		HealthEndpointEnv:       "false",
+		WebEnabledEnv:           "false",
+		CORSAllowedOriginsEnv:   "",
+		CORSAllowCredentialsEnv: "false",
+		CORSAllowedHeadersEnv:   "",
 	}
 	got := make(map[string]string, len(settings))
 	for _, setting := range settings {
