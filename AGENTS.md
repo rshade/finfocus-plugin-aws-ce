@@ -58,7 +58,7 @@ The project follows these milestones and issues:
 ## Context for the next agent
 
 - `product.md` contains the master plan and analysis.
-- `specs/` contains the completed `001-aws-ce-plugin/spec.md`. Create new specs in this directory for the roadmap issues.
+- `specs/` is frozen Spec Kit history; keep it and `.specify/` intact. Current tested behavior lives in `openspec/specs/`. Use OpenSpec changes for new behavior and archive completed changes.
 - **Refactoring**: use the `env` and `mapping` helpers in `pluginsdk`, and use `zerolog` when touching any code.
 
 ## Plugin SDK reference for v0.5.2

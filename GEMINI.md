@@ -53,7 +53,8 @@ This project is a single-binary gRPC server.
 - `internal/pricing/`: contains the core logic.
   - `calculator.go`: implements the `Plugin` interface methods, including `GetActualCost` and `GetProjectedCost`.
 - `internal/client/`: wraps the AWS SDK v2 clients for Cost Explorer and Budgets.
-- `specs/`: contains feature specifications in Markdown following the Spec-Kit methodology.
+- `openspec/specs/`: contains current tested behavior. Use OpenSpec proposals and archive completed changes.
+- `specs/` and `.specify/`: frozen Spec Kit history; do not add new feature specifications there.
 - `.github/workflows/`: defines continuous integration and delivery workflows for tests and releases.
 
 ### Integration points

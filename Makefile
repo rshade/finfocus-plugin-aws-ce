@@ -62,6 +62,7 @@ clean:
 lint:
 	@echo "Running linters..."
 	@golangci-lint run --allow-parallel-runners
+	@openspec validate --all --strict
 	@echo "✅ Linting complete"
 
 # Install plugin to local registry
