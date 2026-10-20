@@ -26,7 +26,7 @@ jobs:
         env:
           REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          vale . --output=line 2>/dev/null | reviewdog \
+          vale . --glob '!CHANGELOG.md' --output=line 2>/dev/null | reviewdog \
             -efm="%f:%l:%c:%m" \
             -name="vale" \
             -reporter=github-pr-review \

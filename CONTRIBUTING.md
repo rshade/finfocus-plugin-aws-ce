@@ -83,7 +83,8 @@ vale --minAlertLevel=suggestion CONTRIBUTING.md
 
 Replace `CONTRIBUTING.md` with the files you changed. `make lint-md` checks all
 Markdown files using the repository configuration, including its exclusions.
-Require zero errors, warnings, and suggestions in changed documents. Vale can
+Require zero errors, warnings, and suggestions in changed documents. Vale and
+reviewdog skip `CHANGELOG.md` because Release Please generates it. Vale can
 exit successfully with suggestions, and reviewdog posts those suggestions to
 the pull request. Inspect the diagnostic counts instead of relying on the exit
 status. Keep the configured rules active and correct the prose.
