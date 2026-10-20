@@ -26,7 +26,8 @@ jobs:
         env:
           REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          vale . --glob '!CHANGELOG.md' --output=line 2>/dev/null | reviewdog \
+          # OpenSpec specs remain in Vale; only generated Claude templates are excluded.
+          vale . --glob '!{CHANGELOG.md,.claude/**}' --output=line 2>/dev/null | reviewdog \
             -efm="%f:%l:%c:%m" \
             -name="vale" \
             -reporter=github-pr-review \
