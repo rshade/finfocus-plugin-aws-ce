@@ -52,7 +52,8 @@ func TestSupports(t *testing.T) {
 				Provider: "aws",
 				Arn:      "arn:aws:s3:::my_bucket",
 			}},
-			supported: false, reasonHas: invalidResource,
+			supported: true,
+			reasonHas: "unverified",
 		},
 		{
 			name: "malformed ARN with Id",
@@ -70,8 +71,8 @@ func TestSupports(t *testing.T) {
 				ResourceType: "ec2",
 				Region:       "eu-west-1",
 			}},
-			supported: false,
-			reasonHas: invalidResource,
+			supported: true,
+			reasonHas: "unverified",
 		},
 		{
 			name: "malformed ARN with no Id",
@@ -136,8 +137,8 @@ func TestSupports(t *testing.T) {
 				Provider:     "aws",
 				ResourceType: "aws:s3/bucket:Bucket",
 			}},
-			supported: false,
-			reasonHas: "aws:ec2/instance:Instance",
+			supported: true,
+			reasonHas: "unverified",
 		},
 		{
 			name:      "nil resource",
@@ -180,6 +181,9 @@ func TestSupports(t *testing.T) {
 			case tc.supported:
 				if !strings.Contains(resp.GetReason(), "14 days") || !strings.Contains(resp.GetReason(), "opt-in") {
 					t.Fatalf("supported reason = %q, want resource limitations", resp.GetReason())
+				}
+				if tc.reasonHas != "" && !strings.Contains(resp.GetReason(), tc.reasonHas) {
+					t.Fatalf("reason %q does not contain %q", resp.GetReason(), tc.reasonHas)
 				}
 			case tc.plainReason:
 				reason := resp.GetReason()

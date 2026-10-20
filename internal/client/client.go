@@ -406,10 +406,10 @@ func (c *Client) getCost(ctx context.Context, filter *types.Expression, dimensio
 // GetCostWithResources retrieves resource-level cost for an EC2 instance id.
 // resourceID is the Cost Explorer RESOURCE_ID value, never a full ARN.
 func (c *Client) GetCostWithResources(ctx context.Context, resourceID, accountID string, startTime, endTime time.Time) ([]CostResult, error) {
-	return c.getCostWithResources(ctx, resourceID, accountID, startTime, endTime, nil, costIdentity{})
+	return c.getCostWithResources(ctx, []string{resourceID}, ec2ComputeService, accountID, startTime, endTime, nil, costIdentity{})
 }
 
-func (c *Client) getCostWithResources(ctx context.Context, resourceID, accountID string, startTime, endTime time.Time, extraFilter *types.Expression, identity costIdentity) ([]CostResult, error) {
+func (c *Client) getCostWithResources(ctx context.Context, resourceIDs []string, serviceName, accountID string, startTime, endTime time.Time, extraFilter *types.Expression, identity costIdentity) ([]CostResult, error) {
 	interval, err := dateInterval(startTime, endTime)
 	if err != nil {
 		return nil, err
@@ -417,16 +417,18 @@ func (c *Client) getCostWithResources(ctx context.Context, resourceID, accountID
 	parts := []types.Expression{
 		{
 			Dimensions: &types.DimensionValues{
-				Key:    types.DimensionService,
-				Values: []string{ec2ComputeService},
-			},
-		},
-		{
-			Dimensions: &types.DimensionValues{
 				Key:    types.DimensionResourceId,
-				Values: []string{resourceID},
+				Values: resourceIDs,
 			},
 		},
+	}
+	if serviceName != "" {
+		parts = append([]types.Expression{{
+			Dimensions: &types.DimensionValues{
+				Key:    types.DimensionService,
+				Values: []string{serviceName},
+			},
+		}}, parts...)
 	}
 	if accountID != "" {
 		parts = append(parts, types.Expression{

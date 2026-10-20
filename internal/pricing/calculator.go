@@ -143,7 +143,7 @@ func (c *Calculator) Supports(ctx context.Context, req *pbc.SupportsRequest) (*p
 		} else {
 			response.Supported = true
 			if plan.resourceLevel {
-				response.Reason = "EC2 resource costs require Cost Explorer resource-level opt-in and cover the last 14 days"
+				response.Reason = resourceLevelReason(plan)
 			}
 		}
 	}
@@ -156,15 +156,23 @@ const pulumiEC2InstanceType = "aws:ec2/instance:Instance"
 // id. The engine's Supports call carries the Pulumi type but no id or ARN, so
 // the type alone decides. GetActualCost still needs an EC2 instance id.
 func supportsByResourceType(resourceType string) (bool, string) {
-	switch strings.ToLower(resourceType) {
-	case strings.ToLower(pulumiEC2InstanceType):
-		return true, "EC2 resource costs require Cost Explorer resource-level opt-in, an instance id, and cover the last 14 days"
+	switch strings.ToLower(strings.TrimSpace(resourceType)) {
+	case "":
+		return false, invalidResourceReason("resource type is required when no id or ARN is sent")
 	case "aws:account", "aws:service":
 		return true, ""
+	case strings.ToLower(pulumiEC2InstanceType):
+		return true, "EC2 resource costs require Cost Explorer resource-level opt-in, an instance id, and cover the last 14 days"
+	default:
+		return true, fmt.Sprintf("resource-level cost for %s is unverified, requires Cost Explorer resource-level opt-in, and covers the last 14 days", resourceType)
 	}
-	return false, invalidResourceReason(fmt.Sprintf(
-		"resource type %q has no cost lookup; supported types are %s, aws:account and aws:service",
-		resourceType, pulumiEC2InstanceType))
+}
+
+func resourceLevelReason(plan costQueryPlan) string {
+	if plan.unverified {
+		return fmt.Sprintf("resource-level cost for %s is unverified, requires Cost Explorer resource-level opt-in, and covers the last 14 days", plan.serviceName)
+	}
+	return "EC2 resource costs require Cost Explorer resource-level opt-in and cover the last 14 days"
 }
 
 func invalidResourceReason(detail string) string {
@@ -261,7 +269,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 
 	var clientCosts []client.CostResult
 	if plan.resourceLevel {
-		clientCosts, err = ce.GetAttributedCostWithResources(ctx, plan.resourceID, plan.accountID, startTime, endTime)
+		clientCosts, err = ce.GetAttributedCostWithResources(ctx, plan.resourceIDs, plan.serviceName, plan.accountID, startTime, endTime)
 	} else {
 		var filter *types.Expression
 		if plan.serviceName != "" {
@@ -318,7 +326,9 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 
 type costQueryPlan struct {
 	resourceLevel bool
+	unverified    bool
 	resourceID    string
+	resourceIDs   []string
 	accountID     string
 	cacheID       string
 	serviceName   string
@@ -332,74 +342,81 @@ func (c *Calculator) planCostQuery(logger zerolog.Logger, req *pbc.GetActualCost
 	if resource := req.GetResource(); resource != nil && resource.GetProvider() != "aws" {
 		return costQueryPlan{}, statusWithDetail(codes.InvalidArgument, "aws-ce only supports provider aws", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
 	}
-	plan := costQueryPlan{cacheID: resourceID}
-	if id, ok := ec2InstanceID(resourceID); ok {
-		plan.resourceLevel = true
-		plan.resourceID = id
-		plan.cacheID = id
-	}
 	if arn == "" {
 		resource := req.GetResource()
 		switch resource.GetResourceType() {
 		case "aws:account":
 			if resourceID != "" {
-				plan = costQueryPlan{cacheID: "account-total"}
-				return plan, nil
+				return costQueryPlan{cacheID: "account-total"}, nil
 			}
 		case "aws:service":
 			if resourceID != "" {
-				plan = costQueryPlan{cacheID: "service:" + resourceID, serviceName: resourceID}
-				return plan, nil
+				return costQueryPlan{cacheID: "service:" + resourceID, serviceName: resourceID}, nil
 			}
 		}
-		if plan.resourceLevel {
-			return plan, nil
+		if id, ok := ec2InstanceID(resourceID); ok {
+			return ec2ResourcePlan(id, ""), nil
 		}
 		if resourceID == "aws-account-total" {
-			plan.cacheID = "account-total"
-			return plan, nil
+			return costQueryPlan{cacheID: "account-total"}, nil
 		}
-		return costQueryPlan{}, statusWithDetail(codes.InvalidArgument, "resource-level costs require an EC2 instance id; use aws:account or aws:service for explicit totals", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		return costQueryPlan{}, statusWithDetail(codes.InvalidArgument, "non-EC2 resource-level cost requires an ARN; use aws:account or aws:service for explicit totals", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
 	}
 	parsed, err := ParseARN(arn)
 	if err != nil {
+		if id, ok := ec2InstanceID(resourceID); ok {
+			logger.Warn().Err(err).Str("arn", arn).Str("resource_id", id).
+				Msg("Malformed ARN; using ResourceId as the EC2 instance id")
+			return ec2ResourcePlan(id, ""), nil
+		}
 		if resourceID == "" {
 			return costQueryPlan{}, statusWithDetail(codes.InvalidArgument, "malformed ARN and empty resource id", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
 		}
-		if plan.resourceLevel {
-			logger.Warn().Err(err).Str("arn", arn).Str("resource_id", plan.resourceID).
-				Msg("Malformed ARN; using ResourceId as the EC2 instance id")
-		} else {
-			return costQueryPlan{}, statusWithDetail(codes.InvalidArgument, "malformed ARN without a usable EC2 instance id", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+		return costQueryPlan{}, statusWithDetail(codes.InvalidArgument, "malformed ARN without a usable EC2 instance id", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
+	}
+	if parsed.Service == "ec2" {
+		instanceID, ok := ec2InstanceID(parsed.Resource)
+		if !ok {
+			return costQueryPlan{}, statusWithDetail(
+				codes.InvalidArgument,
+				fmt.Sprintf("resource-level cost is not available for service ec2 resource %s", parsed.Resource),
+				pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE,
+			)
 		}
-		return plan, nil
+		if resourceID != "" && resourceID != instanceID && !strings.HasSuffix(parsed.Resource, resourceID) {
+			logger.Warn().
+				Str("resource_id", resourceID).
+				Str("arn_resource", parsed.Resource).
+				Msg("Identifier mismatch: ResourceId does not match ARN resource component. Using ARN as source of truth.")
+		}
+		return ec2ResourcePlan(instanceID, parsed.AccountID), nil
 	}
-	if parsed.Service != "ec2" {
-		return costQueryPlan{}, statusWithDetail(
-			codes.InvalidArgument,
-			fmt.Sprintf("resource-level cost is not available for service %s", parsed.Service),
-			pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE,
-		)
+	service, _ := costExplorerService(parsed.Service)
+	bare := bareResourceID(parsed.Resource)
+	if bare == "" {
+		return costQueryPlan{}, statusWithDetail(codes.InvalidArgument, "ARN resource name is empty", pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE)
 	}
-	instanceID, ok := ec2InstanceID(parsed.Resource)
-	if !ok {
-		return costQueryPlan{}, statusWithDetail(
-			codes.InvalidArgument,
-			fmt.Sprintf("resource-level cost is not available for service ec2 resource %s", parsed.Resource),
-			pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE,
-		)
+	return costQueryPlan{
+		resourceLevel: true,
+		unverified:    true,
+		resourceID:    bare,
+		resourceIDs:   uniqueIDs(arn, bare),
+		accountID:     parsed.AccountID,
+		cacheID:       parsed.Service + ":" + bare,
+		serviceName:   service,
+	}, nil
+}
+
+func ec2ResourcePlan(instanceID, accountID string) costQueryPlan {
+	service, _ := costExplorerService("ec2")
+	return costQueryPlan{
+		resourceLevel: true,
+		resourceID:    instanceID,
+		resourceIDs:   []string{instanceID},
+		accountID:     accountID,
+		cacheID:       instanceID,
+		serviceName:   service,
 	}
-	if resourceID != "" && resourceID != instanceID && !strings.HasSuffix(parsed.Resource, resourceID) {
-		logger.Warn().
-			Str("resource_id", resourceID).
-			Str("arn_resource", parsed.Resource).
-			Msg("Identifier mismatch: ResourceId does not match ARN resource component. Using ARN as source of truth.")
-	}
-	plan.resourceLevel = true
-	plan.resourceID = instanceID
-	plan.accountID = parsed.AccountID
-	plan.cacheID = instanceID
-	return plan, nil
 }
 
 func ec2InstanceID(resource string) (string, bool) {

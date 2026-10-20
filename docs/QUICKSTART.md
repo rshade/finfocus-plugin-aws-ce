@@ -27,7 +27,8 @@ You can also use environment credentials or workload credentials through the
 AWS SDK default chain. Temporary credentials need all three AWS key, secret
 and session-token variables. See [AWS credentials](CREDENTIALS.md) for exact
 host-supplied keys and IAM permissions. Enable Cost Explorer and its
-resource-level opt-in before querying individual EC2 instances.
+resource-level opt-in before querying an EC2 instance or another resource ARN.
+Non-EC2 resource ids are unverified and cover the last 14 days.
 
 ## Run the plugin
 
@@ -71,11 +72,11 @@ Each paginated Cost Explorer request costs $0.01 in real use.
 | Symptom | Action |
 | --- | --- |
 | Missing AWS region | Set `AWS_REGION=us-east-1` or configure your profile's region |
-| `PermissionDenied` | Grant `ce:GetDimensionValues`, `ce:GetCostAndUsage` and, for EC2, `ce:GetCostAndUsageWithResources` |
+| `PermissionDenied` | Grant `ce:GetDimensionValues`, `ce:GetCostAndUsage` and `ce:GetCostAndUsageWithResources` |
 | `Unauthenticated` | Refresh expired session credentials and include `AWS_SESSION_TOKEN` |
 | `InvalidArgument` with `ERROR_CODE_INVALID_CREDENTIALS` | Check supported key names, matching key pair, and role ARN |
-| Resource query has no data | Confirm resource opt-in, instance id, 14-day window and 24-to-48-hour data lag |
-| Unsupported non-EC2 ARN | This service lacks resource attribution. Don't substitute a guessed id |
+| Resource query has no data | Confirm resource opt-in, the id or ARN, the 14-day window and 24-to-48-hour data lag |
+| Non-EC2 resource returns `NotFound` | Cost Explorer had no row for the ARN or bare name. The id form for that service is unverified |
 | `ResourceExhausted` | Wait for the rate limit to reset or reduce CE page requests |
 | `GetProjectedCost` returns `Unimplemented` | This release serves actual costs. Use a plugin with projected-cost support |
 | Invalid startup port or batch setting | Use port 0 to 65535 and the documented batch limits |

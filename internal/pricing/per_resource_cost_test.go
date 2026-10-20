@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
 	"github.com/rs/zerolog"
@@ -57,20 +58,42 @@ func TestPerResourceCostClassification(t *testing.T) {
 	t.Run("other_non_instance_id", func(t *testing.T) {
 		calc, mockAPI := newClassifiedCalc()
 		_, err := calc.GetActualCost(context.Background(), costRequest("example-bucket", "", start, end, nil))
-		assertInvalidArgument(t, err, "EC2")
+		assertInvalidArgument(t, err, "ARN")
 		assertNoCostExplorerCall(t, mockAPI)
 	})
 
 	t.Run("s3_arn", func(t *testing.T) {
-		assertResourceLevelUnavailable(t, "contract-resource_id:s3", "arn:aws:s3:::example-bucket", start, end)
+		assertNonEC2ResourceQuery(t, "contract-resource_id:s3", "arn:aws:s3:::example-bucket", "Amazon Simple Storage Service", "arn:aws:s3:::example-bucket", "example-bucket")
 	})
 
 	t.Run("rds_arn", func(t *testing.T) {
-		assertResourceLevelUnavailable(t, "contract-resource_id:rds", "arn:aws:rds:us-east-1:123456789012:db:example-db", start, end)
+		assertNonEC2ResourceQuery(t, "contract-resource_id:rds", "arn:aws:rds:us-east-1:123456789012:db:example-db", "Amazon Relational Database Service", "arn:aws:rds:us-east-1:123456789012:db:example-db", "example-db")
+	})
+
+	t.Run("lambda_arn", func(t *testing.T) {
+		assertNonEC2ResourceQuery(t, "contract-resource_id:lambda", "arn:aws:lambda:us-east-1:123456789012:function:billing-report", "AWS Lambda", "arn:aws:lambda:us-east-1:123456789012:function:billing-report", "billing-report")
 	})
 
 	t.Run("instance_id_with_s3_arn", func(t *testing.T) {
-		assertResourceLevelUnavailable(t, bareInstanceID, "arn:aws:s3:::example-bucket", start, end)
+		assertNonEC2ResourceQuery(t, bareInstanceID, "arn:aws:s3:::example-bucket", "Amazon Simple Storage Service", "arn:aws:s3:::example-bucket", "example-bucket")
+	})
+
+	t.Run("s3_no_rows", func(t *testing.T) {
+		calc, mockAPI := newEmptyResourceCalc()
+		_, err := calc.GetActualCost(context.Background(), costRequest("example-bucket", "arn:aws:s3:::example-bucket", start, end, nil))
+		if status.Code(err) != codes.NotFound {
+			t.Fatalf("got %v, want NotFound", err)
+		}
+		if len(mockAPI.resourceCalls) == 0 {
+			t.Fatal("no-row case did not query Cost Explorer")
+		}
+	})
+
+	t.Run("s3_older_than_14_days", func(t *testing.T) {
+		calc, mockAPI := newClassifiedCalc()
+		_, err := calc.GetActualCost(context.Background(), costRequest("example-bucket", "arn:aws:s3:::example-bucket", oldStart, oldEnd, nil))
+		assertInvalidArgument(t, err, "14 days")
+		assertNoCostExplorerCall(t, mockAPI)
 	})
 
 	t.Run("older_than_14_days", func(t *testing.T) {
@@ -184,15 +207,90 @@ func assertServiceTotalQuery(t *testing.T, mockAPI *mockCostExplorerAPI) {
 	}
 }
 
-func assertResourceLevelUnavailable(t *testing.T, resourceID, arn string, start, end time.Time) {
+func assertNonEC2ResourceQuery(t *testing.T, resourceID, arn, service string, wantIDs ...string) {
 	t.Helper()
+	start, end := recentCostWindow()
 	calc, mockAPI := newClassifiedCalc()
-	_, err := calc.GetActualCost(context.Background(), costRequest(resourceID, arn, start, end, nil))
-	assertInvalidArgument(t, err, "resource-level cost is not available")
-	assertNoCostExplorerCall(t, mockAPI)
-	if strings.Contains(err.Error(), arn) {
-		t.Fatalf("error echoes the ARN: %v", err)
+	if _, err := calc.GetActualCost(context.Background(), costRequest(resourceID, arn, start, end, nil)); err != nil {
+		t.Fatalf("GetActualCost: %v", err)
 	}
+	if len(mockAPI.resourceCalls) != 1 {
+		t.Fatalf("GetCostAndUsageWithResources calls=%d", len(mockAPI.resourceCalls))
+	}
+	filter := mockAPI.resourceCalls[0].Filter
+	got := resourceIDs(filter)
+	if !sameIDs(got, wantIDs) {
+		t.Fatalf("RESOURCE_ID=%v, want %v", got, wantIDs)
+	}
+	if !strings.Contains(strings.Join(serviceValues(filter), ","), service) {
+		t.Fatalf("SERVICE=%v, want %s", serviceValues(filter), service)
+	}
+}
+
+func sameIDs(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	seen := map[string]int{}
+	for _, id := range got {
+		seen[id]++
+	}
+	for _, id := range want {
+		seen[id]--
+		if seen[id] < 0 {
+			return false
+		}
+	}
+	for _, n := range seen {
+		if n != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func serviceValues(filter *types.Expression) []string {
+	return dimensionValuesOf(filter, types.DimensionService)
+}
+
+func dimensionValuesOf(filter *types.Expression, key types.Dimension) []string {
+	if filter == nil {
+		return nil
+	}
+	var out []string
+	var walk func(*types.Expression)
+	walk = func(e *types.Expression) {
+		if e == nil {
+			return
+		}
+		if e.Dimensions != nil && e.Dimensions.Key == key {
+			out = append(out, e.Dimensions.Values...)
+		}
+		for i := range e.And {
+			walk(&e.And[i])
+		}
+		for i := range e.Or {
+			walk(&e.Or[i])
+		}
+		if e.Not != nil {
+			walk(e.Not)
+		}
+	}
+	walk(filter)
+	return out
+}
+
+func newEmptyResourceCalc() (*Calculator, *mockCostExplorerAPI) {
+	mockAPI := &mockCostExplorerAPI{
+		GetCostAndUsageFunc: func(context.Context, *costexplorer.GetCostAndUsageInput, ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error) {
+			return &costexplorer.GetCostAndUsageOutput{ResultsByTime: []types.ResultByTime{{
+				TimePeriod: &types.DateInterval{Start: aws.String("2026-09-01"), End: aws.String("2026-09-02")},
+			}}}, nil
+		},
+	}
+	calc := NewCalculatorWithClient(client.NewClientWithAPI(mockAPI, "us-east-1"))
+	calc.cache = nil
+	return calc, mockAPI
 }
 
 func assertInvalidArgument(t *testing.T, err error, fragment string) {
