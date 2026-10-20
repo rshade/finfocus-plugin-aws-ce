@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v5
         with:
           install_args: vale aqua:reviewdog/reviewdog
 
@@ -40,7 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v5
         with:
           install_args: node npm:markdownlint-cli2
 

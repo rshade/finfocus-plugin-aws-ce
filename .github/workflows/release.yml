@@ -23,17 +23,12 @@ jobs:
           fetch-depth: 0
           ref: ${{ inputs.tag || github.event.release.tag_name }}
 
-      - name: Set up Go
-        uses: actions/setup-go@v7
+      - name: Set up release tools with mise
+        uses: jdx/mise-action@v5
         with:
-          go-version-file: go.mod
-          check-latest: true
-          cache: false
+          install_args: go goreleaser
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v7
-        with:
-          version: latest
-          args: release --clean
+        run: goreleaser release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

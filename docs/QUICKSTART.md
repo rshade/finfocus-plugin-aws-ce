@@ -2,7 +2,7 @@
 
 ## Build and install
 
-Install Go 1.27.1, then run from the repository root:
+Install Go 1.27.2, then run from the repository root:
 
 ```bash
 make build

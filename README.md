@@ -7,7 +7,7 @@ return gRPC `Unimplemented` with task reference CE-6.10.
 
 ## Quick start
 
-Install Go 1.27.1 and use an AWS identity with Cost Explorer read permissions.
+Install Go 1.27.2 and use an AWS identity with Cost Explorer read permissions.
 Build and install from source:
 
 ```bash
@@ -144,6 +144,9 @@ There is no response-level metadata map. FOCUS and these columns are absent
 without a billing account.
 
 ## Development and offline testing
+
+See the [contributor guide](CONTRIBUTING.md) for development setup, code style,
+testing, and the pull request process.
 
 ```bash
 make develop

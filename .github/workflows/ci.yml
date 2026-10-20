@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up tools with mise
+        uses: jdx/mise-action@v5
+        with:
+          install_args: go golangci-lint go:golang.org/x/vuln/cmd/govulncheck
+
+      - name: Run golangci-lint
+        run: make lint
+
+      - name: Run vulnerability check
+        run: make vuln
+        continue-on-error: true
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go with mise
+        uses: jdx/mise-action@v5
+        with:
+          install_args: go
+
+      - name: Run tests with race detection
+        run: go test -count=1 -v -race ./...
+
+      - name: Run integration tests
+        run: make test-integration
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go with mise
+        uses: jdx/mise-action@v5
+        with:
+          install_args: go
+
+      - name: Build plugin
+        run: make build

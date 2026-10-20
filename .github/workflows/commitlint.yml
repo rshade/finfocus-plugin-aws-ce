@@ -12,7 +12,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Node with mise
+        uses: jdx/mise-action@v5
+        with:
+          install_args: node
+
+      - name: Install locked commitlint dependencies
+        run: npm ci
+
       - name: Validate commits
-        run: |
-          npm install --save-dev @commitlint/config-conventional @commitlint/cli
-          npx commitlint --from ${{ github.event.pull_request.base.sha }} --to HEAD
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: npx --no-install commitlint --from "$BASE_SHA" --to HEAD
