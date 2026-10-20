@@ -49,7 +49,7 @@ func TestGetPluginInfo_GRPC(t *testing.T) {
 	if !hasCapability(caps, pbc.PluginCapability_PLUGIN_CAPABILITY_PROJECTED_COSTS) {
 		t.Fatalf("capabilities %v do not contain PROJECTED_COSTS", caps)
 	}
-	if len(caps) != 4 || !hasCapability(caps, pbc.PluginCapability_PLUGIN_CAPABILITY_RECOMMENDATIONS) {
+	if len(caps) != 4 || !hasCapability(caps, pbc.PluginCapability_PLUGIN_CAPABILITY_BUDGETS) {
 		t.Fatalf("capabilities = %v, want actual, projected, and budgets", caps)
 	}
 	if got := resp.GetMetadata()["supported_rpcs"]; got != pluginInfoRPCs {
@@ -79,7 +79,7 @@ func assertPluginInfo(t *testing.T, resp *pbc.GetPluginInfoResponse) {
 		t.Fatalf("providers = %v, want [aws]", providers)
 	}
 	caps := resp.GetCapabilities()
-	if len(caps) != 4 || caps[3] != pbc.PluginCapability_PLUGIN_CAPABILITY_RECOMMENDATIONS {
+	if len(caps) != 4 || caps[2] != pbc.PluginCapability_PLUGIN_CAPABILITY_BUDGETS {
 		t.Fatalf("capabilities = %v, want actual, projected, and budgets", caps)
 	}
 	meta := resp.GetMetadata()

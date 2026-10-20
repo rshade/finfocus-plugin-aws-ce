@@ -57,9 +57,13 @@ func (p *suiteProxy) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 	return p.client.GetRecommendations(ctx, req)
 }
 
+func (p *suiteProxy) GetRecommendations(ctx context.Context, req *pbc.GetRecommendationsRequest) (*pbc.GetRecommendationsResponse, error) {
+	return p.client.GetRecommendations(ctx, req)
+}
+
 func TestOfficialStandardConformance(t *testing.T) {
 	const resourceID = "i-0123456789abcdef0"
-	var costs, reservations, savings atomic.Int32
+	var costs, reservations, savings, forecasts, budgets, recommendations atomic.Int32
 	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
 		body, err := io.ReadAll(r.Body)
@@ -91,7 +95,19 @@ func TestOfficialStandardConformance(t *testing.T) {
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
-		switch target {
+		switch r.Header.Get("X-Amz-Target") {
+		case "AWSInsightsIndexService.GetCostForecast":
+			forecasts.Add(1)
+			_, _ = fmt.Fprintf(w, `{"Total":{"Amount":"30","Unit":"USD"},"ForecastResultsByTime":[{"TimePeriod":{"Start":%q,"End":%q},"MeanValue":"30","PredictionIntervalLowerBound":"20","PredictionIntervalUpperBound":"40"}]}`, request.TimePeriod.Start, request.TimePeriod.End)
+		case "AWSBudgetServiceGateway.DescribeBudgets":
+			budgets.Add(1)
+			_, _ = w.Write([]byte(`{"Budgets":[{"BudgetName":"offline","BudgetType":"COST","TimeUnit":"MONTHLY","BudgetLimit":{"Amount":"100","Unit":"USD"},"CalculatedSpend":{"ActualSpend":{"Amount":"10","Unit":"USD"},"ForecastedSpend":{"Amount":"30","Unit":"USD"}}}]}`))
+		case "AWSInsightsIndexService.GetRightsizingRecommendation":
+			recommendations.Add(1)
+			_, _ = w.Write([]byte(`{"RightsizingRecommendations":[{"AccountId":"123456789012","RightsizingType":"TERMINATE","CurrentInstance":{"ResourceId":"i-0123456789abcdef0"},"TerminateRecommendationDetail":{"EstimatedMonthlySavings":"12.50","CurrencyCode":"USD"}}]}`))
+		case "AWSInsightsIndexService.GetSavingsPlansPurchaseRecommendation":
+			recommendations.Add(1)
+			_, _ = w.Write([]byte(`{}`))
 		case "AWSInsightsIndexService.GetDimensionValues":
 			switch request.Dimension {
 			case "RESERVATION_ID":
@@ -120,6 +136,12 @@ func TestOfficialStandardConformance(t *testing.T) {
 	defer fake.Close()
 
 	process := testutil.StartPlugin(t, conformanceEnvironment(t, fake.URL), "--port", "0")
+	// The pinned Standard suite does not exercise recommendations yet.
+	// Explicitly verify the newly advertised RPC through the real subprocess.
+	recs, recErr := process.Client.GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{})
+	if recErr != nil || len(recs.GetRecommendations()) != 1 || recs.GetRecommendations()[0].GetImpact().GetEstimatedSavings() != 12.5 {
+		t.Fatalf("offline recommendation RPC: response=%v error=%v", recs, recErr)
+	}
 	result, err := sdktesting.RunConformance(&suiteProxy{client: process.Client},
 		sdktesting.ConformanceLevelStandard,
 		sdktesting.WithSampleResource(&pbc.ResourceDescriptor{
@@ -148,6 +170,9 @@ func TestOfficialStandardConformance(t *testing.T) {
 	}
 	// The official suite allows unavailable data. Prove this run actually
 	// exercised positive offline AWS responses, not merely no-data statuses.
+	if forecasts.Load() == 0 || budgets.Load() == 0 || recommendations.Load() == 0 {
+		t.Fatalf("advertised RPCs did not reach offline AWS: forecasts=%d budgets=%d recommendations=%d", forecasts.Load(), budgets.Load(), recommendations.Load())
+	}
 	if costs.Load() == 0 || reservations.Load() == 0 || savings.Load() == 0 {
 		t.Fatalf("missing actual-cost queries: costs=%d reservations=%d savings=%d", costs.Load(), reservations.Load(), savings.Load())
 	}
@@ -169,6 +194,7 @@ func conformanceEnvironment(t *testing.T, endpoint string) map[string]string {
 		t.Fatal(err)
 	}
 	for key, value := range map[string]string{
+		"AWS_ENDPOINT_URL_BUDGETS": endpoint, "FINFOCUS_AWS_ACCOUNT_ID": "123456789012",
 		"AWS_ENDPOINT_URL_COST_EXPLORER": endpoint, "AWS_ENDPOINT_URL": endpoint,
 		"AWS_IGNORE_CONFIGURED_ENDPOINT_URLS": "false", "AWS_REGION": "us-east-1", "AWS_DEFAULT_REGION": "us-east-1",
 		"AWS_ACCESS_KEY_ID": "test", "AWS_SECRET_ACCESS_KEY": "test", "AWS_EC2_METADATA_DISABLED": "true",
