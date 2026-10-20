@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -30,8 +31,14 @@ type CostExplorerAPI interface {
 
 // Client represents a client for AWS Cost Explorer API.
 type Client struct {
-	ceClient CostExplorerAPI
-	region   string
+	ceClient   CostExplorerAPI
+	region     string
+	awsConfig  aws.Config
+	spotAPI    SpotAPI
+	pricingAPI PricingAPI
+	cacheMu    sync.Mutex
+	spotCache  map[string]cachedHourly
+	priceCache map[string]cachedHourly
 }
 
 // Config holds configuration for the AWS Cost Explorer client.
@@ -146,7 +153,8 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 			// Cost Explorer attempt, regardless of AWS_MAX_ATTEMPTS configuration.
 			options.Retryer = aws.NopRetryer{}
 		}),
-		region: ceCfg.Region,
+		region:    ceCfg.Region,
+		awsConfig: ceCfg,
 	}, nil
 }
 

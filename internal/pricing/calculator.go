@@ -47,6 +47,11 @@ type Calculator struct {
 	accountID func(context.Context) (string, error)
 	// now overrides the wall clock. Nil uses time.Now.
 	now func() time.Time
+	// spotQuote, onDemandQuote, and spotRisk override the live Spot comparison.
+	// Nil uses the Cost Explorer client's EC2 and Price List calls, and the public advisor feed.
+	spotQuote     spotHourly
+	onDemandQuote onDemandHourly
+	spotRisk      interruptionLookup
 }
 
 var (
@@ -222,8 +227,11 @@ func (c *Calculator) initClient(ctx context.Context, logger zerolog.Logger) erro
 }
 
 // GetProjectedCost proxies AWS Cost Explorer GetCostForecast for an account or
-// a service. Cost Explorer cannot forecast one resource, so any other resource
-// is declined rather than priced at a service or account total.
+// a service. An EC2 instance with an instance type and an availability zone is
+// a Spot comparison instead: DescribeSpotPriceHistory for that zone, and the
+// Price List on-demand rate on the same monthly basis. Cost Explorer cannot
+// forecast any other single resource, so it is declined rather than priced at a
+// service or account total.
 // CostPerMonth is the projected total for the current UTC calendar month: the
 // AmortizedCost already billed before today plus the Cost Explorer forecast from
 // today to the last day of the month. The prediction interval comes from AWS
@@ -242,6 +250,9 @@ func (c *Calculator) GetProjectedCost(ctx context.Context, req *pbc.GetProjected
 	}
 	if req.GetDryRun() {
 		return nil, status.Error(codes.InvalidArgument, "dry run is not supported for Cost Explorer forecasts")
+	}
+	if wantsSpotComparison(resource) {
+		return c.quoteSpot(ctx, logger, req)
 	}
 	if !forecastScopeSupported(resource) {
 		return nil, statusWithDetail(

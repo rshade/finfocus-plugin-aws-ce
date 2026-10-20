@@ -38,6 +38,8 @@ Explorer. It implements the `finfocus-spec` plugin SDK interface.
 - `cmd/plugin/main.go` sets up the gRPC server at the plugin entry point
 - `internal/pricing/calculator.go` contains the core `Calculator` struct
   - `GetProjectedCost()` serves `aws:account` and `aws:service` only and declines other resources with `InvalidArgument`. It returns month-to-date `AmortizedCost` (`ce:GetCostAndUsage`) plus the `ce:GetCostForecast` to the first of next month, and shifts the AWS interval bounds by the month-to-date amount
+    An EC2 instance with an instance type and zone takes the Spot comparison path in `spot.go`, which also calls EC2,
+    the Price List API, and the Spot Instance Advisor feed
   - `GetActualCost()` retrieves historical costs from the Cost Explorer API
   - `GetServiceActualCost()` and `GetAccountActualCost()` handle service and account queries
 - `internal/client/client.go` wraps the AWS Cost Explorer API client
@@ -111,8 +113,16 @@ make test-integration
 - `GetPluginInfo` advertises plugin settings from `internal/pricing/settings.go`. Add an entry there when the plugin reads a new
   environment variable. A test checks the list with `ValidatePluginSettings`.
 - Never add `Parse`, the cost-parsing remote procedure call, to this plugin. `aws-public` owns `Parse` for the `aws` provider.
-- The plugin also doesn't adopt `GetRecommendationHistory`, the Spot on-demand equivalent field, or the `ParsedResource`
-  action hint. These fields remain outside this plugin’s implemented remote procedure call scope.
+- The plugin also doesn't adopt `GetRecommendationHistory` or the `ParsedResource` action hint. They serve projected-cost and recommendation plugins, not an actual-cost plugin.
+- An EC2 `GetProjectedCost` with an instance type and an availability zone is a Spot comparison.
+  Account and service requests stay on `ce:GetCostForecast`. Any other single resource returns `InvalidArgument`.
+  Read `attributes` before `sku` and tags. `DescribeSpotPriceHistory` filters instance type, product description, and zone.
+  Linux uses `Linux/UNIX`. `pricing:GetProducts` in `us-east-1` supplies the shared-tenancy on-demand hourly rate.
+  `on_demand_equivalent_monthly_cost` and the `STANDARD` `On-Demand` price option use the same hour count as `cost_per_month`.
+  `savings_fraction` is `(spot unit price - on-demand unit price) / spot unit price`. Leave the on-demand fields unset when the price list has no row.
+  Advisor `r` maps to `0.05`, `0.10`, `0.15`, and `0.20`. The `>20%` bucket leaves the score at 0 and keeps the label in metadata.
+  Don't derive the on-demand price from advisor field `s`, and don't pick the cheapest zone.
+  Spot and on-demand rates cache for five minutes. The advisor document caches for one hour.
 
 ## Dependencies
 

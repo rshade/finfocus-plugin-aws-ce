@@ -76,6 +76,16 @@ func TestOfficialStandardConformance(t *testing.T) {
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
+		raw := string(body)
+		if strings.Contains(raw, "DescribeSpotPriceHistory") || strings.Contains(r.URL.RawQuery, "DescribeSpotPriceHistory") {
+			w.Header().Set("Content-Type", "text/xml")
+			_, _ = w.Write([]byte(`<DescribeSpotPriceHistoryResponse><spotPriceHistorySet><item><availabilityZone>us-east-1a</availabilityZone><instanceType>t3.micro</instanceType><productDescription>Linux/UNIX</productDescription><spotPrice>0.004</spotPrice><timestamp>2026-10-19T12:00:00Z</timestamp></item></spotPriceHistorySet></DescribeSpotPriceHistoryResponse>`))
+			return
+		}
+		if r.Header.Get("X-Amz-Target") == "AWSPriceListService.GetProducts" {
+			_, _ = w.Write([]byte(`{"FormatVersion":"aws_v1","PriceList":["{\"product\":{\"productFamily\":\"Compute Instance\",\"attributes\":{\"usagetype\":\"BoxUsage:t3.micro\"}},\"terms\":{\"OnDemand\":{\"t\":{\"priceDimensions\":{\"d\":{\"unit\":\"Hrs\",\"pricePerUnit\":{\"USD\":\"0.0104\"}}}}}}}"]}`))
+			return
+		}
 		var request struct {
 			Dimension   string
 			Granularity string
@@ -146,10 +156,17 @@ func TestOfficialStandardConformance(t *testing.T) {
 	if anomalyErr != nil || len(anomalyPage.GetRecommendations()) != 1 || anomalyPage.GetRecommendations()[0].GetId() != "offline-anomaly" {
 		t.Fatalf("offline anomaly RPC: response=%v error=%v", anomalyPage, anomalyErr)
 	}
+	projected, projectedErr := process.Client.GetProjectedCost(context.Background(), &pbc.GetProjectedCostRequest{
+		Resource: &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:account", Sku: "account", Region: "us-east-1"},
+	})
+	if projectedErr != nil || projected.GetCostPerMonth() <= 0 {
+		t.Fatalf("offline account projection RPC: response=%v error=%v", projected, projectedErr)
+	}
 	result, err := sdktesting.RunConformance(&suiteProxy{client: process.Client},
 		sdktesting.ConformanceLevelStandard,
 		sdktesting.WithSampleResource(&pbc.ResourceDescriptor{
 			Provider: "aws", ResourceType: "ec2", Sku: "t3.micro", Region: "us-east-1", Id: resourceID,
+			Tags: map[string]string{"availability_zone": "us-east-1a"},
 		}))
 	if err != nil {
 		t.Fatalf("run official conformance: %v", err)

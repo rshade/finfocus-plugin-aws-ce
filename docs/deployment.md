@@ -100,6 +100,8 @@ Grant these actions to the identity that performs the queries:
         "ce:GetCostAndUsage",
         "ce:GetCostAndUsageWithResources",
         "ce:GetCostForecast",
+        "ec2:DescribeSpotPriceHistory",
+        "pricing:GetProducts",
         "budgets:ViewBudget"
       ],
       "Resource": "*"
@@ -111,7 +113,9 @@ Grant these actions to the identity that performs the queries:
 `ce:GetDimensionValues` supports reservation and Savings Plan discovery for
 every actual-cost query. `ce:GetCostAndUsage` supplies account and service totals.
 `ce:GetCostAndUsageWithResources` supplies resource costs.
-`ce:GetCostForecast` and `ce:GetCostAndUsage` supply projections, and `budgets:ViewBudget` permits
+`ce:GetCostForecast` and `ce:GetCostAndUsage` supply account and service projections.
+`ec2:DescribeSpotPriceHistory` and `pricing:GetProducts` supply an EC2 Spot
+comparison for one instance type and availability zone. `budgets:ViewBudget` permits
 reading budgets. Grant only the operations the installation needs. Budget
 queries use the process credentials and the account in `FINFOCUS_AWS_ACCOUNT_ID`,
 or call STS `GetCallerIdentity` when that setting is empty.
@@ -212,7 +216,7 @@ procedure. Setting `FINFOCUS_TEST_MODE` alone doesn't make a live query offline.
 | Address already in use | Choose another port or use `--port 0` |
 | No startup port announcement | Read standard error for port, batch-setting, or listener failures |
 | Missing AWS region | Set `AWS_REGION=us-east-1` or configure the selected profile's region |
-| `PermissionDenied` | Check all actions needed by the query, including `ce:GetDimensionValues` |
+| `PermissionDenied` | Check all actions needed by the query, including `ce:GetDimensionValues`, and `ec2:DescribeSpotPriceHistory` plus `pricing:GetProducts` for a Spot comparison |
 | `Unauthenticated` | Refresh the AWS session and include its session token |
 | `ERROR_CODE_INVALID_CREDENTIALS` | Check the supported host credential keys, complete key pair, and role ARN |
 | `NotFound` for an EC2 instance | Check resource opt-in, instance identity, lookback, and data availability |
