@@ -25,6 +25,7 @@ type CostExplorerAPI interface {
 	GetCostAndUsage(ctx context.Context, params *costexplorer.GetCostAndUsageInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageOutput, error)
 	GetCostAndUsageWithResources(ctx context.Context, params *costexplorer.GetCostAndUsageWithResourcesInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageWithResourcesOutput, error)
 	GetCostForecast(ctx context.Context, params *costexplorer.GetCostForecastInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostForecastOutput, error)
+	GetAnomalies(ctx context.Context, params *costexplorer.GetAnomaliesInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetAnomaliesOutput, error)
 }
 
 // Client represents a client for AWS Cost Explorer API.
@@ -277,6 +278,33 @@ func (c *Client) GetCostForecast(ctx context.Context, filter *types.Expression, 
 	}
 
 	return c.parseForecastResults(output)
+}
+
+// GetAnomalies reads one page of Cost Explorer anomalies. The caller supplies
+// the date window and passes NextPageToken through unchanged.
+func (c *Client) GetAnomalies(ctx context.Context, startDate, endDate, pageToken string, pageSize int32) (*costexplorer.GetAnomaliesOutput, error) {
+	input := &costexplorer.GetAnomaliesInput{
+		DateInterval: &types.AnomalyDateInterval{
+			StartDate: aws.String(startDate),
+			EndDate:   aws.String(endDate),
+		},
+	}
+	if pageToken != "" {
+		input.NextPageToken = aws.String(pageToken)
+	}
+	if pageSize > 0 {
+		input.MaxResults = aws.Int32(pageSize)
+	}
+	return WithRetry(ctx, DefaultRetryConfig(), func(ctx context.Context) (*costexplorer.GetAnomaliesOutput, error, bool) {
+		if err := runPageHook(ctx); err != nil {
+			return nil, err, false
+		}
+		out, err := c.ceClient.GetAnomalies(ctx, input)
+		if err != nil {
+			return nil, err, isRetryableError(err)
+		}
+		return out, nil, false
+	})
 }
 
 // parseForecastResults converts AWS Cost Explorer forecast output to ForecastResult slice.

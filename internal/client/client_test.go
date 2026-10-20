@@ -31,6 +31,10 @@ func (m *mockCostExplorerAPI) GetCostForecast(ctx context.Context, params *coste
 	return nil, nil
 }
 
+func (m *mockCostExplorerAPI) GetAnomalies(ctx context.Context, params *costexplorer.GetAnomaliesInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetAnomaliesOutput, error) {
+	return &costexplorer.GetAnomaliesOutput{}, nil
+}
+
 func (m *mockCostExplorerAPI) GetCostAndUsageWithResources(ctx context.Context, params *costexplorer.GetCostAndUsageWithResourcesInput, optFns ...func(*costexplorer.Options)) (*costexplorer.GetCostAndUsageWithResourcesOutput, error) {
 	return &costexplorer.GetCostAndUsageWithResourcesOutput{}, nil
 }
