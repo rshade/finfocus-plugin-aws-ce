@@ -271,3 +271,104 @@ func TestAttributedCostLateFailureReturnsNoRows(t *testing.T) {
 		t.Fatalf("rows=%v err=%v calls=%d", rows, err, costCalls)
 	}
 }
+
+// requireValidExpression applies the rule AWS enforces: an And or Or
+// expression needs at least two operands. The fake server calls it so a
+// malformed filter fails here the way it fails against Cost Explorer.
+func requireValidExpression(t *testing.T, raw json.RawMessage) {
+	t.Helper()
+	var node struct {
+		And []json.RawMessage
+		Or  []json.RawMessage
+		Not json.RawMessage
+	}
+	if err := json.Unmarshal(raw, &node); err != nil {
+		t.Errorf("filter is not valid JSON: %v", err)
+		return
+	}
+	if node.And != nil && len(node.And) < 2 {
+		t.Errorf("And expression must have at least 2 operands: %s", raw)
+	}
+	if node.Or != nil && len(node.Or) < 2 {
+		t.Errorf("Or expression must have at least 2 operands: %s", raw)
+	}
+	for _, child := range append(append([]json.RawMessage{}, node.And...), node.Or...) {
+		requireValidExpression(t, child)
+	}
+	if node.Not != nil {
+		requireValidExpression(t, node.Not)
+	}
+}
+
+func TestResourceLevelFiltersHaveAtLeastTwoOperandsPerAnd(t *testing.T) {
+	cases := []struct {
+		name         string
+		reservations string
+		savings      string
+	}{
+		{name: "no commitments", reservations: `{}`, savings: `{}`},
+		{name: "reservation and savings plan", reservations: `{"DimensionValues":[{"Value":"ri-1"}]}`, savings: `{"DimensionValues":[{"Value":"sp-1"}]}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var resourceQueries int
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+				var request struct {
+					Dimension string
+					Filter    json.RawMessage
+				}
+				_ = json.NewDecoder(r.Body).Decode(&request)
+				if len(request.Filter) > 0 {
+					requireValidExpression(t, request.Filter)
+				}
+				switch {
+				case strings.HasSuffix(r.Header.Get("X-Amz-Target"), ".GetDimensionValues"):
+					if request.Dimension == "RESERVATION_ID" {
+						_, _ = w.Write([]byte(tc.reservations))
+					} else {
+						_, _ = w.Write([]byte(tc.savings))
+					}
+				default:
+					resourceQueries++
+					_, _ = w.Write([]byte(`{"ResultsByTime":[{"TimePeriod":{"Start":"2026-10-01","End":"2026-10-02"},"Groups":[{"Keys":["i-1234567890abcdef0"],"Metrics":{"UnblendedCost":{"Amount":"1","Unit":"USD"},"AmortizedCost":{"Amount":"1","Unit":"USD"}}}]}]}`))
+				}
+			}))
+			defer server.Close()
+			ce, err := NewClient(context.Background(), Config{Region: "us-east-1", BaseEndpoint: server.URL, AccessKeyID: "test", SecretAccessKey: "test"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			start := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+			if _, err := ce.GetAttributedCostWithResources(context.Background(), []string{"i-1234567890abcdef0"}, "", "", start, start.Add(24*time.Hour)); err != nil {
+				t.Fatal(err)
+			}
+			if resourceQueries == 0 {
+				t.Fatal("no resource-level query reached the server")
+			}
+		})
+	}
+}
+
+// Resource-level data that is enabled but not yet ingested comes back as
+// zero-valued days with no groups. That is missing data, not a zero cost.
+func TestResourceLevelEmptyGroupsAreNoCostData(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		if strings.HasSuffix(r.Header.Get("X-Amz-Target"), ".GetDimensionValues") {
+			_, _ = w.Write([]byte(`{}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"ResultsByTime":[{"TimePeriod":{"Start":"2026-10-17","End":"2026-10-18"},"Groups":[],"Total":{"UnblendedCost":{"Amount":"0","Unit":"USD"}}}]}`))
+	}))
+	defer server.Close()
+	ce, err := NewClient(context.Background(), Config{Region: "us-east-1", BaseEndpoint: server.URL, AccessKeyID: "test", SecretAccessKey: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Date(2026, 10, 17, 0, 0, 0, 0, time.UTC)
+	_, err = ce.GetAttributedCostWithResources(context.Background(), []string{"i-1234567890abcdef0"}, "", "", start, start.Add(24*time.Hour))
+	if !errors.Is(err, ErrNoCostData) {
+		t.Fatalf("got %v, want ErrNoCostData", err)
+	}
+}
