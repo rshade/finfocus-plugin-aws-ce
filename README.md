@@ -1,8 +1,8 @@
 # FinFocus AWS Cost Explorer plugin
 
 `finfocus-plugin-aws-ce` retrieves actual AWS costs through Cost Explorer for
-FinFocus. The plugin name is `aws-ce`, and its protocol dependency is
-`finfocus-spec v0.7.8`. It advertises actual costs only. Projected cost requests
+FinFocus. The plugin name is `aws-ce`, and it implements the `finfocus-spec`
+v0.7.8 protocol. It advertises actual costs only. Projected cost requests
 return gRPC `Unimplemented` with task reference CE-6.10.
 
 ## Quick start
@@ -122,7 +122,10 @@ and each additional page adds requests. The request budget bounds this work.
 
 On actual-cost requests, the descriptor identity takes precedence over legacy
 identifiers. The identity can be an id or ARN. A descriptor without either identity falls back to `resource_id`
-and `arn`. The SDK still requires `resource_id` on every request.
+and `arn`. When a descriptor ID is a Pulumi URN, the plugin uses a non-empty
+`resource.tags["pulumi:cloudId"]` as its cloud identity. Ordinary descriptor IDs
+retain precedence over that metadata. This identity metadata does not enable
+Cost Explorer tag filtering. The SDK still requires `resource_id` on every request.
 
 Pass `billing_account_id` to receive FOCUS records. The plugin copies that
 caller value verbatim. Without it, costs remain available with `focus_record`
@@ -157,19 +160,37 @@ make vuln
 ```
 
 `make develop` fetches Go modules and prepares the build directory.
-`make test-integration` runs real plugin processes with local fake CE
-endpoints and verifies protocol conformance. All Go test recipes use `-count=1`.
-Releases contain binary archives and checksums. The owner removed Docker support and its
-Makefile target.
+`make test-integration` launches plugin processes against local fake Cost Explorer
+endpoints. All Go test recipes use `-count=1`. Releases contain binary archives
+and checksums; Docker support remains outside scope.
 
-Set `FINFOCUS_E2E=true` to run the subprocess E2E test against a local fake CE
-endpoint. Legacy `finfocus_E2E` is a fallback only when the uppercase name is
-unset. Explicit uppercase `false` turns off the fallback. Tests inject synthetic
-credentials and use local fake endpoints. The ordinary suite never queries
-a live AWS service. Contract fixtures prove parsing,
-paging, totals, dates, and failure handling. [Live AWS checks](docs/AWS-VERIFICATION.md)
-require an explicit build tag and environment flag, and a Pulumi environment
-with Cost Explorer read permission. FinFocus core E2E remains outside this run.
+Run the real FinFocus core test and official SDK conformance suite with:
+
+```bash
+make core-install
+make e2e
+make conformance
+```
+
+`make core-install` builds the pinned core revision. Override
+`FINFOCUS_CORE_VERSION` to build another revision, or set `FINFOCUS_CORE_BINARY`
+to an existing executable. `make e2e`, also available as `make test-e2e`, uses
+an isolated registry, synthetic credentials, and a local fake AWS endpoint.
+It asserts actual cost results from core; a successful exit with no data fails.
+`make conformance` runs the official Standard suite against the plugin's
+actual-only capabilities. Ordinary tests never query live AWS services.
+
+The SDK dependency pins `v0.7.9-0.20261020013049-bc3a94391af7`, which includes
+the [upstream capability-aware conformance fix](https://github.com/rshade/finfocus-spec/pull/652).
+The suite validates advertised capabilities and requires `Unimplemented` for
+unsupported methods. It retains mandatory checks without fabricated responses.
+
+[Live AWS verification](docs/AWS-VERIFICATION.md) has a separate `make e2e-live`
+target, explicit build and environment gates, and bounded AWS requests. It uses
+the existing Pulumi environment for credentials. The current foundation has
+no new live verification result; the recorded earlier check predates commitment
+discovery. Monthly grouping, tag filtering, and persistent cache reuse remain
+outside this change.
 
 The vulnerability check reports the known `GO-2026-6443` finding in
 gRPC v1.84.0. The plugin retains the stable dependency. This verification environment

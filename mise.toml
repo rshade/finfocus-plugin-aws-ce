@@ -60,3 +60,11 @@ run = "make build"
 [tasks.release-check]
 description = "Check goreleaser configuration"
 run = "make release-check"
+
+[tasks.e2e]
+description = "Run FinFocus core against the local plugin and fake AWS"
+run = "make e2e"
+
+[tasks.conformance]
+description = "Run the official plugin SDK conformance suite"
+run = "make conformance"

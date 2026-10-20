@@ -23,10 +23,13 @@ This roadmap outlines the development path for `finfocus-plugin-aws-ce`, priorit
 | ✅ Done | [#2](https://github.com/rshade/finfocus-plugin-aws-ce/issues/2) | Initial plugin creation for real AWS billing data |
 | ✅ Done | [#7](https://github.com/rshade/finfocus-plugin-aws-ce/issues/7) | Establish continuous delivery infrastructure |
 
-Offline verification covers release plumbing, actual-cost behavior, integration, and custom protocol conformance tests.
+Offline verification covers release plumbing, actual-cost behavior, integration,
+and protocol tests. The current foundation adds real core integration and the
+official SDK Standard conformance suite.
 Pulumi Environments, Secrets, and Configuration also supplied AWS credentials. Live service
 cost comparison passed after the owner granted Cost Explorer read permission.
-Resource-level verification is separate, and core E2E remains outside this run.
+That earlier comparison predates the current commitment-discovery path.
+The current live harness remains unverified; resource-level verification is separate.
 The whole-repository Markdown check passes. Vulnerability
 scanning reports gRPC v1.84.0 through a vulnerability database version-range mismatch.
 The upstream advisory lists this stable version as patched. See the
@@ -39,9 +42,9 @@ finished and the duplicates listed under [Rejected and out of scope](#rejected-a
 
 | Status | Issue | Technical Thesis | Boundary Guardrail |
 |--------|-------|------------------|-------------------|
-| 🔄 Partial | [#11](https://github.com/rshade/finfocus-plugin-aws-ce/issues/11) | Core Cost Plugin - `GetActualCost` with FOCUS 1.2 records. Plugin released. E2E test against `finfocus` core and a live re-check of commitment discovery remain | Use values directly from `GetCostAndUsage` |
+| 🔄 Partial | [#11](https://github.com/rshade/finfocus-plugin-aws-ce/issues/11) | Actual-cost translation and real core testing implemented offline. Manual live workflow and bounded comparison implemented; current live verification outstanding | Use values directly from `GetCostAndUsage` |
 | ✅ Done | [#12](https://github.com/rshade/finfocus-plugin-aws-ce/issues/12) | Installation & Documentation polish | Ready to use after installation |
-| 🔄 Partial | [#31](https://github.com/rshade/finfocus-plugin-aws-ce/issues/31) | Custom protocol checks and SDK FOCUS validation implemented. Upstream conformance suite integration pending | Don't modify test suite to pass |
+| ✅ Done | [#31](https://github.com/rshade/finfocus-plugin-aws-ce/issues/31) | Official Standard suite passes through the plugin process, using the pinned capability-aware SDK commit. Pull-request checks run the suite | Preserve mandatory checks; never fabricate pricing or discard failures |
 | ✅ Done | [#23](https://github.com/rshade/finfocus-plugin-aws-ce/issues/23) | Use `finfocus-spec` v0.7.5 | Dependency update only |
 
 ## Core features for v0.2.0

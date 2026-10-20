@@ -255,7 +255,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 	if !perRequest && c.cache != nil {
 		if entry, ok := c.cache.getEntry(cacheKey); ok {
 			logger.Info().Int("ce_requests", 0).Msg("Cache hit for cost query")
-			return c.buildResponse(entry.Results, entry.ExpiresAt, req.GetBillingAccountId(), plan.resourceLevel), nil
+			return c.buildResponse(entry.Results, entry.ExpiresAt, req.GetBillingAccountId(), plan.resourceLevel)
 		}
 	}
 
@@ -313,7 +313,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 
 	logger.Info().Int("ce_requests", pages).Int("results_count", len(costs)).Msg("Retrieved costs from AWS")
 
-	return c.buildResponse(costs, expires, req.GetBillingAccountId(), plan.resourceLevel), nil
+	return c.buildResponse(costs, expires, req.GetBillingAccountId(), plan.resourceLevel)
 }
 
 type costQueryPlan struct {
@@ -483,7 +483,7 @@ func statusWithDetail(code codes.Code, msg string, errorCode pbc.ErrorCode) erro
 	return detailed.Err()
 }
 
-func (c *Calculator) buildResponse(costs []CostEntry, expires time.Time, billingAccountID string, resourceLevel bool) *pbc.GetActualCostResponse {
+func (c *Calculator) buildResponse(costs []CostEntry, expires time.Time, billingAccountID string, resourceLevel bool) (*pbc.GetActualCostResponse, error) {
 	expiresAt := timestamppb.New(expires.UTC())
 	results := make([]*pbc.ActualCostResult, 0, len(costs))
 	for _, cost := range costs {
@@ -500,7 +500,11 @@ func (c *Calculator) buildResponse(costs []CostEntry, expires time.Time, billing
 			if resourceLevel {
 				cost.Lookback = "14_days"
 			}
-			focus = focusFor(cost)
+			var err error
+			focus, err = focusFor(cost, resourceLevel)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "translating AWS costs to FOCUS: %v", err)
+			}
 		}
 		results = append(results, &pbc.ActualCostResult{
 			Timestamp:   timestamppb.New(cost.Timestamp.UTC()),
@@ -516,7 +520,7 @@ func (c *Calculator) buildResponse(costs []CostEntry, expires time.Time, billing
 	return &pbc.GetActualCostResponse{
 		Results:      results,
 		FallbackHint: pbc.FallbackHint_FALLBACK_HINT_NONE,
-	}
+	}, nil
 }
 
 // GetServiceActualCost retrieves actual costs for a specific AWS service.
@@ -632,10 +636,15 @@ func sumDecimalCosts(rows []client.CostResult) (float64, string, error) {
 }
 
 // actualCostIdentity prefers descriptor identity, then legacy request fields.
+// Core carries a Pulumi URN in Id and the AWS identity in pulumi:cloudId.
 func actualCostIdentity(req *pbc.GetActualCostRequest) (string, string) {
 	resource := req.GetResource()
 	if resource != nil && (resource.GetId() != "" || resource.GetArn() != "") {
-		return resource.GetId(), resource.GetArn()
+		id := resource.GetId()
+		if cloudID := resource.GetTags()["pulumi:cloudId"]; strings.HasPrefix(id, "urn:pulumi:") && cloudID != "" {
+			id = cloudID
+		}
+		return id, resource.GetArn()
 	}
 	return req.GetResourceId(), req.GetArn()
 }

@@ -169,7 +169,7 @@ func costMergeKey(row client.CostResult) string {
 	return row.ServiceName + "\x00" + row.ReservationARN + "\x00" + row.SavingsPlanARN
 }
 
-func focusFor(entry CostEntry) *pbc.FocusCostRecord {
+func focusFor(entry CostEntry, resourceLevel bool) (*pbc.FocusCostRecord, error) {
 	start := entry.Timestamp.UTC()
 	end := entry.PeriodEnd.UTC()
 	if !end.After(start) {
@@ -196,6 +196,12 @@ func focusFor(entry CostEntry) *pbc.FocusCostRecord {
 	ri := entry.ReservationARN
 	sp := entry.SavingsPlanARN
 	serviceName := entry.Service
+	if resourceLevel {
+		if serviceName == "" {
+			return nil, fmt.Errorf("missing EC2 resource group identity")
+		}
+		serviceName = "Amazon Elastic Compute Cloud - Compute"
+	}
 	if serviceName == "" && (ri != "" || sp != "") {
 		serviceName = "unknown"
 	}
@@ -235,6 +241,9 @@ func focusFor(entry CostEntry) *pbc.FocusCostRecord {
 		WithExtension("data_source", "AWS Cost Explorer").
 		WithExtension("granularity", "DAILY").
 		WithExtension("lookback", entry.Lookback)
+	if resourceLevel {
+		builder = builder.WithResource(entry.Service, "", "aws:ec2/instance:Instance")
+	}
 	if commitmentID != "" {
 		builder = builder.WithCommitmentDiscount(
 			pbc.FocusCommitmentDiscountCategory_FOCUS_COMMITMENT_DISCOUNT_CATEGORY_UNSPECIFIED,
@@ -255,28 +264,10 @@ func focusFor(entry CostEntry) *pbc.FocusCostRecord {
 	}
 	record, err := builder.Build()
 	if err != nil {
-		columns := map[string]string{
-			"estimated":      estimated,
-			"group_key":      entry.Service,
-			"currency":       entry.Currency,
-			"amount_decimal": entry.AmountDecimal,
-			"metric":         metric,
-			"data_source":    "AWS Cost Explorer",
-			"granularity":    "DAILY",
-			"lookback":       entry.Lookback,
-		}
-		if copyRawIDs {
-			if ri != "" {
-				columns["reservation_id"] = ri
-			}
-			if sp != "" {
-				columns["savings_plan_arn"] = sp
-			}
-		}
-		return &pbc.FocusCostRecord{ExtendedColumns: columns}
+		return nil, fmt.Errorf("building FOCUS record: %w", err)
 	}
 	if commitmentType != "" {
 		record.CommitmentDiscountType = commitmentType
 	}
-	return record
+	return record, nil
 }

@@ -1,49 +1,61 @@
 # Verify AWS Cost Explorer access
 
 Ordinary tests use local fake endpoints. Live checks require the `awslive`
-build tag and `FINFOCUS_AWS_LIVE=true`. Neither alone enables AWS calls.
-Use a Pulumi Environments, Secrets, and Configuration environment that supplies AWS credentials. Credentials stay
-in the child process environment. The tests exclude them from output.
+build tag, `FINFOCUS_AWS_LIVE=true`, and a configured FinFocus core executable.
+The Makefile target supplies the build tag after checking the environment gate.
+Use the existing Pulumi Environments, Secrets, and Configuration environment to
+supply AWS credentials to child processes. Tests exclude credentials from output.
+
+## Run a live comparison
+
+Build the pinned core executable, then run the comparison with authorized credentials:
 
 ```bash
+make core-install
 pulumi env run tailscale-phase-2/aws-oidc -- env \
   FINFOCUS_AWS_LIVE=true AWS_EC2_METADATA_DISABLED=true AWS_MAX_ATTEMPTS=1 \
-  go test -count=1 -tags awslive -run '^TestAWSActualCost$' -v ./test/live
+  make e2e-live
 ```
 
-Replace the environment name when verifying another account. Don't use
-`pulumi env open` to print credentials. The check creates no cloud resources
-and doesn't change the Pulumi environment or IAM policies.
+Set `FINFOCUS_CORE_BINARY` to use an existing core executable instead.
+Don't use `pulumi env open` to print credentials. The check creates no cloud
+resources and changes neither the Pulumi environment nor IAM policies.
 
-The check reads STS identity, then requests seven days of service costs ending
-two Coordinated Universal Time days ago. It compares one independent Cost Explorer
-`AmortizedCost` page with a newly built plugin served over gRPC. The comparison
-sums daily baseline groups and plugin commitment partitions by service for the
-window. It adds every partition rather than overwriting repeated service names.
-The comparison checks period boundaries, exact decimal sums, protocol
-amounts, currency, caller billing account, and `Estimated`. It also verifies Supports,
-GetPluginInfo, invalid-request status and clean shutdown.
+The check uses seven days of daily costs ending two Coordinated Universal Time
+days ago. It scopes the comparison to one service, defaulting to
+Amazon Simple Storage Service. Set `FINFOCUS_AWS_LIVE_SERVICE` to select another
+exact Cost Explorer service name. Two `GetDimensionValues` calls first establish
+that this service has no Reserved Instance or Savings Plan IDs in the selected
+period. A scope with commitments cannot use this comparison: it must fail
+explicitly rather than mix incompatible metrics.
 
-The baseline stops if the response requires another page. The plugin has a
-20-attempt request budget to cover Reserved Instance and Savings Plan discovery,
-their cost partitions, the residual cost query, and any pagination or plugin retries.
-The check turns off AWS SDK retries. Cost Explorer requests are billable. This
-check can make at most 21 CE attempts: one baseline and 20 plugin attempts within
-the 40-second check deadline. Identity requests are separate. A successful comparison requires grouped billing data in the
-selected period. An empty or incomplete response doesn't prove cost accuracy.
+For an eligible scope, the baseline requests one `GetCostAndUsage` page using
+`UnblendedCost`. The direct plugin call and real core command then retrieve costs
+for the same service and period. Checks cover non-empty results, exact decimal
+and protocol totals, currency, billing identity, dates, and estimated status
+where exposed. The direct protocol checks also verify discovery metadata,
+support declarations, invalid-request errors, and clean shutdown.
 
-[AWS describes amortized costs](https://docs.aws.amazon.com/cost-management/latest/userguide/ce-advanced.html)
-as spreading upfront and recurring commitment fees over their applicable period.
-Comparing the plugin's mixed metrics with the global amortized baseline assumes
-that discovery finds all relevant commitments and that residual charges have equal
-Unblended and amortized amounts. The check tests that assumption against the
-selected account and period. A mismatch fails the comparison. it doesn't switch
-metrics or treat unmatched fees as successful verification. Offline partition
-tests don't prove this equivalence for every AWS fee or account configuration.
+## Request limits and interpretation
+
+The baseline stops if AWS requires another page. The direct plugin and core
+queries each permit at most three Cost Explorer attempts, including retries:
+two commitment-discovery requests and one cost request. Together with the two
+initial discovery requests and one baseline request, this permits at most nine
+Cost Explorer attempts. The check turns off SDK retries. Each direct plugin
+query and core process has a 45-second deadline, below the one-minute request
+budget reset. The Go test target has a two-minute timeout. Identity requests
+are separate. Cost Explorer requests are billable.
+
+Empty results, unexpected commitments, pagination, authorization failures, or
+exhausted request budgets do not establish live cost accuracy. The bounded scope
+verifies the residual Unblended-cost path and real core integration. It does not
+verify live commitment allocation, EC2 resource costs, or every account setup.
+Offline fixtures separately exercise commitment partitions and their arithmetic.
 
 ## AWS permissions
 
-Attach this policy to the IAM role used by the Pulumi environment:
+The existing AWS role needs the following read permissions:
 
 ```json
 {
@@ -63,39 +75,56 @@ Attach this policy to the IAM role used by the Pulumi environment:
 }
 ```
 
-The plugin requires `GetDimensionValues` for commitment discovery and
-`GetCostAndUsage` for service costs. The resource action
-supports EC2 resource-cost queries, which are outside this check and also
-require resource data opt-in. See the [AWS permission reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ce.html).
-The plugin needs no IAM write permission or forecasting action.
+`GetDimensionValues` supports commitment discovery; `GetCostAndUsage` supplies
+service costs. `GetCostAndUsageWithResources` supports EC2 queries, which are
+outside this comparison and also require resource data opt-in. See the
+[AWS permission reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ce.html).
+The plugin needs no IAM write permission or forecasting action. Missing
+permission is an explicit verification blocker, not a passing live comparison.
 
-If AWS returns AccessDeniedException, the check verifies the plugin returns
-PermissionDenied, then reports `BLOCKED-ON-INPUT` and skips cost comparison.
-This outcome proves the error mapping, not live cost amounts. Grant the read
-permission to the role, allow policy propagation, and rerun the command.
+## Enable the manual workflow
 
-Compile and test the comparison without live access:
+Run the live workflow manually from `main` and select its `run_live` input.
+It remains off until maintainers configure these repository variables:
+
+| Variable | Required value |
+| --- | --- |
+| `FINFOCUS_AWS_LIVE_ENABLED` | `true` to permit live execution |
+| `PULUMI_ORGANIZATION` | Organization containing the existing environment |
+| `PULUMI_TEAM` | Team authorized to obtain the Pulumi OIDC token |
+| `PULUMI_ESC_ENVIRONMENT` | Fully qualified name of the existing environment |
+
+The workflow uses `pulumi/auth-actions` for a team token through OIDC, then
+`pulumi/esc-action` to inject the environment into the test process. Configure
+this access before enabling the workflow. No long-lived AWS keys belong in
+GitHub secrets. Fork pull requests receive no live credentials; ordinary continuous integration
+runs the fake-endpoint core test and official conformance suite.
+
+## Check the harness without AWS
 
 ```bash
 go test -count=1 ./test/live
 go test -count=1 -tags awslive ./test/live
+make core-install
+make e2e
+make conformance
 ```
 
-With FINFOCUS_AWS_LIVE unset, both commands are offline. The unit tests reject
-wrong amounts, periods, accounts, currency, estimates, and missing or duplicate
-partitions. They also verify that Reserved Instance, Savings Plan, and residual
-rows for the same service contribute to both exact and protocol totals. Synthetic
-comparison data is separate from live AWS evidence.
+Leave `FINFOCUS_AWS_LIVE` unset for the two Go commands. The tests verify
+comparison failures and request limits using synthetic data. `make e2e` runs
+real core against a fake endpoint; it never proves live AWS access.
 
 ## Recorded verification
 
-On 2026-10-06, `tailscale-phase-2/aws-oidc` supplied a valid AWS identity. The
-initial role policy denied GetCostAndUsage, and the plugin returned
-PermissionDenied. The owner granted Cost Explorer read permission. A rerun
-then matched nine service totals for 2026-09-27 through 2026-10-04, including
-exact decimal sums and period metadata. This result doesn't verify EC2
-resource-level data, FinFocus core E2E, or another account.
+On 2026-10-06, `tailscale-phase-2/aws-oidc` supplied an AWS identity. The initial
+role policy denied `GetCostAndUsage`, and the plugin returned `PermissionDenied`.
+After the owner granted Cost Explorer read permission, a rerun matched nine
+service totals for 2026-09-27 through 2026-10-04, including exact decimal sums and
+period metadata. This result predates the current commitment-discovery path.
+It does not verify EC2 resource data, core integration, or another account.
 
-The audit fixes add commitment discovery to actual-cost queries. The earlier
-live result in this document predates that query path. Run the gated live check again with
-the updated policy to verify the new path against AWS.
+The 2026-10-19 foundation work implements the offline core test, conformance
+integration, and gated live harness. The owner chose offline implementation
+because authentication was unavailable. No live AWS calls ran during that
+continuation, and there is no new live result. A future authorized run must
+verify the current path before marking live acceptance complete.

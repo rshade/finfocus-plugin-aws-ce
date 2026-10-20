@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"testing"
 	"time"
@@ -13,10 +14,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
-	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go"
 	"github.com/rshade/finfocus-plugin-aws-ce/internal/testutil"
+	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
 	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -33,42 +34,60 @@ func awsFailureCode(err error) string {
 
 func TestAWSActualCost(t *testing.T) {
 	if os.Getenv("FINFOCUS_AWS_LIVE") != "true" {
-		t.Skip("Set FINFOCUS_AWS_LIVE=true with the awslive build tag for explicitly authorized billable checks")
+		t.Skip("Set FINFOCUS_AWS_LIVE=true with the awslive build tag for billable checks")
+	}
+	if os.Getenv("FINFOCUS_CORE_BINARY") == "" {
+		t.Fatal("set FINFOCUS_CORE_BINARY; make core-install builds the pinned core")
 	}
 	for _, key := range []string{"AWS_ENDPOINT_URL", "AWS_ENDPOINT_URL_COST_EXPLORER", "AWS_ENDPOINT_URL_STS"} {
 		t.Setenv(key, "")
 	}
 	t.Setenv("AWS_IGNORE_CONFIGURED_ENDPOINT_URLS", "true")
-	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+	ctx, cancel := context.WithTimeout(context.Background(), 110*time.Second)
 	defer cancel()
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion("us-east-1"), config.WithRetryMaxAttempts(1))
 	if err != nil {
 		t.Fatal("AWS configuration failed:", awsFailureCode(err))
 	}
+	if _, err := cfg.Credentials.Retrieve(ctx); err != nil {
+		if os.Getenv("FINFOCUS_AWS_LIVE_REQUIRED") == "true" {
+			t.Fatal("required AWS credentials unavailable:", awsFailureCode(err))
+		}
+		t.Skip("AWS credentials unavailable; no cost verification performed")
+	}
 	identity, err := sts.NewFromConfig(cfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
-	if err != nil || aws.ToString(identity.Account) == "" {
+	if err != nil || identity == nil || aws.ToString(identity.Account) == "" {
 		t.Fatal("AWS identity failed:", awsFailureCode(err))
 	}
 	t.Log("AWS identity verified; credentials and principal are not printed")
+	service := os.Getenv("FINFOCUS_AWS_LIVE_SERVICE")
+	if service == "" {
+		service = "Amazon Simple Storage Service"
+	}
 	end := time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -2)
 	start := end.AddDate(0, 0, -7)
-	baseline, baselineErr := costexplorer.NewFromConfig(cfg).GetCostAndUsage(ctx, &costexplorer.GetCostAndUsageInput{TimePeriod: &types.DateInterval{Start: aws.String(start.Format(time.DateOnly)), End: aws.String(end.Format(time.DateOnly))}, Granularity: types.GranularityDaily, Metrics: []string{"AmortizedCost"}, GroupBy: []types.GroupDefinition{{Type: types.GroupDefinitionTypeDimension, Key: aws.String("SERVICE")}}})
-	if baselineErr != nil && awsFailureCode(baselineErr) != "AccessDeniedException" {
-		t.Fatal("AWS baseline failed:", awsFailureCode(baselineErr))
+	baseline, err := fetchLiveBaseline(ctx, costexplorer.NewFromConfig(cfg), service, start, end)
+	if err != nil {
+		// Report only classification, never an AWS response that may include identity.
+		t.Fatal("independent AWS baseline unavailable or incomparable:", awsFailureCode(err))
 	}
-	if baselineErr == nil && baseline == nil {
-		t.Fatal("AWS returned no baseline response")
+	total, currency, err := baselineTotal(baseline, service)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if baseline != nil && aws.ToString(baseline.NextPageToken) != "" {
-		t.Fatal("baseline exceeds one-page check budget; no further CE call made")
+	env := map[string]string{
+		"AWS_REGION": "us-east-1", "AWS_DEFAULT_REGION": "us-east-1", "AWS_MAX_ATTEMPTS": "1",
+		"AWS_IGNORE_CONFIGURED_ENDPOINT_URLS": "true", "FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE": "3",
+		"FINFOCUS_PLUGIN_PORT": "0", "FINFOCUS_LOG_FILE": "", "FINFOCUS_LOG_LEVEL": "error",
 	}
-	proc := testutil.StartPlugin(t, map[string]string{"AWS_REGION": "us-east-1", "AWS_DEFAULT_REGION": "us-east-1", "AWS_MAX_ATTEMPTS": "1", "AWS_IGNORE_CONFIGURED_ENDPOINT_URLS": "true", "FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE": "20", "FINFOCUS_PLUGIN_PORT": "0", "FINFOCUS_LOG_FILE": "", "FINFOCUS_LOG_LEVEL": "error"}, "--port", "0")
+	proc := testutil.StartPlugin(t, env, "--port", "0")
 	info, err := proc.Client.GetPluginInfo(ctx, &pbc.GetPluginInfoRequest{})
-	if err != nil || info.GetName() != "aws-ce" || info.GetSpecVersion() != "v0.7.5" {
-		t.Fatal("GetPluginInfo failed")
+	if err != nil || info.GetName() != "aws-ce" || info.GetSpecVersion() != pluginsdk.SpecVersion {
+		t.Fatal("GetPluginInfo failed or returned an unexpected spec version")
 	}
 	for _, provider := range []string{"aws", "azure"} {
-		result, callErr := proc.Client.Supports(ctx, &pbc.SupportsRequest{Resource: &pbc.ResourceDescriptor{Provider: provider, ResourceType: "aws:account", Id: "live-service-totals"}})
+		result, callErr := proc.Client.Supports(ctx, &pbc.SupportsRequest{Resource: &pbc.ResourceDescriptor{Provider: provider, ResourceType: "aws:service", Id: service}})
 		if callErr != nil || result.GetSupported() != (provider == "aws") {
 			t.Fatal("Supports provider result differs")
 		}
@@ -77,27 +96,31 @@ func TestAWSActualCost(t *testing.T) {
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatal("invalid request reached unexpected status:", status.Code(err))
 	}
-	request := &pbc.GetActualCostRequest{ResourceId: fmt.Sprintf("live-service-totals-%d", time.Now().UnixNano()), Start: timestamppb.New(start), End: timestamppb.New(end), BillingAccountId: aws.ToString(identity.Account)}
-	request.Resource = &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:account", Id: request.ResourceId}
-	result, err := proc.Client.GetActualCost(ctx, request)
-	t.Logf("period=%s..%s; Supports AWS=true Azure=false; GetPluginInfo aws-ce v0.7.5; invalid=InvalidArgument; actual=%s", start.Format(time.DateOnly), end.Format(time.DateOnly), status.Code(err))
-	if baselineErr != nil {
-		if status.Code(err) != codes.PermissionDenied || result != nil {
-			t.Fatal("AWS AccessDenied must map to PermissionDenied:", status.Code(err))
-		}
-		if stopErr := proc.Stop(); stopErr != nil {
-			t.Fatal("plugin shutdown failed")
-		}
-		t.Skip("BLOCKED-ON-INPUT: AWS role lacks ce:GetCostAndUsage; real denial mapping verified, cost amounts not verified")
+	request := &pbc.GetActualCostRequest{
+		ResourceId: service, Start: timestamppb.New(start), End: timestamppb.New(end),
+		BillingAccountId: aws.ToString(identity.Account),
+		Resource:         &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:service", Id: service},
 	}
+	queryCtx, queryCancel := context.WithTimeout(ctx, 45*time.Second)
+	defer queryCancel()
+	result, err := proc.Client.GetActualCost(queryCtx, request)
 	if err != nil {
 		t.Fatal("plugin actual cost failed:", status.Code(err))
 	}
-	if err := compareLiveCost(baseline.ResultsByTime, result, aws.ToString(identity.Account)); err != nil {
+	if err := compareLiveCost(baseline, result, aws.ToString(identity.Account), "UnblendedCost"); err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("Live AWS cost comparison passed: %d rows; dates, amounts, currency, caller account and Estimated match", len(result.GetResults()))
 	if err := proc.Stop(); err != nil {
 		t.Fatal("plugin shutdown failed")
 	}
+	rows, err := testutil.RunCoreActualCost(t, testutil.CoreActualCostConfig{
+		Start: start, End: end, ResourceType: "aws:service", ResourceID: service, Env: env,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Currency != currency || math.Abs(rows[0].TotalCost-total) > 1e-9*math.Max(1, math.Abs(total)) {
+		t.Fatal("core total or currency differs from independent AWS baseline")
+	}
+	t.Logf("Live core and plugin comparison passed for %s..%s; FOCUS, amount, currency and estimate verified", start.Format(time.DateOnly), end.Format(time.DateOnly))
 }

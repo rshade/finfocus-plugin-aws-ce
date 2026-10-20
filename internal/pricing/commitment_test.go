@@ -50,7 +50,10 @@ func TestCommitmentLineMapsToFocusRecord(t *testing.T) {
 			if err != nil || len(costs) != 1 {
 				t.Fatalf("aggregate costs=%v err=%v", costs, err)
 			}
-			rec := focusFor(costs[0])
+			rec, err := focusFor(costs[0], false)
+			if err != nil {
+				t.Fatal(err)
+			}
 			assertFocusAmount(t, rec, tc.amount)
 			if rec.GetCommitmentDiscountId() != tc.wantID || rec.GetCommitmentDiscountType() != tc.wantType {
 				t.Fatalf("id=%q type=%q", rec.GetCommitmentDiscountId(), rec.GetCommitmentDiscountType())
