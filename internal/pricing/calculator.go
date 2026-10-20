@@ -51,6 +51,7 @@ var (
 	_ pluginsdk.SupportsProvider             = (*Calculator)(nil)
 	_ pluginsdk.PluginInfoProvider           = (*Calculator)(nil)
 	_ pluginsdk.PerRequestCredentialConsumer = (*Calculator)(nil)
+	_ pluginsdk.RecommendationsProvider      = (*Calculator)(nil)
 	_ pluginsdk.BudgetsProvider              = (*Calculator)(nil)
 	_ pluginsdk.RecommendationsProvider      = (*Calculator)(nil)
 )
@@ -95,7 +96,7 @@ func (c *Calculator) traceLogger(ctx context.Context) zerolog.Logger {
 }
 
 // GetPluginInfo returns discovery metadata for this plugin.
-// Capabilities list actual costs and Cost Explorer forecasts. Leaving the list
+// Capabilities list costs, forecasts, budgets, and recommendations. Leaving the list
 // empty would let the server infer every method the type has.
 func (c *Calculator) GetPluginInfo(ctx context.Context, _ *pbc.GetPluginInfoRequest) (*pbc.GetPluginInfoResponse, error) {
 	logger := c.traceLogger(ctx)
