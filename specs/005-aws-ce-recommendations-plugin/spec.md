@@ -4,7 +4,7 @@
 
 **Created:** 2026-10-19
 
-**Status:** approved and implemented; `make test`, `make lint`, and `make build` passed on 2026-10-19. Offline HTTP, RPC, and conformance coverage passed. Opt-in live verification is available but was not run.
+**Status:** approved and implemented. `make test`, `make lint`, and `make build` passed on 2026-10-19. Offline HTTP, remote procedure call, and conformance coverage passed. Opt-in live verification is available, but nobody has run it.
 
 ## Purpose and scope
 
@@ -36,7 +36,7 @@ Acceptance criteria:
 2. EC2 terminate and modify recommendations produce distinct action types and
    the corresponding SDK action detail. Modify targets remain alternatives:
    select the first target with `DefaultTargetInstance=true`, or the first target
-   as a deterministic fallback when none is flagged. Emit one recommendation
+   as a deterministic fallback when AWS flags no target. Emit one recommendation
    per instance, without counting alternatives as independent savings.
 3. Savings Plans records describe the proposed commitment and AWS estimates,
    including plan type, hourly commitment, upfront amount, term, and payment
@@ -45,6 +45,8 @@ Acceptance criteria:
    pagination, and a summary for the returned page.
 5. No matching recommendations is a successful empty response. Failed AWS
    retrieval or invalid financial data cannot become a successful empty result.
+6. An unfiltered request also returns account-scoped cost anomalies from the
+   last 90 days, as the cost anomaly section describes.
 
 ## AWS requests and defaults
 
@@ -61,14 +63,37 @@ this version does not overload resource tags to introduce such configuration.
 Intersect filter-selected sources with the union of compatible target provider/resource
 types before credential or client initialization. Only call sources that can satisfy
 that intersection. Push account filters to AWS where supported. Omit rightsizing
-REGION pushdown because AWS requires display names; apply exact canonical region
-matching after mapping. Apply remaining selection after mapping: Savings Plans filter
-expressions have different restrictions from rightsizing expressions.
+`REGION` pushdown because AWS requires display names there. Apply exact canonical
+region matching after mapping. Apply remaining selection after mapping, because
+Savings Plans filter expressions have different restrictions from rightsizing
+expressions.
 
 Follow the `NextPageToken` from each API, with the existing 100-page safety cap per
 query. Detect repeated tokens. Every AWS attempt must pass through the existing
 request budget and retry policy, including context cancellation. Exhaustion
-or failure returns an error; do not return an incomplete successful result.
+or failure returns an error. Don't return an incomplete successful result.
+
+## Cost anomalies
+
+`GetRecommendations` also proxies Cost Explorer `GetAnomalies`. The AWS identity
+needs `ce:GetAnomalies`. Each query covers the 90 days ending today in
+Coordinated Universal Time. Each anomaly maps to category `ANOMALY` and action
+`INVESTIGATE`. The plugin copies AWS `TotalImpact` to metadata `total_impact`,
+leaves estimated savings unset, and doesn't detect or score anomalies.
+
+Category `ANOMALY` or action `INVESTIGATE` selects anomalies alone. These
+requests read one AWS page per call. They pass the page size and the AWS page
+token through, and return the AWS `NextPageToken` unchanged. Target resources
+return `InvalidArgument`, because anomalies are account scoped.
+
+Other requests include anomalies only when the filter allows category `ANOMALY`,
+action `INVESTIGATE`, and source `aws-cost-explorer`. The request must have no
+target resources, no resource ID, and no minimum savings. Its provider must be
+empty or `aws`, and its resource type must not be `ec2:Instance` or
+`savingsplans:Account`. These combined requests share one per-request client and
+request budget with the optimization sources. They follow up to 100 anomaly
+pages, reject repeated tokens, and then apply shared filtering, sorting, and SDK
+pagination. An anomaly retrieval failure fails the whole combined request.
 
 ## SDK response mapping
 
@@ -81,7 +106,7 @@ mentioned in the old issue drafts.
 | Rightsizing `CurrentInstance.ResourceId` | Resource ID; provider `aws`; EC2 instance resource type |
 | Account, region, instance type, and tags | Corresponding resource fields |
 | `TERMINATE` and terminate detail | Terminate action/detail; cost optimization category |
-| `MODIFY` and first flagged default target (first target fallback) | Rightsize action/detail with current and target instance types |
+| `MODIFY` and first flagged default target, else the first target | Rightsize action/detail with current and target instance types |
 | Savings Plans recommendation detail | Purchase commitment action/detail; cost optimization category |
 | AWS recommendation identifier | Stable source-prefixed recommendation ID |
 | Missing AWS identifier | Deterministic digest of account, source, resource, action, and target/plan identity |
@@ -92,8 +117,12 @@ mentioned in the old issue drafts.
 Savings Plans are account-level purchase opportunities. Their resource identity
 must identify the account/plan opportunity, not invent an existing instance or
 purchased Savings Plan ARN. Retain regional/instance-family detail for EC2
-Instance plans when AWS provides it. A Compute plan without a region does not
+Instance plans when AWS provides it. A Compute plan without a region doesn't
 match an explicit regional or instance target filter.
+
+Payer-scoped Savings Plans details may omit `AccountId`. Map those details to
+resource `account:payer:savings-plan` and omit `account_id` metadata. A
+linked-account detail without `AccountId` remains invalid data.
 
 Parse AWS monetary decimal strings with explicit error handling. Reject missing
 required savings/currency, malformed values, negative savings, NaN, infinity,
@@ -120,8 +149,8 @@ validate each resource with SDK helpers where available.
 
 Use SDK helpers for recommendation validation, filtering, visibility,
 sorting, pagination, and page summary calculation. Target matching follows the
-pinned Protocol Buffers contract: provider and resource type are required matches;
-specified SKU, region, and tags match exactly. Honor supplied resource IDs/ARNs
+pinned Protocol Buffers contract. Provider and resource type must match.
+Specified stock keeping units, regions, and tags match exactly. Honor supplied resource IDs/ARNs
 as additional identity constraints. Do not broaden unsupported target scopes.
 
 Provider/source/resource filters that cannot match produce an empty response
@@ -130,9 +159,9 @@ filters requiring that metadata.
 
 Retrieve and map applicable AWS pages, then apply projection, selection,
 exclusions, deterministic sorting, and SDK pagination. Use ID as a stable
-tie-breaker. The default page size is 50 and the maximum is 1000, following SDK
-behavior. Return `InvalidArgument` for invalid page tokens. Offset pagination
-queries AWS again and does not promise snapshot consistency if AWS regenerates
+tie-breaker. The default page size is 50 records and the SDK clamps it to 1,000 records.
+This limit is separate from the 100-page AWS query cap. Return `InvalidArgument` for invalid page tokens. Offset pagination
+queries AWS again and doesn't promise snapshot consistency if AWS regenerates
 recommendations between calls. Page summaries cover returned records only;
 aggregate savings are potential opportunities and may overlap across rightsizing
 and commitment recommendations.
@@ -162,7 +191,8 @@ page-only summaries. Exercise AWS pagination, repeated tokens, page caps,
 request budgets, retries, cancellation, permission failures, and source failures.
 Verify per-request credentials and capability discovery over the SDK test server.
 
-Run `make test`, `make lint`, and `make build`. Use an offline HTTP AWS fixture
+Run `make test`, `make lint`, and `make build`. Run markdownlint and Vale on the
+changed Markdown, and resolve their findings. Use an offline HTTP AWS fixture
 to verify serialized requests and real AWS SDK response decoding. Provide an
 opt-in live verification path for accounts with existing recommendation data;
 report live checks as pending unless actually exercised.

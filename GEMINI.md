@@ -152,7 +152,7 @@ The project follows these milestones and issues:
 
 - `001-cicd-infrastructure` added Go 1.25.5, `goreleaser` for cross-platform binary builds, `golangci-lint` v2.6.2 for code quality, `release-please` for automated versioning, and GitHub Actions for continuous integration and delivery workflows.
 
-## AWS recommendations (issue #13)
+## AWS recommendations for issue #13
 
 `GetRecommendations` implements EC2 rightsizing and Compute/EC2 Instance Savings
 Plans together. See `specs/005-aws-ce-recommendations-plugin/spec.md` and README
@@ -161,5 +161,5 @@ selection, pagination, summary helpers, and `zerolog` operation logging. Preserv
 request-scoped credentials, retry budgets, the 100-page AWS cap, and all-source
 failure semantics. Never generate recommendations, purchase plans, or mutate
 resources. Ordinary tests use offline fixtures. The `awslive` recommendation
-test additionally requires `FINFOCUS_AWS_LIVE=true`; do not run it without an
-explicit request for real AWS verification. Live verification remains pending.
+test also requires `FINFOCUS_AWS_LIVE=true`. Don't run it without an explicit
+request for real AWS verification. Live verification remains pending.
