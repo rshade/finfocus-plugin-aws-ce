@@ -88,10 +88,15 @@ excludes their values from logs and returned errors. See [AWS credentials](docs/
 
 An EC2 instance id consists of `i-` plus 8 to 17 lowercase hex characters.
 An instance id supplied as a bare id or instance ARN uses `GetCostAndUsageWithResources` and filters
-`RESOURCE_ID` by the bare id. This requires the account's resource-level
-Cost Explorer opt-in and covers the last 14 days. A non-EC2 ARN returns an
-explicit unsupported-resource error. Unknown bare resource ids also return an
-error. To query totals, set `resource.provider` to `aws` and choose:
+`RESOURCE_ID` by the bare id. The filter never sends the full EC2 ARN.
+This requires the account's resource-level
+Cost Explorer opt-in and covers the last 14 days. A non-EC2 ARN uses the same
+operation. The plugin maps `s3`, `rds`, and `lambda` to Cost Explorer service
+names and sends `RESOURCE_ID` values for both the ARN and the bare name, the
+text after the first `:` or `/` in the ARN resource. Other service codes are
+sent as written. That id form is unverified per service and can return
+`NotFound` when no row matches. A bare id that is not an EC2 instance id still
+needs an ARN. To query totals, set `resource.provider` to `aws` and choose:
 
 | `resource.resource_type` | `resource.id` | Query |
 | --- | --- | --- |
@@ -101,9 +106,10 @@ error. To query totals, set `resource.provider` to `aws` and choose:
 The legacy `resource_id` value `aws-account-total` also selects account totals.
 
 `Supports` also answers when the host sends a resource type and no id or ARN, as the FinFocus
-engine does. It accepts the Pulumi type `aws:ec2/instance:Instance` plus `aws:account` and
-`aws:service`, and declines other types with the supported list. `GetActualCost` still needs the
-instance id or a total label.
+engine does. Any non-empty AWS type is accepted. `aws:account` and `aws:service` are totals.
+Other types, including non-EC2 resources, say that resource-level cost is unverified for that
+service, needs the resource-level opt-in, and covers 14 days. `GetActualCost` still needs an
+EC2 instance id, a non-EC2 ARN, or a total label.
 The SDK still requires a non-empty `resource_id` when using a descriptor.
 Service and account queries cover the last 14 months.
 

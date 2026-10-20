@@ -19,6 +19,13 @@ func TestWireCapabilitiesActualOnly(t *testing.T) {
 	if len(info.GetCapabilities()) != 1 || info.GetCapabilities()[0] != pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS {
 		t.Fatalf("info capabilities=%v", info.GetCapabilities())
 	}
+	s3, err := srv.Client().Supports(ctx, &pbc.SupportsRequest{Resource: &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:s3/bucket:Bucket"}})
+	if err != nil || !s3.GetSupported() {
+		t.Fatalf("s3 type support=%v err=%v", s3.GetSupported(), err)
+	}
+	if len(s3.GetCapabilitiesEnum()) != 1 || s3.GetCapabilitiesEnum()[0] != pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS {
+		t.Fatalf("s3 capabilities=%v", s3.GetCapabilitiesEnum())
+	}
 	for _, provider := range []string{"aws", "azure"} {
 		resp, err := srv.Client().Supports(ctx, &pbc.SupportsRequest{Resource: &pbc.ResourceDescriptor{Provider: provider, ResourceType: "ec2", Id: bareInstanceID}})
 		if err != nil {

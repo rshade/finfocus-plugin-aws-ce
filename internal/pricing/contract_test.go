@@ -338,22 +338,30 @@ func runResourceCase(t *testing.T, tc contractCase) contractRow {
 		row.Verdict = "PASS"
 		return row
 	case "resource_id:s3", "resource_id:rds":
-		// Documented choice: non-EC2 resource ARNs have no verified Cost Explorer
-		// RESOURCE_ID form. The plugin returns an explicit error and does not send
-		// the bucket name, the db name, or the full ARN.
-		row.Expected = "explicit error: resource-level cost is not available"
-		if err == nil {
-			row.Actual = fmt.Sprintf("success results=%d calls=%d", len(resp.GetResults()), len(calls))
+		// Documented choice: send the Cost Explorer service name for the ARN
+		// service and match RESOURCE_ID against the ARN and the bare name.
+		// The id form is still unverified against a live account.
+		bare := "example-bucket"
+		service := "Amazon Simple Storage Service"
+		if tc.ID == "resource_id:rds" {
+			bare = "example-db"
+			service = "Amazon Relational Database Service"
+		}
+		row.Expected = "GetCostAndUsageWithResources SERVICE=" + service + " RESOURCE_ID includes ARN and " + bare
+		var body []byte
+		for _, call := range calls {
+			if operationName(call.Target) == "GetCostAndUsageWithResources" {
+				body = call.Body
+				break
+			}
+		}
+		values := dimensionValues(body, "RESOURCE_ID")
+		if len(body) == 0 || !containsAll(values, tc.Input, bare) || !strings.Contains(string(body), service) {
+			row.Actual = fmt.Sprintf("values=%v service_present=%t err=%v", values, strings.Contains(string(body), service), err)
 			row.Verdict = "FAIL"
 			return row
 		}
-		msg := err.Error()
-		if !strings.Contains(msg, "resource-level cost is not available") || len(calls) != 0 || strings.Contains(joinedBodies(calls), tc.Input) {
-			row.Actual = fmt.Sprintf("%s; calls=%d", msg, len(calls))
-			row.Verdict = "FAIL"
-			return row
-		}
-		row.Actual = "choice=explicit error, no id form sent; " + status.Code(err).String() + ": " + msg
+		row.Actual = fmt.Sprintf("op=GetCostAndUsageWithResources RESOURCE_ID=%v", values)
 		row.Verdict = "PASS"
 		return row
 	default:
@@ -749,12 +757,17 @@ func pageTokens(pages []json.RawMessage) []string {
 	return tokens
 }
 
-func joinedBodies(calls []capturedCall) string {
-	var b strings.Builder
-	for _, c := range calls {
-		b.Write(c.Body)
+func containsAll(values []string, want ...string) bool {
+	seen := make(map[string]bool, len(values))
+	for _, value := range values {
+		seen[value] = true
 	}
-	return b.String()
+	for _, value := range want {
+		if !seen[value] {
+			return false
+		}
+	}
+	return true
 }
 
 func expectSummary(e contractExpect) string {

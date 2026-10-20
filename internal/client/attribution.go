@@ -24,16 +24,20 @@ func (c *Client) GetAttributedCost(ctx context.Context, filter *types.Expression
 	})
 }
 
-// GetAttributedCostWithResources enriches EC2 resource costs using commitment
-// filters. Discovery is scoped to EC2 and account; resource IDs remain confined
-// to GetCostAndUsageWithResources, which supports resource-level filtering.
-func (c *Client) GetAttributedCostWithResources(ctx context.Context, resourceID, accountID string, start, end time.Time) ([]CostResult, error) {
-	filter := dimensionFilter(types.DimensionService, []string{ec2ComputeService})
+// GetAttributedCostWithResources enriches resource costs using commitment
+// filters. Discovery uses serviceName and account. resourceIDs stay on
+// GetCostAndUsageWithResources. An empty serviceName keeps the EC2 compute
+// service, which is the historical caller.
+func (c *Client) GetAttributedCostWithResources(ctx context.Context, resourceIDs []string, serviceName, accountID string, start, end time.Time) ([]CostResult, error) {
+	if serviceName == "" {
+		serviceName = ec2ComputeService
+	}
+	filter := dimensionFilter(types.DimensionService, []string{serviceName})
 	if accountID != "" {
 		filter = andFilters(filter, dimensionFilter(types.DimensionLinkedAccount, []string{accountID}))
 	}
 	return c.attributedCosts(ctx, filter, start, end, func(part *types.Expression, identity costIdentity) ([]CostResult, error) {
-		return c.getCostWithResources(ctx, resourceID, accountID, start, end, part, identity)
+		return c.getCostWithResources(ctx, resourceIDs, "", accountID, start, end, part, identity)
 	})
 }
 

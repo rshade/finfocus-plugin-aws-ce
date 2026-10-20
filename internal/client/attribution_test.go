@@ -187,7 +187,7 @@ func TestAttributedResourceCostPartitionsAndAmortizes(t *testing.T) {
 	}
 	ctx := WithPageHook(context.Background(), func() error { hooks++; return nil })
 	start := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
-	rows, err := ce.GetAttributedCostWithResources(ctx, "i-1234567890abcdef0", "123", start, start.Add(24*time.Hour))
+	rows, err := ce.GetAttributedCostWithResources(ctx, []string{"i-1234567890abcdef0"}, "", "123", start, start.Add(24*time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
