@@ -6,14 +6,16 @@ import (
 	"strconv"
 
 	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
+
+	"github.com/rshade/finfocus-plugin-aws-ce/internal/pricing"
 )
 
 func batchSettingsFromEnv() (int, int, error) {
-	size, err := batchSetting("FINFOCUS_AWS_CE_MAX_BATCH_SIZE", pluginsdk.DefaultMaxBatchSize, pluginsdk.MaxBatchSize)
+	size, err := batchSetting(pricing.BatchSizeEnv, pluginsdk.DefaultMaxBatchSize, pluginsdk.MaxBatchSize)
 	if err != nil {
 		return 0, 0, err
 	}
-	workers, err := batchSetting("FINFOCUS_AWS_CE_BATCH_WORKERS", pluginsdk.DefaultBatchWorkers, pluginsdk.MaxBatchWorkers)
+	workers, err := batchSetting(pricing.BatchWorkersEnv, pluginsdk.DefaultBatchWorkers, pluginsdk.MaxBatchWorkers)
 	if err != nil {
 		return 0, 0, err
 	}

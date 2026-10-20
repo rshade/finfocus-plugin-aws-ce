@@ -2,7 +2,7 @@
 
 `finfocus-plugin-aws-ce` retrieves actual AWS costs through Cost Explorer for
 FinFocus. The plugin name is `aws-ce`, and its protocol dependency is
-`finfocus-spec v0.7.5`. It advertises actual costs only. Projected cost requests
+`finfocus-spec v0.7.8`. It advertises actual costs only. Projected cost requests
 return gRPC `Unimplemented` with task reference CE-6.10.
 
 ## Quick start
