@@ -28,7 +28,7 @@ AWS SDK default chain. Temporary credentials need all three AWS key, secret
 and session-token variables. See [AWS credentials](CREDENTIALS.md) for exact
 host-supplied keys and IAM permissions. Enable Cost Explorer and its
 resource-level opt-in before querying an EC2 instance or another resource ARN.
-Non-EC2 resource ids are unverified and cover the last 14 days.
+The plugin hasn't verified non-EC2 resource ids. Those queries cover the last 14 days.
 
 ## Run the plugin
 
@@ -76,9 +76,9 @@ Each paginated Cost Explorer request costs $0.01 in real use.
 | `Unauthenticated` | Refresh expired session credentials and include `AWS_SESSION_TOKEN` |
 | `InvalidArgument` with `ERROR_CODE_INVALID_CREDENTIALS` | Check supported key names, matching key pair, and role ARN |
 | Resource query has no data | Confirm resource opt-in, the id or ARN, the 14-day window and 24-to-48-hour data lag |
-| Non-EC2 resource returns `NotFound` | Cost Explorer had no row for the ARN or bare name. The id form for that service is unverified |
+| Non-EC2 resource returns `NotFound` | Cost Explorer returned no row for the ARN or bare name. No live check has verified the id form for that service |
 | `ResourceExhausted` | Wait for the rate limit to reset or reduce CE page requests |
-| `GetProjectedCost` returns `NotFound` | Cost Explorer returned no forecast rows for the next 30 UTC days |
+| `GetProjectedCost` returns `NotFound` | Cost Explorer returned no forecast rows for the next 30 Coordinated Universal Time days |
 | Invalid startup port or batch setting | Use port 0 to 65535 and the documented batch limits |
 
 The plugin returns explicit errors for invalid requests, missing data, AWS

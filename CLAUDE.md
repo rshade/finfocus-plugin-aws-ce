@@ -33,7 +33,7 @@ Explorer. It implements the `finfocus-spec` plugin SDK interface.
 
 - `cmd/plugin/main.go` sets up the gRPC server at the plugin entry point
 - `internal/pricing/calculator.go` contains the core `Calculator` struct
-  - `GetProjectedCost()` proxies `ce:GetCostForecast` for the next 30 UTC days and copies AWS interval bounds when one row is returned
+  - `GetProjectedCost()` proxies `ce:GetCostForecast` for the next 30 Coordinated Universal Time days and copies AWS interval bounds from a single row
   - `GetActualCost()` retrieves historical costs from the Cost Explorer API
   - `GetServiceActualCost()` and `GetAccountActualCost()` handle service and account queries
 - `internal/client/client.go` wraps the AWS Cost Explorer API client
@@ -104,9 +104,9 @@ make test-integration
 ## Spec v0.7.8 features
 
 - `GetPluginInfo` advertises plugin settings from `internal/pricing/settings.go`. Add an entry there when the plugin reads a new
-  environment variable. A test checks the list against the SDK validator.
-- Never add `Parse` (cost parsing) to this plugin. `aws-public` owns `Parse` for the `aws` provider.
-- The plugin also doesn't adopt `GetRecommendationHistory`, the spot on-demand equivalent field, or the `ParsedResource`
+  environment variable. A test checks the list with `ValidatePluginSettings`.
+- Never add `Parse`, the cost-parsing remote procedure call, to this plugin. `aws-public` owns `Parse` for the `aws` provider.
+- The plugin also doesn't adopt `GetRecommendationHistory`, the Spot on-demand equivalent field, or the `ParsedResource`
   action hint. They serve projected-cost and recommendation plugins, not an actual-cost plugin.
 
 ## Dependencies

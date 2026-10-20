@@ -3,10 +3,10 @@
 `finfocus-plugin-aws-ce` retrieves actual AWS costs through Cost Explorer for
 FinFocus. The plugin name is `aws-ce`, and it implements the `finfocus-spec`
 v0.7.8 protocol. It advertises actual costs and Cost Explorer forecasts.
-`GetProjectedCost` proxies `GetCostForecast` for the next 30 UTC days. A single
-forecast row copies AWS prediction bounds and the requested 80 percent
-interval. Several rows sum the means and leave the interval unset. The plugin
-does not calculate its own forecast.
+`GetProjectedCost` proxies `GetCostForecast` for the next 30 Coordinated
+Universal Time days. A single forecast row copies AWS prediction bounds and
+the requested 80 percent interval. Several rows sum the means and leave the
+interval unset. The plugin doesn't calculate its own forecast.
 
 ## Quick start
 
@@ -97,10 +97,11 @@ This requires the account's resource-level
 Cost Explorer opt-in and covers the last 14 days. A non-EC2 ARN uses the same
 operation. The plugin maps `s3`, `rds`, and `lambda` to Cost Explorer service
 names and sends `RESOURCE_ID` values for both the ARN and the bare name, the
-text after the first `:` or `/` in the ARN resource. Other service codes are
-sent as written. That id form is unverified per service and can return
-`NotFound` when no row matches. A bare id that is not an EC2 instance id still
-needs an ARN. To query totals, set `resource.provider` to `aws` and choose:
+text after the first `:` or `/` in the ARN resource. The plugin sends other
+service codes as written. No live check has verified that id form for each
+service, and a missing row returns `NotFound`. A bare id that's not an EC2
+instance id still needs an ARN. To query totals, set `resource.provider` to
+`aws` and choose:
 
 | `resource.resource_type` | `resource.id` | Query |
 | --- | --- | --- |
@@ -110,9 +111,9 @@ needs an ARN. To query totals, set `resource.provider` to `aws` and choose:
 The legacy `resource_id` value `aws-account-total` also selects account totals.
 
 `Supports` also answers when the host sends a resource type and no id or ARN, as the FinFocus
-engine does. Any non-empty AWS type is accepted. `aws:account` and `aws:service` are totals.
-Other types, including non-EC2 resources, say that resource-level cost is unverified for that
-service, needs the resource-level opt-in, and covers 14 days. `GetActualCost` still needs an
+engine does. The engine accepts any non-empty AWS type. `aws:account` and `aws:service` are totals.
+Other types, including non-EC2 resources, report unverified resource-level cost for that
+service. Those queries need the resource-level opt-in and cover 14 days. `GetActualCost` still needs an
 EC2 instance id, a non-EC2 ARN, or a total label.
 The SDK still requires a non-empty `resource_id` when using a descriptor.
 Service and account queries cover the last 14 months.

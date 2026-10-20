@@ -35,7 +35,7 @@ Allow `ce:GetDimensionValues` for commitment discovery,
 `ce:GetCostAndUsageWithResources` for resource queries, and
 `ce:GetCostForecast` for `GetProjectedCost`, and
 `budgets:ViewBudget` for `GetBudgets`. Budgets uses its own endpoint.
-`FINFOCUS_AWS_ACCOUNT_ID` selects the account. When it is empty, the plugin
+`FINFOCUS_AWS_ACCOUNT_ID` selects the account. When it's empty, the plugin
 calls STS `GetCallerIdentity`. Resource-level
 queries require the account's Cost Explorer resource opt-in and cover only
 the last 14 days. Assuming a role also requires `sts:AssumeRole` permission
