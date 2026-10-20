@@ -187,3 +187,27 @@ func TestMapRightsizingDefaultTarget(t *testing.T) {
 	require.Len(t, recs, 1)
 	require.Equal(t, "m5.medium", recs[0].GetRightsize().GetRecommendedInstanceType())
 }
+
+// AWS returns a recommendation object with no plan type and no details when
+// it has nothing to recommend. That is an empty result, not invalid data.
+func TestMapSavingsPlansRecommendationsAcceptsEmptyResponse(t *testing.T) {
+	pages := []costexplorer.GetSavingsPlansPurchaseRecommendationOutput{{
+		SavingsPlansPurchaseRecommendation: &types.SavingsPlansPurchaseRecommendation{},
+	}}
+	recs, err := mapSavingsPlansRecommendations(pages)
+	require.NoError(t, err)
+	require.Empty(t, recs)
+}
+
+func TestMapSavingsPlansRecommendationsStillRejectsUnknownTypeWithDetails(t *testing.T) {
+	pages := []costexplorer.GetSavingsPlansPurchaseRecommendationOutput{{
+		SavingsPlansPurchaseRecommendation: &types.SavingsPlansPurchaseRecommendation{
+			SavingsPlansType: types.SupportedSavingsPlansType("SAGEMAKER_SP"),
+			SavingsPlansPurchaseRecommendationDetails: []types.SavingsPlansPurchaseRecommendationDetail{{
+				AccountId: aws.String("123"), EstimatedMonthlySavingsAmount: aws.String("1"), CurrencyCode: aws.String("USD"),
+			}},
+		},
+	}}
+	_, err := mapSavingsPlansRecommendations(pages)
+	require.Error(t, err)
+}

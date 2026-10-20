@@ -163,7 +163,7 @@ func mapSavingsPlansRecommendations(pages []costexplorer.GetSavingsPlansPurchase
 	var result []*pbc.Recommendation
 	for _, page := range pages {
 		p := page.SavingsPlansPurchaseRecommendation
-		if p == nil {
+		if p == nil || len(p.SavingsPlansPurchaseRecommendationDetails) == 0 {
 			continue
 		}
 		if p.SavingsPlansType != types.SupportedSavingsPlansTypeComputeSp && p.SavingsPlansType != types.SupportedSavingsPlansTypeEc2InstanceSp {

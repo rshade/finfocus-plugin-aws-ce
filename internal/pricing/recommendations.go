@@ -77,7 +77,8 @@ func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 			}
 			mapped, err := mapRightsizingRecommendations(data)
 			if err != nil {
-				return nil, status.Error(codes.DataLoss, "invalid AWS recommendation data")
+				logger.Error().Err(err).Msg("invalid AWS rightsizing recommendation data")
+				return nil, status.Error(codes.DataLoss, "invalid AWS recommendation data: rightsizing")
 			}
 			recs = append(recs, mapped...)
 		}
@@ -90,7 +91,8 @@ func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 				}
 				mapped, err := mapSavingsPlansRecommendations(data)
 				if err != nil {
-					return nil, status.Error(codes.DataLoss, "invalid AWS recommendation data")
+					logger.Error().Err(err).Str("plan_type", string(kind)).Msg("invalid AWS Savings Plans recommendation data")
+					return nil, status.Error(codes.DataLoss, "invalid AWS recommendation data: Savings Plans")
 				}
 				recs = append(recs, mapped...)
 			}
