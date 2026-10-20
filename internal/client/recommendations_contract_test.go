@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,29 +22,62 @@ func TestRecommendationsAWSContract(t *testing.T) {
 			endpoint := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				calls++
 				var body map[string]any
-				require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-				require.Contains(t, r.Header.Get("Authorization"), "synthetic-access")
-				require.Equal(t, "application/x-amz-json-1.1", r.Header.Get("Content-Type"))
-				if calls == 1 {
-					require.NotContains(t, body, "NextPageToken")
-				} else {
-					require.Equal(t, "continue", body["NextPageToken"])
+				if !assert.NoError(t, json.NewDecoder(r.Body).Decode(&body)) {
+					http.Error(w, "invalid request body", http.StatusBadRequest)
+					return
 				}
-				require.Equal(t, map[string]any{"Dimensions": map[string]any{"Key": "LINKED_ACCOUNT", "Values": []any{"123456789012"}}}, body["Filter"])
+				if !assert.Contains(t, r.Header.Get("Authorization"), "synthetic-access") {
+					http.Error(w, "unexpected AWS request", http.StatusBadRequest)
+					return
+				}
+				if !assert.Equal(t, "application/x-amz-json-1.1", r.Header.Get("Content-Type")) {
+					http.Error(w, "unexpected AWS request", http.StatusBadRequest)
+					return
+				}
+				if calls == 1 {
+					if !assert.NotContains(t, body, "NextPageToken") {
+						http.Error(w, "unexpected AWS request", http.StatusBadRequest)
+						return
+					}
+				} else {
+					if !assert.Equal(t, "continue", body["NextPageToken"]) {
+						http.Error(w, "unexpected AWS request", http.StatusBadRequest)
+						return
+					}
+				}
+				if !assert.Equal(t, map[string]any{"Dimensions": map[string]any{"Key": "LINKED_ACCOUNT", "Values": []any{"123456789012"}}}, body["Filter"]) {
+					http.Error(w, "unexpected AWS request", http.StatusBadRequest)
+					return
+				}
 				token := ""
 				if calls == 1 {
 					token = `,"NextPageToken":"continue"`
 				}
 				w.Header().Set("Content-Type", "application/x-amz-json-1.1")
 				if source == "rightsizing" {
-					require.Equal(t, "AWSInsightsIndexService.GetRightsizingRecommendation", r.Header.Get("X-Amz-Target"))
-					require.Equal(t, "AmazonEC2", body["Service"])
-					require.Equal(t, map[string]any{"BenefitsConsidered": true, "RecommendationTarget": "SAME_INSTANCE_FAMILY"}, body["Configuration"])
+					if !assert.Equal(t, "AWSInsightsIndexService.GetRightsizingRecommendation", r.Header.Get("X-Amz-Target")) {
+						http.Error(w, "unexpected AWS request", http.StatusBadRequest)
+						return
+					}
+					if !assert.Equal(t, "AmazonEC2", body["Service"]) {
+						http.Error(w, "unexpected AWS request", http.StatusBadRequest)
+						return
+					}
+					if !assert.Equal(t, map[string]any{"BenefitsConsidered": true, "RecommendationTarget": "SAME_INSTANCE_FAMILY"}, body["Configuration"]) {
+						http.Error(w, "unexpected AWS request", http.StatusBadRequest)
+						return
+					}
 					_, _ = fmt.Fprintf(w, `{"RightsizingRecommendations":[{"AccountId":"123456789012","RightsizingType":"TERMINATE","CurrentInstance":{"ResourceId":"i-offline","ResourceDetails":{"EC2ResourceDetails":{"InstanceType":"m5.large","Region":"us-east-1"}}},"TerminateRecommendationDetail":{"EstimatedMonthlySavings":"12.50","CurrencyCode":"USD"}}]%s}`, token)
 				} else {
-					require.Equal(t, "AWSInsightsIndexService.GetSavingsPlansPurchaseRecommendation", r.Header.Get("X-Amz-Target"))
+					if !assert.Equal(t, "AWSInsightsIndexService.GetSavingsPlansPurchaseRecommendation", r.Header.Get("X-Amz-Target")) {
+						http.Error(w, "unexpected AWS request", http.StatusBadRequest)
+						return
+					}
 					for key, value := range map[string]string{"SavingsPlansType": source, "AccountScope": "PAYER", "LookbackPeriodInDays": "THIRTY_DAYS", "TermInYears": "ONE_YEAR", "PaymentOption": "NO_UPFRONT"} {
-						require.Equal(t, value, body[key])
+						if !assert.Equal(t, value, body[key]) {
+							http.Error(w, "unexpected AWS request", http.StatusBadRequest)
+							return
+						}
 					}
 					_, _ = fmt.Fprintf(w, `{"SavingsPlansPurchaseRecommendation":{"SavingsPlansType":%q,"SavingsPlansPurchaseRecommendationSummary":{"CurrencyCode":"USD"},"SavingsPlansPurchaseRecommendationDetails":[{"AccountId":"123456789012","RecommendationDetailId":"detail","EstimatedMonthlySavingsAmount":"300","HourlyCommitmentToPurchase":"1.25","SavingsPlansDetails":{"Region":"us-east-1","InstanceFamily":"m5"}}]}%s}`, source, token)
 				}

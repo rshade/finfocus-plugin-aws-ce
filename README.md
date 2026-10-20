@@ -253,8 +253,10 @@ permissions determine which recommendations are available.
 
 An unfiltered request queries EC2 rightsizing and both Compute and EC2 Instance
 Savings Plans. Rightsizing uses `AmazonEC2`, benefits considered, and
-same-instance-family targets. Only the first AWS-ranked modify target becomes a
-recommendation; alternative targets are not added together. Savings Plans use
+same-instance-family targets. The first modify target flagged by AWS as
+`DefaultTargetInstance` becomes a recommendation. If none is flagged, the first
+target is the deterministic fallback. Alternative targets are not added together.
+Savings Plans use
 payer scope, `THIRTY_DAYS`, `ONE_YEAR`, and `NO_UPFRONT` for both `COMPUTE_SP` and
 `EC2_INSTANCE_SP`. These parameters cannot be overridden through resource tags
 or this RPC. AWS supplies savings estimates; priority is neutral `MEDIUM`, and
@@ -271,8 +273,11 @@ grpcurl -plaintext -d '{"filter":{"actionType":"RECOMMENDATION_ACTION_TYPE_PURCH
 Action and category filters select applicable sources before AWS access. EC2
 resource filters accept `ec2`, `ec2:Instance`, and `aws:ec2/instance:Instance`;
 Savings Plans use `savingsplans:Account`. Account filters are pushed to AWS;
-rightsizing region filters are also pushed to AWS. Other filters apply to mapped
-records. Target resources require provider and type, and supplied SKU, region,
+region filters apply exactly to mapped records using canonical AWS region codes.
+Rightsizing REGION pushdown is omitted because AWS requires region display names.
+Target resource types restrict the selected AWS sources before credential
+initialization. Other filters apply to mapped records. Target resources require
+provider and type, and supplied SKU, region,
 tags, ID, and ARN constrain the match. At most 100 targets are accepted. Account
 identity is retained in recommendation metadata as `account_id`.
 

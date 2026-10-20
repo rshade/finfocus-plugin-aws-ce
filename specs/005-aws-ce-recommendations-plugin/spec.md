@@ -35,8 +35,9 @@ Acceptance criteria:
    Instance Savings Plans recommendations visible to the request credentials.
 2. EC2 terminate and modify recommendations produce distinct action types and
    the corresponding SDK action detail. Modify targets remain alternatives:
-   select the first AWS-ranked target rather than counting every alternative
-   as independent savings for the same instance.
+   select the first target with `DefaultTargetInstance=true`, or the first target
+   as a deterministic fallback when none is flagged. Emit one recommendation
+   per instance, without counting alternatives as independent savings.
 3. Savings Plans records describe the proposed commitment and AWS estimates,
    including plan type, hourly commitment, upfront amount, term, and payment
    option when supplied by AWS.
@@ -57,9 +58,11 @@ filter when requested. Record these choices in recommendation metadata.
 The RPC has no dedicated fields for overriding these purchase parameters;
 this version does not overload resource tags to introduce such configuration.
 
-Only call sources that can satisfy explicit category/action filters. Push
-account filters to AWS where supported, and region filters for rightsizing
-where supported. Apply remaining selection after mapping: Savings Plans filter
+Intersect filter-selected sources with the union of compatible target provider/resource
+types before credential or client initialization. Only call sources that can satisfy
+that intersection. Push account filters to AWS where supported. Omit rightsizing
+REGION pushdown because AWS requires display names; apply exact canonical region
+matching after mapping. Apply remaining selection after mapping: Savings Plans filter
 expressions have different restrictions from rightsizing expressions.
 
 Follow the `NextPageToken` from each API, with the existing 100-page safety cap per
@@ -78,7 +81,7 @@ mentioned in the old issue drafts.
 | Rightsizing `CurrentInstance.ResourceId` | Resource ID; provider `aws`; EC2 instance resource type |
 | Account, region, instance type, and tags | Corresponding resource fields |
 | `TERMINATE` and terminate detail | Terminate action/detail; cost optimization category |
-| `MODIFY` and first target instance | Rightsize action/detail with current and target instance types |
+| `MODIFY` and first flagged default target (first target fallback) | Rightsize action/detail with current and target instance types |
 | Savings Plans recommendation detail | Purchase commitment action/detail; cost optimization category |
 | AWS recommendation identifier | Stable source-prefixed recommendation ID |
 | Missing AWS identifier | Deterministic digest of account, source, resource, action, and target/plan identity |

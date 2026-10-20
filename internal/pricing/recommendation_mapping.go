@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -23,7 +24,13 @@ func recommendationID(parts ...string) string {
 	b, _ := json.Marshal(parts)
 	return fmt.Sprintf("%s:%x", recommendationSource, sha256.Sum256(b))
 }
+
+var recommendationDecimalPattern = regexp.MustCompile(`^[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$`)
+
 func recommendationMoney(s string) (float64, error) {
+	if !recommendationDecimalPattern.MatchString(s) {
+		return 0, fmt.Errorf("invalid recommendation financial value")
+	}
 	v, e := strconv.ParseFloat(s, 64)
 	if e != nil || math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
 		return 0, fmt.Errorf("invalid recommendation financial value")
@@ -69,7 +76,7 @@ func ec2Details(d *types.ResourceDetails) *types.EC2ResourceDetails {
 	return d.EC2ResourceDetails
 }
 
-// mapRightsizingRecommendations selects only the first AWS-ranked resize alternative.
+// mapRightsizingRecommendations selects the first AWS default target, or the first alternative when none is flagged.
 func mapRightsizingRecommendations(pages []costexplorer.GetRightsizingRecommendationOutput) ([]*pbc.Recommendation, error) {
 	var result []*pbc.Recommendation
 	for _, page := range pages {
@@ -94,6 +101,12 @@ func mapRightsizingRecommendations(pages []costexplorer.GetRightsizingRecommenda
 					return nil, fmt.Errorf("missing modify target")
 				}
 				t := item.ModifyRecommendationDetail.TargetInstances[0]
+				for _, candidate := range item.ModifyRecommendationDetail.TargetInstances {
+					if candidate.DefaultTargetInstance {
+						t = candidate
+						break
+					}
+				}
 				monthly = aws.ToString(t.EstimatedMonthlySavings)
 				if s := aws.ToString(t.CurrencyCode); s != "" {
 					currency = s

@@ -24,7 +24,7 @@ func TestAWSRecommendations(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-	proc := testutil.StartPlugin(t, map[string]string{
+	proc := testutil.StartPluginWithTimeout(t, 4*time.Minute, map[string]string{
 		"AWS_REGION": "us-east-1", "AWS_DEFAULT_REGION": "us-east-1",
 		"AWS_IGNORE_CONFIGURED_ENDPOINT_URLS": "true", "AWS_EC2_METADATA_DISABLED": "true",
 		"FINFOCUS_LOG_LEVEL": "error", "FINFOCUS_LOG_FILE": "", "FINFOCUS_PLUGIN_PORT": "0",

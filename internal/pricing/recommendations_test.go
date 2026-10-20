@@ -29,11 +29,15 @@ type recommendationAPI struct {
 	rightInput *costexplorer.GetRightsizingRecommendationInput
 	planInputs []*costexplorer.GetSavingsPlansPurchaseRecommendationInput
 	planFail   error
+	rightFail  error
 }
 
 func (m *recommendationAPI) GetRightsizingRecommendation(_ context.Context, in *costexplorer.GetRightsizingRecommendationInput, _ ...func(*costexplorer.Options)) (*costexplorer.GetRightsizingRecommendationOutput, error) {
 	m.calls = append(m.calls, "ec2")
 	m.rightInput = in
+	if m.rightFail != nil {
+		return nil, m.rightFail
+	}
 	if m.fail != nil {
 		return nil, m.fail
 	}
@@ -92,7 +96,7 @@ func TestRecommendationsTargets(t *testing.T) {
 		target *pbc.ResourceDescriptor
 		count  int
 	}{
-		{&pbc.ResourceDescriptor{Provider: "aws", ResourceType: "ec2"}, 1}, {&pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:ec2/instance:Instance", Id: "i-123", Sku: "m5.large", Region: "us-east-1"}, 1}, {&pbc.ResourceDescriptor{Provider: "aws", ResourceType: "ec2:Instance", Id: "other"}, 0}, {&pbc.ResourceDescriptor{Provider: "aws", ResourceType: "ec2:Instance", Arn: "arn:aws:ec2:us-east-1:123:instance/i-123"}, 1}, {&pbc.ResourceDescriptor{Provider: "aws", ResourceType: "savingsplans:Account", Region: "us-east-1"}, 0},
+		{&pbc.ResourceDescriptor{Provider: "aws", ResourceType: "ec2"}, 1}, {&pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:ec2/instance:Instance", Id: "i-123", Sku: "m5.large", Region: "us-east-1"}, 1}, {&pbc.ResourceDescriptor{Provider: "aws", ResourceType: "ec2:Instance", Arn: "arn:awsbogus:ec2:us-east-1:123:instance/i-123"}, 0}, {&pbc.ResourceDescriptor{Provider: "aws", ResourceType: "ec2:Instance", Arn: "arn:aws-cn:ec2:us-east-1:123:instance/i-123"}, 0}, {&pbc.ResourceDescriptor{Provider: "aws", ResourceType: "ec2:Instance", Id: "other"}, 0}, {&pbc.ResourceDescriptor{Provider: "aws", ResourceType: "ec2:Instance", Arn: "arn:aws:ec2:us-east-1:123:instance/i-123"}, 1}, {&pbc.ResourceDescriptor{Provider: "aws", ResourceType: "savingsplans:Account", Region: "us-east-1"}, 0},
 	} {
 		m := &recommendationAPI{rights: rightsizingFixture()}
 		r, e := recommendationCalculator(m).GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{TargetResources: []*pbc.ResourceDescriptor{tc.target}})
@@ -124,7 +128,7 @@ func TestRecommendationsFailures(t *testing.T) {
 	for _, tc := range []struct {
 		err  error
 		code codes.Code
-	}{{context.Canceled, codes.Canceled}, {context.DeadlineExceeded, codes.DeadlineExceeded}, {client.ErrRateLimited, codes.ResourceExhausted}, {&smithy.GenericAPIError{Code: "AccessDeniedException", Message: "secret"}, codes.PermissionDenied}, {&smithy.GenericAPIError{Code: "DataUnavailableException"}, codes.FailedPrecondition}, {errors.New("secret"), codes.Internal}} {
+	}{{context.Canceled, codes.Canceled}, {context.DeadlineExceeded, codes.DeadlineExceeded}, {client.ErrRateLimited, codes.ResourceExhausted}, {&smithy.GenericAPIError{Code: "AccessDeniedException", Message: "secret"}, codes.PermissionDenied}, {&smithy.GenericAPIError{Code: "DataUnavailableException"}, codes.FailedPrecondition}, {&smithy.GenericAPIError{Code: "ThrottlingException"}, codes.ResourceExhausted}, {errors.New("secret"), codes.Internal}} {
 		m := &recommendationAPI{fail: tc.err}
 		r, e := recommendationCalculator(m).GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{})
 		require.Nil(t, r)
@@ -141,7 +145,9 @@ func TestRecommendationsRequestDefaults(t *testing.T) {
 	require.Equal(t, "AmazonEC2", aws.ToString(m.rightInput.Service))
 	require.True(t, m.rightInput.Configuration.BenefitsConsidered)
 	require.Equal(t, types.RecommendationTargetSameInstanceFamily, m.rightInput.Configuration.RecommendationTarget)
-	require.Len(t, m.rightInput.Filter.And, 2)
+	require.NotNil(t, m.rightInput.Filter.Dimensions)
+	require.Equal(t, types.DimensionLinkedAccount, m.rightInput.Filter.Dimensions.Key)
+	require.Equal(t, []string{"123"}, m.rightInput.Filter.Dimensions.Values)
 	require.Len(t, m.planInputs, 2)
 	for _, in := range m.planInputs {
 		require.Equal(t, types.LookbackPeriodInDaysThirtyDays, in.LookbackPeriodInDays)
@@ -218,4 +224,45 @@ func TestRecommendationsLargeAge(t *testing.T) {
 	r, err := recommendationCalculator(m).GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{Filter: &pbc.RecommendationFilter{MaxAgeDays: 106752}})
 	require.NoError(t, err)
 	require.Len(t, r.Recommendations, 1)
+}
+
+func TestRecommendationsTargetSourceSelection(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		filter  *pbc.RecommendationFilter
+		targets []*pbc.ResourceDescriptor
+		calls   []string
+		count   int
+	}{
+		{name: "instance suppresses unavailable plans", targets: []*pbc.ResourceDescriptor{{Provider: "aws", ResourceType: "ec2:Instance", Id: "i-123"}}, calls: []string{"ec2"}, count: 1},
+		{name: "plan suppresses rightsizing", targets: []*pbc.ResourceDescriptor{{Provider: "aws", ResourceType: "savingsplans:Account"}}, calls: []string{"COMPUTE_SP", "EC2_INSTANCE_SP"}, count: 2},
+		{name: "unsupported AWS target", targets: []*pbc.ResourceDescriptor{{Provider: "aws", ResourceType: "rds:Instance"}}},
+		{name: "non AWS target", targets: []*pbc.ResourceDescriptor{{Provider: "gcp", ResourceType: "ec2"}}},
+		{name: "contradictory filter", filter: &pbc.RecommendationFilter{ResourceType: "savingsplans:Account"}, targets: []*pbc.ResourceDescriptor{{Provider: "aws", ResourceType: "ec2"}}},
+		{name: "target union", targets: []*pbc.ResourceDescriptor{{Provider: "gcp", ResourceType: "ec2"}, {Provider: "aws", ResourceType: "ec2"}, {Provider: "aws", ResourceType: "savingsplans:Account"}}, calls: []string{"ec2", "COMPUTE_SP", "EC2_INSTANCE_SP"}, count: 3},
+		{name: "union intersect filter", filter: &pbc.RecommendationFilter{ResourceType: "ec2"}, targets: []*pbc.ResourceDescriptor{{Provider: "aws", ResourceType: "savingsplans:Account"}, {Provider: "aws", ResourceType: "ec2"}}, calls: []string{"ec2"}, count: 1},
+		{name: "target and filter identity", filter: &pbc.RecommendationFilter{ResourceId: "other"}, targets: []*pbc.ResourceDescriptor{{Provider: "aws", ResourceType: "ec2", Id: "i-123"}}, calls: []string{"ec2"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := &recommendationAPI{rights: rightsizingFixture()}
+			if len(tc.calls) == 1 {
+				m.planFail = errors.New("unrelated plans unavailable")
+			}
+			if len(tc.calls) == 2 {
+				m.rightFail = errors.New("unrelated rightsizing unavailable")
+			}
+			c := recommendationCalculator(m)
+			if len(tc.calls) == 0 {
+				c = NewCalculator()
+				c.openClient = func(context.Context, client.Config) (*client.Client, error) {
+					t.Error("initialized client for incompatible targets")
+					return nil, errors.New("credentials unavailable")
+				}
+			}
+			r, err := c.GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{Filter: tc.filter, TargetResources: tc.targets})
+			require.NoError(t, err)
+			require.Len(t, r.GetRecommendations(), tc.count)
+			require.Equal(t, tc.calls, m.calls)
+		})
+	}
 }

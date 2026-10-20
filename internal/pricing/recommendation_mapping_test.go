@@ -11,7 +11,22 @@ import (
 )
 
 func rightsizingFixture() []costexplorer.GetRightsizingRecommendationOutput {
-	return []costexplorer.GetRightsizingRecommendationOutput{{RightsizingRecommendations: []types.RightsizingRecommendation{{AccountId: aws.String("123"), RightsizingType: types.RightsizingTypeModify, CurrentInstance: &types.CurrentInstance{ResourceId: aws.String("i-123"), CurrencyCode: aws.String("USD"), ResourceDetails: &types.ResourceDetails{EC2ResourceDetails: &types.EC2ResourceDetails{InstanceType: aws.String("m5.large"), Region: aws.String("us-east-1")}}}, ModifyRecommendationDetail: &types.ModifyRecommendationDetail{TargetInstances: []types.TargetInstance{{EstimatedMonthlySavings: aws.String("12.50"), ResourceDetails: &types.ResourceDetails{EC2ResourceDetails: &types.EC2ResourceDetails{InstanceType: aws.String("m5.medium")}}}, {EstimatedMonthlySavings: aws.String("99")}}}}}}}
+	return []costexplorer.GetRightsizingRecommendationOutput{{
+		RightsizingRecommendations: []types.RightsizingRecommendation{{
+			AccountId:       aws.String("123"),
+			RightsizingType: types.RightsizingTypeModify,
+			CurrentInstance: &types.CurrentInstance{
+				ResourceId: aws.String("i-123"), CurrencyCode: aws.String("USD"),
+				ResourceDetails: &types.ResourceDetails{EC2ResourceDetails: &types.EC2ResourceDetails{
+					InstanceType: aws.String("m5.large"), Region: aws.String("us-east-1"),
+				}},
+			},
+			ModifyRecommendationDetail: &types.ModifyRecommendationDetail{TargetInstances: []types.TargetInstance{
+				{EstimatedMonthlySavings: aws.String("12.50"), ResourceDetails: &types.ResourceDetails{EC2ResourceDetails: &types.EC2ResourceDetails{InstanceType: aws.String("m5.medium")}}},
+				{EstimatedMonthlySavings: aws.String("99")},
+			}},
+		}},
+	}}
 }
 func TestMapRightsizingRecommendations(t *testing.T) {
 	pages := rightsizingFixture()
@@ -19,6 +34,12 @@ func TestMapRightsizingRecommendations(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, recs, 1)
 	require.Equal(t, 12.5, recs[0].GetImpact().GetEstimatedSavings())
+	require.Equal(t, "i-123", recs[0].Resource.Id)
+	require.Equal(t, "ec2:Instance", recs[0].Resource.ResourceType)
+	require.Equal(t, "us-east-1", recs[0].Resource.Region)
+	require.Equal(t, "m5.large", recs[0].GetRightsize().CurrentInstanceType)
+	require.Equal(t, "12.50", recs[0].Metadata["monthly_savings"])
+	require.Equal(t, "123", recs[0].Metadata["account_id"])
 	require.NoError(t, pluginsdk.ValidateRecommendation(recs[0]))
 	require.Equal(t, "m5.medium", recs[0].GetRightsize().GetRecommendedInstanceType())
 	require.Nil(t, recs[0].ConfidenceScore)
@@ -39,7 +60,12 @@ func TestMapRightsizingRecommendations(t *testing.T) {
 func TestMapSavingsPlansRecommendations(t *testing.T) {
 	for _, kind := range []types.SupportedSavingsPlansType{types.SupportedSavingsPlansTypeComputeSp, types.SupportedSavingsPlansTypeEc2InstanceSp} {
 		t.Run(string(kind), func(t *testing.T) {
-			pages := []costexplorer.GetSavingsPlansPurchaseRecommendationOutput{{SavingsPlansPurchaseRecommendation: &types.SavingsPlansPurchaseRecommendation{SavingsPlansType: kind, TermInYears: types.TermInYearsOneYear, PaymentOption: types.PaymentOptionNoUpfront, SavingsPlansPurchaseRecommendationSummary: &types.SavingsPlansPurchaseRecommendationSummary{CurrencyCode: aws.String("USD")}, SavingsPlansPurchaseRecommendationDetails: []types.SavingsPlansPurchaseRecommendationDetail{{AccountId: aws.String("123"), EstimatedMonthlySavingsAmount: aws.String("300"), HourlyCommitmentToPurchase: aws.String("1.5"), UpfrontCost: aws.String("0")}, {AccountId: aws.String("456"), EstimatedMonthlySavingsAmount: aws.String("400")}}}}}
+			pages := []costexplorer.GetSavingsPlansPurchaseRecommendationOutput{{
+				SavingsPlansPurchaseRecommendation: &types.SavingsPlansPurchaseRecommendation{SavingsPlansType: kind, TermInYears: types.TermInYearsOneYear, PaymentOption: types.PaymentOptionNoUpfront,
+					SavingsPlansPurchaseRecommendationSummary: &types.SavingsPlansPurchaseRecommendationSummary{CurrencyCode: aws.String("USD")},
+					SavingsPlansPurchaseRecommendationDetails: []types.SavingsPlansPurchaseRecommendationDetail{
+						{AccountId: aws.String("123"), EstimatedMonthlySavingsAmount: aws.String("300"), HourlyCommitmentToPurchase: aws.String("1.5"), UpfrontCost: aws.String("0")},
+						{AccountId: aws.String("456"), EstimatedMonthlySavingsAmount: aws.String("400")}}}}}
 			recs, err := mapSavingsPlansRecommendations(pages)
 			require.NoError(t, err)
 			require.Len(t, recs, 2)
@@ -56,7 +82,7 @@ func TestMapSavingsPlansRecommendations(t *testing.T) {
 	}
 }
 func TestRecommendationMoney(t *testing.T) {
-	for _, value := range []string{"", "-1", "no", "NaN", "Inf", "1e309"} {
+	for _, value := range []string{"", "-1", "no", "NaN", "Inf", "1e309", "0x1p2", "1_000", "+1", " 1"} {
 		t.Run(value, func(t *testing.T) {
 			p := rightsizingFixture()
 			p[0].RightsizingRecommendations[0].ModifyRecommendationDetail.TargetInstances[0].EstimatedMonthlySavings = aws.String(value)
@@ -100,7 +126,11 @@ func TestMapRightsizingRecommendationsMetadata(t *testing.T) {
 	require.Equal(t, recs[0].Id, again[0].Id)
 }
 func TestMapSavingsPlansRecommendationsMetadata(t *testing.T) {
-	pages := []costexplorer.GetSavingsPlansPurchaseRecommendationOutput{{Metadata: &types.SavingsPlansPurchaseRecommendationMetadata{GenerationTimestamp: aws.String("2026-10-19T15:00:00Z")}, SavingsPlansPurchaseRecommendation: &types.SavingsPlansPurchaseRecommendation{SavingsPlansType: types.SupportedSavingsPlansTypeEc2InstanceSp, TermInYears: types.TermInYearsOneYear, PaymentOption: types.PaymentOptionNoUpfront, SavingsPlansPurchaseRecommendationDetails: []types.SavingsPlansPurchaseRecommendationDetail{{AccountId: aws.String("123"), RecommendationDetailId: aws.String("aws-id"), CurrencyCode: aws.String("USD"), EstimatedMonthlySavingsAmount: aws.String("300"), HourlyCommitmentToPurchase: aws.String("2.00"), UpfrontCost: aws.String("0"), SavingsPlansDetails: &types.SavingsPlansDetails{Region: aws.String("us-east-1"), InstanceFamily: aws.String("m5")}}}}}}
+	pages := []costexplorer.GetSavingsPlansPurchaseRecommendationOutput{{
+		Metadata: &types.SavingsPlansPurchaseRecommendationMetadata{GenerationTimestamp: aws.String("2026-10-19T15:00:00Z")},
+		SavingsPlansPurchaseRecommendation: &types.SavingsPlansPurchaseRecommendation{SavingsPlansType: types.SupportedSavingsPlansTypeEc2InstanceSp, TermInYears: types.TermInYearsOneYear, PaymentOption: types.PaymentOptionNoUpfront,
+			SavingsPlansPurchaseRecommendationDetails: []types.SavingsPlansPurchaseRecommendationDetail{
+				{AccountId: aws.String("123"), RecommendationDetailId: aws.String("aws-id"), CurrencyCode: aws.String("USD"), EstimatedMonthlySavingsAmount: aws.String("300"), HourlyCommitmentToPurchase: aws.String("2.00"), UpfrontCost: aws.String("0"), SavingsPlansDetails: &types.SavingsPlansDetails{Region: aws.String("us-east-1"), InstanceFamily: aws.String("m5")}}}}}}
 	recs, err := mapSavingsPlansRecommendations(pages)
 	require.NoError(t, err)
 	r := recs[0]
@@ -117,7 +147,7 @@ func TestMapSavingsPlansRecommendationsMetadata(t *testing.T) {
 	require.Error(t, err)
 }
 func TestRecommendationProjectionInvalid(t *testing.T) {
-	for _, v := range []string{"", "-1", "NaN", "Inf", "bad", "1e309"} {
+	for _, v := range []string{"", "-1", "NaN", "Inf", "bad", "1e309", "0x1p2", "1_000", "+1", " 1"} {
 		t.Run(v, func(t *testing.T) {
 			r := &pbc.Recommendation{Impact: &pbc.RecommendationImpact{}, Metadata: map[string]string{"monthly_savings": v}}
 			require.Error(t, projectRecommendationSavings([]*pbc.Recommendation{r}, "annual"))
@@ -125,4 +155,20 @@ func TestRecommendationProjectionInvalid(t *testing.T) {
 	}
 	r := &pbc.Recommendation{Impact: &pbc.RecommendationImpact{}, Metadata: map[string]string{"monthly_savings": "1e308"}}
 	require.Error(t, projectRecommendationSavings([]*pbc.Recommendation{r}, "annual"))
+}
+
+func TestMapRightsizingDefaultTarget(t *testing.T) {
+	pages := rightsizingFixture()
+	targets := pages[0].RightsizingRecommendations[0].ModifyRecommendationDetail.TargetInstances
+	targets[1] = types.TargetInstance{DefaultTargetInstance: true, EstimatedMonthlySavings: aws.String("5"), ResourceDetails: &types.ResourceDetails{EC2ResourceDetails: &types.EC2ResourceDetails{InstanceType: aws.String("m5.xlarge")}}}
+	recs, err := mapRightsizingRecommendations(pages)
+	require.NoError(t, err)
+	require.Len(t, recs, 1)
+	require.Equal(t, "m5.xlarge", recs[0].GetRightsize().GetRecommendedInstanceType())
+	require.Equal(t, 5.0, recs[0].GetImpact().GetEstimatedSavings())
+	targets[0].DefaultTargetInstance = true
+	recs, err = mapRightsizingRecommendations(pages)
+	require.NoError(t, err)
+	require.Len(t, recs, 1)
+	require.Equal(t, "m5.medium", recs[0].GetRightsize().GetRecommendedInstanceType())
 }

@@ -102,6 +102,18 @@ func testRecommendationPages(t *testing.T, list func(context.Context, *Client) (
 			if tc.fail {
 				require.Error(t, err)
 				require.NotContains(t, err.Error(), "secret-value")
+				switch tc.name {
+				case "canceled":
+					require.ErrorIs(t, err, context.Canceled)
+				case "budget on retry":
+					require.ErrorIs(t, err, ErrRateLimited)
+				case "page cap":
+					require.ErrorIs(t, err, ErrPageCap)
+				case "permission":
+					var cause *smithy.GenericAPIError
+					require.ErrorAs(t, err, &cause)
+					require.Equal(t, "AccessDeniedException", cause.Code)
+				}
 			} else {
 				require.NoError(t, err)
 			}

@@ -50,6 +50,12 @@ type PluginProcess struct {
 // StartPlugin builds and starts cmd/plugin with an isolated environment overlay.
 func StartPlugin(t testing.TB, env map[string]string, args ...string) *PluginProcess {
 	t.Helper()
+	return StartPluginWithTimeout(t, 45*time.Second, env, args...)
+}
+
+// StartPluginWithTimeout builds and starts a plugin with the specified process lifetime.
+func StartPluginWithTimeout(t testing.TB, lifetime time.Duration, env map[string]string, args ...string) *PluginProcess {
+	t.Helper()
 	_, source, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("cannot locate repository")
@@ -61,7 +67,7 @@ func StartPlugin(t testing.TB, env map[string]string, args ...string) *PluginPro
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build plugin: %v\n%s", err, output)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), lifetime)
 	cmd := exec.CommandContext(ctx, binary, args...)
 	for _, entry := range os.Environ() {
 		key, _, _ := strings.Cut(entry, "=")
