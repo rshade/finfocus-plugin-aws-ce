@@ -33,9 +33,11 @@ shared cache, so another request can't reuse its costs or credentials.
 Allow `ce:GetDimensionValues` for commitment discovery,
 `ce:GetCostAndUsage` for service totals,
 `ce:GetCostAndUsageWithResources` for resource queries, and
-`ce:GetCostForecast` and `ce:GetCostAndUsage` for `GetProjectedCost`, and
-`budgets:ViewBudget` for `GetBudgets`, and `ce:GetAnomalies` for
-anomaly recommendations. Budgets uses its own endpoint.
+`ce:GetCostForecast` and `ce:GetCostAndUsage` for an account or service projection,
+`ec2:DescribeSpotPriceHistory` and `pricing:GetProducts` for an EC2 Spot
+comparison, `budgets:ViewBudget` for `GetBudgets`, and `ce:GetAnomalies` for
+anomaly recommendations. Budgets uses its own endpoint. The Price List call
+uses the `us-east-1` pricing endpoint. The Spot call uses the resource region.
 `FINFOCUS_AWS_ACCOUNT_ID` selects the account. When it's empty, the plugin
 calls STS `GetCallerIdentity`. Resource-level
 queries require the account's Cost Explorer resource opt-in and cover only

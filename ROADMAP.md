@@ -113,7 +113,7 @@ rule sets requiring a status-check migration when the workflow changed.
 | Status | Issue | Technical Thesis | Boundary Guardrail |
 |--------|-------|------------------|-------------------|
 | 🔬 Research | [#30](https://github.com/rshade/finfocus-plugin-aws-ce/issues/30) | What-if `EstimateCost` via Pricing API | Disclaimer: list prices only |
-| 🔬 Research | [#34](https://github.com/rshade/finfocus-plugin-aws-ce/issues/34) | Spot Market Advisor | Use external data feeds for risk |
+| ✅ Done | [#34](https://github.com/rshade/finfocus-plugin-aws-ce/issues/34) | Spot Market Advisor | Zone Spot price plus the Price List on-demand rate, same monthly basis |
 
 ### Standards and compliance
 

@@ -203,11 +203,12 @@ error instead of an incomplete successful record.
 ## GetProjectedCost
 
 `GetProjectedCost(GetProjectedCostRequest) → GetProjectedCostResponse` projects
-the current UTC calendar month for an account or a service. The request
+the current UTC calendar month for an account or a service, and compares Spot
+with on-demand for one EC2 instance. The request
 requires `resource` with provider `aws` and non-empty `resource_type`.
 `dry_run: true` returns `InvalidArgument`.
 
-The plugin reads two things from Cost Explorer and adds them:
+For an account or a service, the plugin reads two things from Cost Explorer and adds them:
 
 1. Month-to-date `AmortizedCost` from the first of the month up to, but not
    including, today, with `MONTHLY` granularity. This call is skipped on the
@@ -220,10 +221,11 @@ The caller doesn't select dates through this method. `AmortizedCost` spreads
 Savings Plan and reservation fees over the usage they cover. `UnblendedCost`
 would show the fee as its own charge and covered usage at the on-demand rate.
 
-| Resource | Forecast scope |
+| Resource | Behavior |
 | --- | --- |
 | Type `aws:account` | All costs visible to the credentials |
 | Type `aws:service` with a non-empty id | Exact Cost Explorer service name in `id` |
+| EC2 instance with an instance type and an availability zone | Spot comparison described below |
 | Any other resource, or `aws:service` without an id | Declined with `InvalidArgument` and `ERROR_CODE_INVALID_RESOURCE` |
 
 Cost Explorer cannot forecast one resource, and resource-level data covers 14
@@ -231,6 +233,39 @@ days and needs an opt-in on the payer account. An instance id or ARN doesn't
 restrict a forecast, so the plugin declines such requests rather than return a
 service or account total as that resource's price. Use a plugin that prices
 resources from list prices for single resources.
+
+### Spot comparison
+
+An EC2 instance request that includes an instance type and an availability zone
+returns a Spot quote instead of a forecast. The instance type comes from
+`attributes.instanceType` or `attributes.instance_type`, then `sku`, then tags.
+The zone comes from `attributes.availabilityZone` or `attributes.availability_zone`,
+then tags. `attributes` win when the same input is also on a tag. The SDK still
+requires `sku` on the request. The operating
+system comes from the same sources and defaults to Linux. The request must include `region`.
+`dry_run: true` still returns `InvalidArgument`.
+
+The plugin filters `ec2:DescribeSpotPriceHistory` by that instance type, product
+description, and availability zone. Linux uses `Linux/UNIX`. The selected
+`unit_price` is the hourly Spot price and `pricing_category` is `DYNAMIC`.
+`cost_per_month` uses the SDK monthly hours for the request usage profile,
+730 hours unless the profile says otherwise.
+
+`pricing:GetProducts` supplies the shared-tenancy on-demand hourly rate for the
+same instance type, region, and operating system. When that rate exists,
+`on_demand_equivalent_monthly_cost` uses the same hour count, and a `STANDARD`
+`price_options` entry named `On-Demand` carries it. `savings_fraction` is
+`(spot unit price - on-demand unit price) / spot unit price`. A missing
+on-demand product leaves both fields unset. A present zero is a real price.
+
+Interruption frequency comes from the public Spot advisor feed. Closed buckets
+map to `spot_interruption_risk_score` values 0.05, 0.10, 0.15, and 0.20.
+The open bucket `>20%` leaves the score at 0 and sets metadata
+`spot_interruption_label`. A feed failure still returns the prices and leaves
+the score at 0. `FINFOCUS_TEST_MODE=true` skips the feed. Metadata also records `spot_availability_zone` and
+`spot_product_description`. `expires_at` is five minutes ahead. The plugin caches
+Spot prices and on-demand rates for five minutes, and caches the advisor document
+for one hour. Missing Spot history returns `NotFound`.
 
 | Response field | Meaning |
 | --- | --- |
