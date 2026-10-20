@@ -58,10 +58,17 @@ finished and the duplicates listed under [Rejected and out of scope](#rejected-a
 | ✅ Done | [#45](https://github.com/rshade/finfocus-plugin-aws-ce/issues/45) | Integration tests for gRPC server | Server behavior verification |
 | ✅ Done | [#46](https://github.com/rshade/finfocus-plugin-aws-ce/issues/46) | Trace ID propagation | Distributed tracing support |
 | ✅ Done | [#47](https://github.com/rshade/finfocus-plugin-aws-ce/issues/47) | Proto ErrorCode enum | Standardized error handling |
-| 📋 Planned | [#48](https://github.com/rshade/finfocus-plugin-aws-ce/issues/48) | Standardize workflow names | Continuous delivery consistency |
+| ✅ Done | [#48](https://github.com/rshade/finfocus-plugin-aws-ce/issues/48) | Standardize workflow names. Separate lint, test, and build jobs in `ci.yml` | Binary archives only. Copilot handles automated review |
 | ✅ Done | [#50](https://github.com/rshade/finfocus-plugin-aws-ce/issues/50) | Makefile targets | Developer workflows. Binary archives only |
 | ✅ Done | [#51](https://github.com/rshade/finfocus-plugin-aws-ce/issues/51) | Configuration parsing tests | Configuration reliability |
-| 📋 Planned | [#53](https://github.com/rshade/finfocus-plugin-aws-ce/issues/53) | CONTRIBUTING.md | Contributor setup |
+| ✅ Done | [#53](https://github.com/rshade/finfocus-plugin-aws-ce/issues/53) | CONTRIBUTING.md | Contributor setup with mise and Go 1.27.2 |
+
+[Pull request #65](https://github.com/rshade/finfocus-plugin-aws-ce/pull/65) delivered
+the workflow changes and contributor guide. The test job runs race detection and
+the integration target. All jobs use tool versions from `mise.toml`. Issue #48
+excludes Docker publishing and Claude review by owner decision. GitHub Copilot
+provides automated review. The repository had no branch protection rules or
+rule sets requiring a status-check migration when the workflow changed.
 
 ### AWS cost features
 
