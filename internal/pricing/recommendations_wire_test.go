@@ -14,7 +14,9 @@ import (
 	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
 	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 func TestRecommendationsWire(t *testing.T) {
@@ -68,7 +70,7 @@ func TestRecommendationsWire(t *testing.T) {
 		return nil, errors.New("synthetic-access synthetic-secret synthetic-token " + credentialRole)
 	}
 	resp, err := rpc.GetRecommendations(ctx, &pbc.GetRecommendationsRequest{})
-	require.Error(t, err)
+	require.Equal(t, codes.Internal, status.Code(err))
 	require.Nil(t, resp)
 	for _, value := range entries {
 		require.NotContains(t, err.Error(), value)

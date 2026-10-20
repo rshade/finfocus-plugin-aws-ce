@@ -35,6 +35,15 @@ func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 	}
 	f := req.GetFilter()
 	rights, plans := recommendationSources(f)
+	if targets := req.GetTargetResources(); len(targets) > 0 {
+		var targetRights, targetPlans bool
+		for _, target := range targets {
+			r, p := recommendationSources(&pbc.RecommendationFilter{Provider: target.GetProvider(), ResourceType: target.GetResourceType()})
+			targetRights = targetRights || r
+			targetPlans = targetPlans || p
+		}
+		rights, plans = rights && targetRights, plans && targetPlans
+	}
 	var recs []*pbc.Recommendation
 	if rights || plans {
 		var pages int
@@ -47,7 +56,7 @@ func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 			return nil, status.Error(codes.Internal, "recommendation client initialization failed")
 		}
 		if rights {
-			in := costexplorer.GetRightsizingRecommendationInput{Service: aws.String("AmazonEC2"), Configuration: &types.RightsizingRecommendationConfiguration{BenefitsConsidered: true, RecommendationTarget: types.RecommendationTargetSameInstanceFamily}, Filter: recommendationAWSFilter(f, true)}
+			in := costexplorer.GetRightsizingRecommendationInput{Service: aws.String("AmazonEC2"), Configuration: &types.RightsizingRecommendationConfiguration{BenefitsConsidered: true, RecommendationTarget: types.RecommendationTargetSameInstanceFamily}, Filter: recommendationAWSFilter(f)}
 			data, err := ce.ListRightsizingRecommendations(ctx, in)
 			if err != nil {
 				return nil, recommendationFailure(err)
@@ -60,7 +69,7 @@ func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 		}
 		if plans {
 			for _, kind := range []types.SupportedSavingsPlansType{types.SupportedSavingsPlansTypeComputeSp, types.SupportedSavingsPlansTypeEc2InstanceSp} {
-				in := costexplorer.GetSavingsPlansPurchaseRecommendationInput{SavingsPlansType: kind, LookbackPeriodInDays: types.LookbackPeriodInDaysThirtyDays, TermInYears: types.TermInYearsOneYear, PaymentOption: types.PaymentOptionNoUpfront, AccountScope: types.AccountScopePayer, Filter: recommendationAWSFilter(f, false)}
+				in := costexplorer.GetSavingsPlansPurchaseRecommendationInput{SavingsPlansType: kind, LookbackPeriodInDays: types.LookbackPeriodInDaysThirtyDays, TermInYears: types.TermInYearsOneYear, PaymentOption: types.PaymentOptionNoUpfront, AccountScope: types.AccountScopePayer, Filter: recommendationAWSFilter(f)}
 				data, err := ce.ListSavingsPlansRecommendations(ctx, in)
 				if err != nil {
 					return nil, recommendationFailure(err)
@@ -197,14 +206,13 @@ func recommendationSources(f *pbc.RecommendationFilter) (bool, bool) {
 	}
 	return rights, plans
 }
-func recommendationAWSFilter(f *pbc.RecommendationFilter, region bool) *types.Expression {
+func recommendationAWSFilter(f *pbc.RecommendationFilter) *types.Expression {
 	var terms []types.Expression
 	if f.GetAccountId() != "" {
 		terms = append(terms, types.Expression{Dimensions: &types.DimensionValues{Key: types.DimensionLinkedAccount, Values: []string{f.GetAccountId()}}})
 	}
-	if region && f.GetRegion() != "" {
-		terms = append(terms, types.Expression{Dimensions: &types.DimensionValues{Key: types.DimensionRegion, Values: []string{f.GetRegion()}}})
-	}
+	// Rightsizing REGION filters require display names; select canonical codes locally.
+
 	if len(terms) == 0 {
 		return nil
 	}
@@ -240,7 +248,7 @@ func recommendationStrictMatch(r *pbc.Recommendation, f *pbc.RecommendationFilte
 		if t.GetArn() != "" {
 			// Only an exact EC2 ARN whose account, region and resource match can constrain an instance.
 			parts := strings.SplitN(t.GetArn(), ":", 6)
-			if len(parts) != 6 || parts[0] != "arn" || !strings.HasPrefix(parts[1], "aws") || parts[2] != "ec2" || resource.GetResourceType() != "ec2:Instance" || parts[3] != resource.GetRegion() || parts[4] != r.GetMetadata()["account_id"] || parts[5] != "instance/"+resource.GetId() {
+			if len(parts) != 6 || parts[0] != "arn" || !recommendationARNPartitionMatches(parts[1], parts[3]) || parts[2] != "ec2" || resource.GetResourceType() != "ec2:Instance" || parts[3] != resource.GetRegion() || parts[4] != r.GetMetadata()["account_id"] || parts[5] != "instance/"+resource.GetId() {
 				continue
 			}
 		}
@@ -269,4 +277,14 @@ func recommendationFailure(err error) error {
 		return mapped
 	}
 	return status.Error(codes.Internal, "retrieving AWS recommendations failed")
+}
+
+// recommendationARNPartitionMatches rejects invented partitions and incompatible regional identities.
+func recommendationARNPartitionMatches(partition, region string) bool {
+	for _, pair := range [][2]string{{"cn-", "aws-cn"}, {"us-gov-", "aws-us-gov"}, {"us-iso-", "aws-iso"}, {"us-isob-", "aws-iso-b"}, {"eu-isoe-", "aws-iso-e"}, {"us-isof-", "aws-iso-f"}, {"eusc-", "aws-eusc"}} {
+		if strings.HasPrefix(region, pair[0]) {
+			return partition == pair[1]
+		}
+	}
+	return partition == "aws"
 }
