@@ -49,7 +49,7 @@ func TestRecommendationsWire(t *testing.T) {
 		ctx = metadata.AppendToOutgoingContext(ctx, pluginsdk.CredentialMetadataPrefix+k, v)
 	}
 	for _, callCtx := range []context.Context{ctx, context.Background()} {
-		resp, err := rpc.GetRecommendations(callCtx, &pbc.GetRecommendationsRequest{})
+		resp, err := rpc.GetRecommendations(callCtx, &pbc.GetRecommendationsRequest{Filter: &pbc.RecommendationFilter{Category: pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_COST}})
 		require.NoError(t, err)
 		require.Len(t, resp.GetRecommendations(), 3)
 		require.Equal(t, 612.5, resp.GetSummary().GetTotalEstimatedSavings())
@@ -69,14 +69,14 @@ func TestRecommendationsWire(t *testing.T) {
 	calc.openClient = func(context.Context, client.Config) (*client.Client, error) {
 		return nil, errors.New("synthetic-access synthetic-secret synthetic-token " + credentialRole)
 	}
-	resp, err := rpc.GetRecommendations(ctx, &pbc.GetRecommendationsRequest{})
+	resp, err := rpc.GetRecommendations(ctx, &pbc.GetRecommendationsRequest{Filter: &pbc.RecommendationFilter{Category: pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_COST}})
 	require.Equal(t, codes.Internal, status.Code(err))
 	require.Nil(t, resp)
 	for _, value := range entries {
 		require.NotContains(t, err.Error(), value)
 		require.NotContains(t, logs.String(), value)
 	}
-	sdkResp, sdkErr := srv.Client().GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{})
+	sdkResp, sdkErr := srv.Client().GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{Filter: &pbc.RecommendationFilter{Category: pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_COST}})
 	require.NoError(t, sdkErr)
 	require.Len(t, sdkResp.GetRecommendations(), 3)
 	info, err := srv.Client().GetPluginInfo(context.Background(), &pbc.GetPluginInfoRequest{})

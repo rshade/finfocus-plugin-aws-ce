@@ -53,7 +53,6 @@ var (
 	_ pluginsdk.PerRequestCredentialConsumer = (*Calculator)(nil)
 	_ pluginsdk.RecommendationsProvider      = (*Calculator)(nil)
 	_ pluginsdk.BudgetsProvider              = (*Calculator)(nil)
-	_ pluginsdk.RecommendationsProvider      = (*Calculator)(nil)
 )
 
 const (

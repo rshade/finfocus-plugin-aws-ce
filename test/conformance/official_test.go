@@ -53,9 +53,6 @@ func (p *suiteProxy) GetPricingSpec(ctx context.Context, req *pbc.GetPricingSpec
 func (p *suiteProxy) GetBudgets(ctx context.Context, req *pbc.GetBudgetsRequest) (*pbc.GetBudgetsResponse, error) {
 	return p.client.GetBudgets(ctx, req)
 }
-func (p *suiteProxy) GetRecommendations(ctx context.Context, req *pbc.GetRecommendationsRequest) (*pbc.GetRecommendationsResponse, error) {
-	return p.client.GetRecommendations(ctx, req)
-}
 
 func (p *suiteProxy) GetRecommendations(ctx context.Context, req *pbc.GetRecommendationsRequest) (*pbc.GetRecommendationsResponse, error) {
 	return p.client.GetRecommendations(ctx, req)
@@ -63,7 +60,7 @@ func (p *suiteProxy) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 
 func TestOfficialStandardConformance(t *testing.T) {
 	const resourceID = "i-0123456789abcdef0"
-	var costs, reservations, savings, forecasts, budgets, recommendations atomic.Int32
+	var costs, reservations, savings, forecasts, budgets, recommendations, anomalies atomic.Int32
 	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
 		body, err := io.ReadAll(r.Body)
@@ -78,24 +75,15 @@ func TestOfficialStandardConformance(t *testing.T) {
 			TimePeriod  struct{ Start, End string }
 			Filter      json.RawMessage
 		}
-		target := r.Header.Get("X-Amz-Target")
-		switch target {
-		case "AWSInsightsIndexService.GetCostForecast":
-			_, _ = w.Write([]byte(`{"Total":{"Amount":"1.25","Unit":"USD"},"ForecastResultsByTime":[{"TimePeriod":{"Start":"2026-10-20","End":"2026-10-21"},"MeanValue":"1.25","PredictionIntervalLowerBound":"1","PredictionIntervalUpperBound":"2"}]}`))
-			return
-		case "AWSInsightsIndexService.GetAnomalies":
-			_, _ = w.Write([]byte(`{"Anomalies":[]}`))
-			return
-		case "AWSBudgetServiceGateway.DescribeBudgets":
-			_, _ = w.Write([]byte(`{"Budgets":[]}`))
-			return
-		}
 		if err := json.Unmarshal(body, &request); err != nil {
 			t.Errorf("decode Cost Explorer request: %v", err)
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
 		switch r.Header.Get("X-Amz-Target") {
+		case "AWSInsightsIndexService.GetAnomalies":
+			anomalies.Add(1)
+			_, _ = w.Write([]byte(`{"Anomalies":[{"AnomalyId":"offline-anomaly","Impact":{"TotalImpact":10,"TotalActualSpend":40,"TotalExpectedSpend":30}}]}`))
 		case "AWSInsightsIndexService.GetCostForecast":
 			forecasts.Add(1)
 			_, _ = fmt.Fprintf(w, `{"Total":{"Amount":"30","Unit":"USD"},"ForecastResultsByTime":[{"TimePeriod":{"Start":%q,"End":%q},"MeanValue":"30","PredictionIntervalLowerBound":"20","PredictionIntervalUpperBound":"40"}]}`, request.TimePeriod.Start, request.TimePeriod.End)
@@ -139,8 +127,14 @@ func TestOfficialStandardConformance(t *testing.T) {
 	// The pinned Standard suite does not exercise recommendations yet.
 	// Explicitly verify the newly advertised RPC through the real subprocess.
 	recs, recErr := process.Client.GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{})
-	if recErr != nil || len(recs.GetRecommendations()) != 1 || recs.GetRecommendations()[0].GetImpact().GetEstimatedSavings() != 12.5 {
+	if recErr != nil || len(recs.GetRecommendations()) != 2 || recs.GetSummary().GetTotalEstimatedSavings() != 12.5 {
 		t.Fatalf("offline recommendation RPC: response=%v error=%v", recs, recErr)
+	}
+	anomalyPage, anomalyErr := process.Client.GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{
+		Filter: &pbc.RecommendationFilter{Category: pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_ANOMALY},
+	})
+	if anomalyErr != nil || len(anomalyPage.GetRecommendations()) != 1 || anomalyPage.GetRecommendations()[0].GetId() != "offline-anomaly" {
+		t.Fatalf("offline anomaly RPC: response=%v error=%v", anomalyPage, anomalyErr)
 	}
 	result, err := sdktesting.RunConformance(&suiteProxy{client: process.Client},
 		sdktesting.ConformanceLevelStandard,
@@ -170,8 +164,8 @@ func TestOfficialStandardConformance(t *testing.T) {
 	}
 	// The official suite allows unavailable data. Prove this run actually
 	// exercised positive offline AWS responses, not merely no-data statuses.
-	if forecasts.Load() == 0 || budgets.Load() == 0 || recommendations.Load() == 0 {
-		t.Fatalf("advertised RPCs did not reach offline AWS: forecasts=%d budgets=%d recommendations=%d", forecasts.Load(), budgets.Load(), recommendations.Load())
+	if forecasts.Load() == 0 || budgets.Load() == 0 || recommendations.Load() == 0 || anomalies.Load() == 0 {
+		t.Fatalf("advertised RPCs did not reach offline AWS: forecasts=%d budgets=%d recommendations=%d anomalies=%d", forecasts.Load(), budgets.Load(), recommendations.Load(), anomalies.Load())
 	}
 	if costs.Load() == 0 || reservations.Load() == 0 || savings.Load() == 0 {
 		t.Fatalf("missing actual-cost queries: costs=%d reservations=%d savings=%d", costs.Load(), reservations.Load(), savings.Load())
@@ -200,7 +194,6 @@ func conformanceEnvironment(t *testing.T, endpoint string) map[string]string {
 		"AWS_ACCESS_KEY_ID": "test", "AWS_SECRET_ACCESS_KEY": "test", "AWS_EC2_METADATA_DISABLED": "true",
 		"AWS_CONFIG_FILE": emptyConfig, "AWS_SHARED_CREDENTIALS_FILE": emptyConfig, "AWS_MAX_ATTEMPTS": "1",
 		"FINFOCUS_LOG_FILE": "", "FINFOCUS_PLUGIN_PORT": "0", "FINFOCUS_TEST_MODE": "true",
-		"FINFOCUS_AWS_ACCOUNT_ID": "123456789012",
 	} {
 		env[key] = value
 	}

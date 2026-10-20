@@ -19,6 +19,9 @@ const anomalyPage = `{"Anomalies":[{"AnomalyId":"a-1","AnomalyScore":{"CurrentSc
 func TestGetRecommendationsAnomalies(t *testing.T) {
 	var bodies []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("X-Amz-Target"); got != "AWSInsightsIndexService.GetAnomalies" {
+			t.Errorf("unexpected AWS operation %q", got)
+		}
 		body, _ := io.ReadAll(r.Body)
 		bodies = append(bodies, string(body))
 		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
@@ -35,7 +38,7 @@ func TestGetRecommendationsAnomalies(t *testing.T) {
 	}
 	calc := NewCalculatorWithClient(ce)
 
-	resp, err := calc.GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{})
+	resp, err := calc.GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{Filter: &pbc.RecommendationFilter{Category: pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_ANOMALY}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +56,7 @@ func TestGetRecommendationsAnomalies(t *testing.T) {
 		t.Fatalf("confidence=%v", rec.GetConfidenceScore())
 	}
 
-	next, err := calc.GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{PageToken: resp.GetNextPageToken()})
+	next, err := calc.GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{PageToken: resp.GetNextPageToken(), Filter: &pbc.RecommendationFilter{Category: pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_ANOMALY}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +92,7 @@ func TestGetRecommendationsEmptyAnomalies(t *testing.T) {
 
 func TestGetRecommendationsSkipsNonAnomalyCategory(t *testing.T) {
 	calc := NewCalculator()
-	resp, err := calc.GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{
+	resp, err := calc.getAnomalyRecommendations(context.Background(), &pbc.GetRecommendationsRequest{
 		Filter: &pbc.RecommendationFilter{Category: pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_COST},
 	})
 	if err != nil {
@@ -99,6 +102,7 @@ func TestGetRecommendationsSkipsNonAnomalyCategory(t *testing.T) {
 		t.Fatalf("resp=%v", resp)
 	}
 	_, err = calc.GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{
+		Filter:          &pbc.RecommendationFilter{Category: pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_ANOMALY},
 		TargetResources: []*pbc.ResourceDescriptor{{Provider: "aws", ResourceType: "aws:s3/bucket:Bucket"}},
 	})
 	if status.Code(err) != codes.InvalidArgument {

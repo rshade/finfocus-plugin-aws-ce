@@ -21,13 +21,22 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// GetRecommendations reads AWS optimization opportunities using credentials scoped to this call.
+// GetRecommendations reads AWS optimization opportunities and anomalies using call-scoped credentials.
 func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecommendationsRequest) (*pbc.GetRecommendationsResponse, error) {
 	logger := c.traceLogger(ctx)
 	done := pluginsdk.LogOperation(logger, "GetRecommendations")
 	defer done()
-	if err := validateRecommendationRequest(req); err != nil {
+	// Anomaly-only pages use AWS tokens, while combined pages use SDK tokens.
+	validationReq := req
+	if explicitAnomalyRequest(req) {
+		validationReq = proto.Clone(req).(*pbc.GetRecommendationsRequest)
+		validationReq.PageToken = ""
+	}
+	if err := validateRecommendationRequest(validationReq); err != nil {
 		return nil, err
+	}
+	if explicitAnomalyRequest(req) {
+		return c.getAnomalyRecommendations(ctx, req)
 	}
 	period := req.GetProjectionPeriod()
 	if period == "" {
@@ -84,6 +93,13 @@ func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 	}
 	if err := projectRecommendationSavings(recs, period); err != nil {
 		return nil, status.Error(codes.DataLoss, "invalid AWS recommendation projection")
+	}
+	if combinedAnomalyRequest(req) {
+		anomalies, err := c.collectAnomalyRecommendations(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		recs = append(recs, anomalies...)
 	}
 	selected := make([]*pbc.Recommendation, 0, len(recs))
 	for _, r := range recs {
@@ -287,4 +303,62 @@ func recommendationARNPartitionMatches(partition, region string) bool {
 		}
 	}
 	return partition == "aws"
+}
+
+// explicitAnomalyRequest selects the account-scoped API and its opaque AWS token.
+func explicitAnomalyRequest(req *pbc.GetRecommendationsRequest) bool {
+	f := req.GetFilter()
+	return f.GetCategory() == pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_ANOMALY || f.GetActionType() == pbc.RecommendationActionType_RECOMMENDATION_ACTION_TYPE_INVESTIGATE
+}
+
+// combinedAnomalyRequest avoids AWS calls when mapped anomalies cannot match.
+func combinedAnomalyRequest(req *pbc.GetRecommendationsRequest) bool {
+	f := req.GetFilter()
+	if len(req.GetTargetResources()) > 0 || !anomalyRequest(req) ||
+		f.GetProvider() != "" && f.GetProvider() != "aws" ||
+		f.GetResourceId() != "" || f.GetMinEstimatedSavings() > 0 {
+		return false
+	}
+	// Anomaly resource types are AWS service names, not optimization types.
+	switch canonicalRecommendationType(f.GetResourceType()) {
+	case "ec2:Instance", "savingsplans:Account":
+		return false
+	}
+	return true
+}
+
+// collectAnomalyRecommendations collects AWS pages before the shared SDK pagination.
+func (c *Calculator) collectAnomalyRecommendations(ctx context.Context, req *pbc.GetRecommendationsRequest) ([]*pbc.Recommendation, error) {
+	var pages int
+	ctx = c.withCostBudget(ctx, &pages)
+	ce, _, err := c.clientForCall(ctx, c.traceLogger(ctx))
+	if err != nil {
+		return nil, recommendationFailure(err)
+	}
+	start, end := anomalyWindow(time.Now().UTC())
+	token := ""
+	seen := map[string]bool{}
+	var out []*pbc.Recommendation
+	for range 100 {
+		page, err := ce.GetAnomalies(ctx, start, end, token, 100)
+		if err != nil {
+			return nil, recommendationFailure(err)
+		}
+		if page == nil {
+			return out, nil
+		}
+		for _, row := range page.Anomalies {
+			out = append(out, mapAnomaly(row))
+		}
+		next := aws.ToString(page.NextPageToken)
+		if next == "" {
+			return out, nil
+		}
+		if seen[next] {
+			return nil, status.Error(codes.Internal, "repeated anomaly page token")
+		}
+		seen[next] = true
+		token = next
+	}
+	return nil, status.Error(codes.ResourceExhausted, "anomaly page limit exceeded")
 }

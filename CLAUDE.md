@@ -119,7 +119,7 @@ make test-integration
 
 - Plugin supports the `aws` provider only, as configured in `NewCalculator()`
 - Cost Explorer is a global AWS service. Region doesn't affect data access
-- `GetRecommendations` proxies `ce:GetAnomalies` for the last 90 days. The plugin doesn't score anomalies
+- `GetRecommendations` combines optimization opportunities and anomalies; category `ANOMALY` selects `ce:GetAnomalies` for the last 90 days
 - Vale and reviewdog skip `CHANGELOG.md` because Release Please generates it
 - Client initializes on the first API call
 
