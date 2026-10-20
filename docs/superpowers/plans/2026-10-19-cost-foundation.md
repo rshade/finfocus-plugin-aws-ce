@@ -4,7 +4,7 @@ Independent file groups can proceed in parallel under the implementation and rev
 
 **Goal:** complete the current actual-cost foundation for issues #11 and #31 with real core integration, official capability-aware conformance, and a bounded live AWS pipeline.
 
-**Architecture:** preserve the existing actual-cost query and cache contracts. Test a locally built plugin through the real FinFocus executable with an isolated registry and fake AWS endpoint. Keep live AWS comparisons separately gated and authenticate through the existing Pulumi ESC environment.
+**Architecture:** preserve the existing actual-cost query and cache contracts. Test a locally built plugin through the real FinFocus executable with an isolated registry and fake AWS endpoint. Keep live AWS comparisons separately gated and authenticate through the existing Pulumi Environments, Secrets, and Configuration (ESC) environment.
 
 **Tech stack:** Go 1.27.2, FinFocus SDK, AWS SDK v2, GitHub Actions, mise, Pulumi ESC.
 
@@ -18,15 +18,15 @@ Independent file groups can proceed in parallel under the implementation and rev
 - Correct the official SDK suite upstream to respect declared capabilities, as explicitly approved by the owner.
 - Keep offline tests independent of AWS credentials. Never create cloud resources for verification.
 - Live execution requires explicit opt-in and the existing `tailscale-phase-2/aws-oidc` environment.
-- Bound live query dates to seven days, AWS attempts, pagination, and execution time. Missing authorization is not a successful cost comparison.
-- Integrate a reproducible upstream SDK commit or release; do not commit a local filesystem replacement.
+- Bound live query dates to seven days, AWS attempts, pagination, and execution time. Missing authorization isn't a successful cost comparison.
+- Integrate a reproducible upstream SDK commit or release. Don't commit a local filesystem replacement.
 
 ## Review priorities
 
 - EC2 resource group IDs must not become service names.
 - Invalid FOCUS inputs must return a meaningful error, not an incomplete successful record.
 - Core command success with empty results must fail the E2E assertions.
-- An advertised capability must pass its checks; unsupported capabilities must return the correct protocol status.
+- An advertised capability must pass its checks. Unsupported capabilities must return the correct protocol status.
 - No AWS credentials or inherited endpoint overrides may leak into offline tests or logs.
 
 ## Task 1: correct current FOCUS translation
@@ -43,15 +43,15 @@ Independent file groups can proceed in parallel under the implementation and rev
 **Files:** `test/e2e/e2e_test.go`, a reusable core process helper under `internal/testutil/`, and test fixtures as needed.
 
 - [x] Replace the stale fake-only gRPC path with a real core command-line tool invocation and isolated registry.
-- [x] Require an explicit core binary built from a pinned source revision; do not silently download from tests.
+- [x] Require an explicit core binary built from a pinned source revision. Don't silently download from tests.
 - [x] Handle reservation/Savings Plans discovery and cost queries in the fake endpoint and assert their parameters.
 - [x] Validate row identity, adapter, currency, dates, exact expected total, and source breakdown.
-- [x] Prove missing plugin data or AWS failures cannot yield a successful test solely from a zero exit code.
+- [x] Prove missing plugin data or AWS failures can't yield a successful test solely from a zero exit code.
 - [x] Run the gated offline E2E test against the pinned core binary.
 
 ## Task 3: integrate official conformance
 
-**Files:** upstream `finfocus-spec/sdk/go/testing` suite and its regression tests; plugin `test/conformance`, `go.mod`, and `go.sum`.
+**Files:** upstream `finfocus-spec/sdk/go/testing` suite and its regression tests, plus plugin `test/conformance`, `go.mod`, and `go.sum`.
 
 - [x] Add upstream regressions for actual-only, projected-only, and falsely advertised capabilities.
 - [x] Make mandatory suite checks respect advertised capabilities while checking unsupported statuses and preserving legacy behavior.
@@ -65,18 +65,18 @@ Independent file groups can proceed in parallel under the implementation and rev
 **Files:** `test/live`, `Makefile`, `mise.toml`, `.github/workflows/ci.yml`, a dedicated E2E workflow, `docs/AWS-VERIFICATION.md`, and contributor/roadmap documentation.
 
 - [x] Correct stale protocol-version checks and the independent live cost baseline to match documented commitment/residual metrics.
-- [x] Exercise the real core path with live AWS data as well as direct protocol/FOCUS validation.
+- [x] Implement the live core path and direct protocol/FOCUS validation for a future authorized run.
 - [x] Add `make e2e`, `make test-e2e`, and `make conformance` with clear offline/live gating.
 - [x] Add offline core E2E and official conformance to pull-request checks.
 - [x] Add a trusted, explicitly enabled live workflow using Pulumi ESC. Fork pull requests must not obtain credentials.
-- [x] Verify local live execution if existing environment access is available; otherwise record the precise external blocker.
+- [x] Record the authentication blocker and the owner's request for offline continuation. Leave live acceptance outstanding.
 - [x] Update stale spec-004 acceptance criteria and documentation to the approved current scope.
 - [x] Run build, full tests, race tests, lint, actionlint, Markdown/prose checks, and independent review before pushing.
 
 ## Verification notes
 
-The owner requested offline continuation after the Pulumi session could not open the existing environment. Live execution remains unverified; the workflow stays off pending maintainer configuration and an authorized run.
+The owner requested offline continuation after the Pulumi session couldn't open the existing environment. Live execution remains unverified. The workflow stays off pending maintainer configuration and an authorized run.
 
-Independent reviews covered the core harness, conformance adapter, production translation and identity mapping, and live workflow. The date-window review finding was fixed with a recent UTC window.
+Independent reviews covered the core harness, conformance adapter, production translation and identity mapping, and live workflow. The E2E fixture now uses a recent Coordinated Universal Time window to address the date-window review finding.
 
-The upstream change is [FinFocus SDK PR #652](https://github.com/rshade/finfocus-spec/pull/652). The plugin consumes `v0.7.9-0.20261020013049-bc3a94391af7` without a local replacement. Official Standard conformance passes all 22 applicable checks; two Advanced checks remain outside the requested level.
+The upstream change is [FinFocus SDK PR #652](https://github.com/rshade/finfocus-spec/pull/652). The plugin consumes `v0.7.9-0.20261020013049-bc3a94391af7` without a local replacement. Official Standard conformance passes all 22 applicable checks. Two Advanced checks remain outside the requested level.

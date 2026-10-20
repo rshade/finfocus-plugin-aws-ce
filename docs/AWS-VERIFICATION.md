@@ -26,7 +26,7 @@ days ago. It scopes the comparison to one service, defaulting to
 Amazon Simple Storage Service. Set `FINFOCUS_AWS_LIVE_SERVICE` to select another
 exact Cost Explorer service name. Two `GetDimensionValues` calls first establish
 that this service has no Reserved Instance or Savings Plan IDs in the selected
-period. A scope with commitments cannot use this comparison: it must fail
+period. A scope with commitments can't use this comparison: it must fail
 explicitly rather than mix incompatible metrics.
 
 For an eligible scope, the baseline requests one `GetCostAndUsage` page using
@@ -48,8 +48,8 @@ budget reset. The Go test target has a two-minute timeout. Identity requests
 are separate. Cost Explorer requests are billable.
 
 Empty results, unexpected commitments, pagination, authorization failures, or
-exhausted request budgets do not establish live cost accuracy. The bounded scope
-verifies the residual Unblended-cost path and real core integration. It does not
+exhausted request budgets don't establish live cost accuracy. The bounded scope
+verifies the residual Unblended-cost path and real core integration. It doesn't
 verify live commitment allocation, EC2 resource costs, or every account setup.
 Offline fixtures separately exercise commitment partitions and their arithmetic.
 
@@ -75,7 +75,7 @@ The existing AWS role needs the following read permissions:
 }
 ```
 
-`GetDimensionValues` supports commitment discovery; `GetCostAndUsage` supplies
+`GetDimensionValues` supports commitment discovery. `GetCostAndUsage` supplies
 service costs. `GetCostAndUsageWithResources` supports EC2 queries, which are
 outside this comparison and also require resource data opt-in. See the
 [AWS permission reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ce.html).
@@ -85,7 +85,8 @@ permission is an explicit verification blocker, not a passing live comparison.
 ## Enable the manual workflow
 
 Run the live workflow manually from `main` and select its `run_live` input.
-It remains off until maintainers configure these repository variables:
+It uses OpenID Connect (OIDC) for authentication and remains off until
+maintainers configure these repository variables:
 
 | Variable | Required value |
 | --- | --- |
@@ -97,7 +98,7 @@ It remains off until maintainers configure these repository variables:
 The workflow uses `pulumi/auth-actions` for a team token through OIDC, then
 `pulumi/esc-action` to inject the environment into the test process. Configure
 this access before enabling the workflow. No long-lived AWS keys belong in
-GitHub secrets. Fork pull requests receive no live credentials; ordinary continuous integration
+GitHub secrets. Fork pull requests receive no live credentials. Ordinary continuous integration
 runs the fake-endpoint core test and official conformance suite.
 
 ## Check the harness without AWS
@@ -112,7 +113,7 @@ make conformance
 
 Leave `FINFOCUS_AWS_LIVE` unset for the two Go commands. The tests verify
 comparison failures and request limits using synthetic data. `make e2e` runs
-real core against a fake endpoint; it never proves live AWS access.
+real core against a fake endpoint. It never proves live AWS access.
 
 ## Recorded verification
 
@@ -121,7 +122,7 @@ role policy denied `GetCostAndUsage`, and the plugin returned `PermissionDenied`
 After the owner granted Cost Explorer read permission, a rerun matched nine
 service totals for 2026-09-27 through 2026-10-04, including exact decimal sums and
 period metadata. This result predates the current commitment-discovery path.
-It does not verify EC2 resource data, core integration, or another account.
+It doesn't verify EC2 resource data, core integration, or another account.
 
 The 2026-10-19 foundation work implements the offline core test, conformance
 integration, and gated live harness. The owner chose offline implementation

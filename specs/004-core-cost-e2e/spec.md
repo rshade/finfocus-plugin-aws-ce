@@ -28,17 +28,20 @@ reservation coverage operations, and resource management also remain outside sco
   opt-in, and cover the last 14 days. Service totals cover 14 months.
 - Queries use daily granularity and normalized Coordinated Universal Time dates
   with an exclusive end date. Request tags remain ignored and documented.
+- Descriptor identity takes precedence over legacy request identity. For a
+  Pulumi Uniform Resource Name (URN), non-empty `resource.tags["pulumi:cloudId"]`
+  supplies the cloud identity. This metadata doesn't enable tag filtering.
 - Commitment discovery produces disjoint Reserved Instance, Savings Plan, and
-  residual partitions. Commitment partitions use amortized cost when supplied;
-  residual charges use Unblended cost. AWS remains the source of monetary values.
+  residual partitions. Commitment partitions use amortized cost when available.
+  Residual charges use Unblended cost. AWS remains the source of monetary values.
 - Caller-supplied `billing_account_id` enables FOCUS output. EC2 resource IDs
   must remain resource identities, separate from the service name. Invalid
   FOCUS input must return an error rather than an incomplete successful record.
 - Missing costs return an explicit error. Estimated data appears in FOCUS
-  extensions when a billing account is supplied.
+  extensions when the caller supplies a billing account.
 - Default caching remains in memory within one calculator session. Recent or
-  estimated results expire after 15 minutes; closed historical results after
-  24 hours. Per-request credentials bypass shared caching.
+  estimated results expire after 15 minutes. Closed historical results expire
+  after 24 hours. Per-request credentials bypass shared caching.
 
 ## User stories and acceptance criteria
 
@@ -50,7 +53,7 @@ FinFocus users need actual AWS costs with correct identities and metadata.
    period boundaries, commitment attribution, and estimated status.
 2. An EC2 response uses the known compute service name, preserves the instance
    ID in the FOCUS resource field and group key, and remains correct on cache hits.
-3. Missing currency or group identity cannot produce a successful incomplete
+3. Missing currency or group identity can't produce a successful incomplete
    FOCUS record.
 4. Invalid requests, unavailable data, permission failures, and exhausted
    request budgets return meaningful protocol errors.
@@ -67,7 +70,7 @@ this plugin. It must use controlled costs without AWS credentials.
    registry and local fake Cost Explorer endpoint with synthetic credentials.
 3. Assertions check non-empty results, identity, adapter, currency, dates,
    expected totals, and source breakdown. Command success alone is insufficient.
-4. Missing plugin data and AWS errors cannot pass as successful cost retrieval.
+4. Missing plugin data and AWS errors can't pass as successful cost retrieval.
 5. Pull-request continuous integration runs the offline core test automatically.
 
 ### Run official conformance
@@ -76,11 +79,12 @@ Maintainers need the official SDK suite to verify the declared capabilities.
 
 1. `make conformance` runs the official Standard suite through the plugin process.
 2. The suite checks advertised capabilities and the correct unsupported status
-   for operations outside the actual-only contract.
+   for operations outside the actual-only contract. Projected-cost and
+   pricing-spec calls must return `Unimplemented`.
 3. The adapter passes real responses through. It must not invent pricing,
    discard mandatory failures, or rewrite suite results.
-4. Any upstream suite correction is consumed through a reproducible revision;
-   committed local filesystem replacements are prohibited.
+4. Pin upstream suite corrections to reproducible revisions. Never commit
+   local filesystem replacements.
 
 ### Verify bounded live AWS access when authorized
 
@@ -93,15 +97,15 @@ Maintainers need an explicitly enabled comparison against live AWS data.
    at most seven days. Two discovery calls must establish that the selected
    scope has no Reserved Instance or Savings Plan IDs before comparing an
    independent Unblended-cost baseline with direct plugin and core results.
-3. The baseline is limited to one page. Direct plugin and core calls each have
+3. The baseline requests at most one page. Direct plugin and core calls each have
    at most three Cost Explorer attempts. The total limit is nine Cost Explorer
    attempts. Each direct query and core process has a 45-second deadline and
    creates no cloud resources.
 4. A manual workflow runs only from `main` with `run_live` selected and the
    enable variable set. It obtains credentials only after maintainers configure
-   its Pulumi OIDC settings. Fork pull requests receive no credentials.
-5. Missing credentials, authorization, billing data, or supported comparison
-   scope must be reported explicitly, never counted as successful live evidence.
+   its Pulumi OpenID Connect settings. Fork pull requests receive no credentials.
+5. The harness must report missing credentials, authorization, billing data, or
+   supported comparison scope explicitly. None counts as successful live evidence.
 
 ## Completion evidence
 
@@ -110,5 +114,5 @@ and failure handling. Live verification is a separate acceptance result.
 The owner requested offline continuation for the 2026-10-19 implementation
 session. That continuation made no live AWS calls.
 The older service comparison predates the current commitment-discovery path
-and does not establish completion of the new live check. Record future results
+and doesn't establish completion of the new live check. Record future results
 and their scope in [AWS verification](../../docs/AWS-VERIFICATION.md).
