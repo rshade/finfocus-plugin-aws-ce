@@ -61,6 +61,7 @@ proto
 Proto
 Pulumi
 PulumiCost
+pushdown
 RDS
 repo
 reviewdog
