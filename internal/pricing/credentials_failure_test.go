@@ -63,7 +63,7 @@ func TestGetActualCost_AssumeRoleDeniedOmitsRoleARN(t *testing.T) {
 		t.Fatalf("status.Code = %s, want %s (%v)", status.Code(err), codes.PermissionDenied, err)
 	}
 	msg := status.Convert(err).Message()
-	if msg != "retrieving costs failed: AccessDenied" {
+	if msg != "retrieving costs failed: AccessDenied (Cost Explorer GetDimensionValues)" {
 		t.Fatalf("message = %q", msg)
 	}
 	if got := errorDetailCode(err); got != pbc.ErrorCode_ERROR_CODE_PERMISSION_DENIED {

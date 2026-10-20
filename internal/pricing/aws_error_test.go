@@ -3,6 +3,7 @@ package pricing
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -141,4 +142,27 @@ func errorDetailList(err error) []pbc.ErrorCode {
 		}
 	}
 	return codesOut
+}
+
+func TestAWSErrorTextNamesTheDeniedOperation(t *testing.T) {
+	t.Parallel()
+	failure := fmt.Errorf("getting rightsizing: %w", &smithy.OperationError{
+		ServiceID:     "Cost Explorer",
+		OperationName: "GetRightsizingRecommendation",
+		Err:           &leakyAPIError{code: "AccessDeniedException", body: "arn:aws:iam::123456789012:role/secret is not authorized"},
+	})
+	mapped, ok := mapAWSAPIError(failure)
+	if !ok {
+		t.Fatal("expected a mapped AWS error")
+	}
+	const want = "retrieving costs failed: AccessDeniedException (Cost Explorer GetRightsizingRecommendation)"
+	if got := status.Convert(mapped).Message(); got != want {
+		t.Fatalf("message %q, want %q", got, want)
+	}
+	if status.Code(mapped) != codes.PermissionDenied {
+		t.Fatalf("code %v, want PermissionDenied", status.Code(mapped))
+	}
+	if text, _ := perRequestAWSFailure(true, failure); text != want {
+		t.Fatalf("per-request text %q, want %q", text, want)
+	}
 }

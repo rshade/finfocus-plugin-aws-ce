@@ -72,7 +72,7 @@ func perRequestAWSFailure(perRequest bool, err error) (string, bool) {
 	if !ok {
 		return "retrieving costs failed", true
 	}
-	return awsAPIErrorText(code), true
+	return awsFailureText(err, code), true
 }
 
 // awsAPIErrorCode returns smithy.APIError.ErrorCode. Error and ErrorMessage
@@ -83,6 +83,18 @@ func awsAPIErrorCode(err error) (string, bool) {
 		return "", false
 	}
 	return api.ErrorCode(), true
+}
+
+// awsFailureText adds the AWS service and operation to the code text so a
+// permission failure says which call was denied. ServiceID and OperationName
+// are fixed SDK names. Unlike Error and ErrorMessage they cannot carry a role ARN.
+func awsFailureText(err error, code string) string {
+	text := awsAPIErrorText(code)
+	var op *smithy.OperationError
+	if errors.As(err, &op) && op.ServiceID != "" && op.OperationName != "" {
+		text += " (" + op.ServiceID + " " + op.OperationName + ")"
+	}
+	return text
 }
 
 func awsAPIErrorText(code string) string {
@@ -100,7 +112,7 @@ func mapAWSAPIError(err error) (error, bool) {
 	if !ok {
 		return nil, false
 	}
-	msg := awsAPIErrorText(code)
+	msg := awsFailureText(err, code)
 	switch code {
 	case "LimitExceededException", "RequestLimitExceeded":
 		return statusWithDetail(codes.ResourceExhausted, msg, pbc.ErrorCode_ERROR_CODE_RATE_LIMITED), true

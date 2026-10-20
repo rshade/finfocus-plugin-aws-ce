@@ -112,6 +112,10 @@ resource identity forms have no live verification. Missing AWS rows return
 | Service totals | Descriptor type `aws:service`, exact Cost Explorer service name as id, no ARN | `GetCostAndUsage` | Last 14 months |
 | Legacy account totals | `resource_id: "aws-account-total"`, no ARN | `GetCostAndUsage` | Last 14 months |
 
+Service and account totals return one row per service, and per commitment when
+one applies, for the whole requested period. They don't return one row per day.
+A five-day account query across eight services returns eight rows.
+
 Account totals cover all services visible to the credentials. The account query
 label and `billing_account_id` don't restrict that scope. For service totals,
 use a name such as `Amazon Simple Storage Service`, not `s3`.
@@ -258,6 +262,12 @@ same instance type, region, and operating system. When that rate exists,
 `(spot unit price - on-demand unit price) / spot unit price`. A missing
 on-demand product leaves both fields unset. A present zero is a real price.
 
+The Spot response is a quote for a Spot instance, not the cost of an on-demand
+instance. FinFocus core takes the first plugin that answers, and at equal
+priority `aws-ce` precedes `aws-public`. See
+[Spot comparison and plugin routing](../README.md#spot-comparison-and-plugin-routing)
+for the routing setting that keeps list prices for projected costs.
+
 Interruption frequency comes from the public Spot advisor feed. Closed buckets
 map to `spot_interruption_risk_score` values 0.05, 0.10, 0.15, and 0.20.
 The open bucket `>20%` leaves the score at 0 and sets metadata
@@ -366,6 +376,11 @@ plugin sets a confidence score only when the AWS current score is already
 between 0 and 1.
 
 ## Errors and unsupported operations
+
+A permission or validation failure from AWS carries the AWS error code and the
+service and operation that failed, such as
+`retrieving costs failed: AccessDeniedException (Cost Explorer GetRightsizingRecommendation)`.
+The text never includes the AWS error message, which can hold a role ARN.
 
 Single-resource failures return a gRPC status. Some also attach an `ErrorDetail`
 with a protocol error code. Don't assume every failure includes that detail.
