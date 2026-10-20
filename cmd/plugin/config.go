@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
 
@@ -20,6 +21,40 @@ func batchSettingsFromEnv() (int, int, error) {
 		return 0, 0, err
 	}
 	return size, workers, nil
+}
+
+// webConfigFromEnv reads the health and Connect settings.
+// Health defaults off. The SDK mounts /healthz only in Connect mode, and
+// Connect does not run the gRPC trace interceptor. Turning health on also
+// turns Connect on, on the same listener. There is no separate health port.
+func webConfigFromEnv() (pluginsdk.WebConfig, error) {
+	health, err := envBool(pricing.HealthEndpointEnv, false)
+	if err != nil {
+		return pluginsdk.WebConfig{}, err
+	}
+	webEnabled, err := envBool(pricing.WebEnabledEnv, false)
+	if err != nil {
+		return pluginsdk.WebConfig{}, err
+	}
+	return pluginsdk.WebConfig{
+		Enabled:              health || webEnabled,
+		EnableHealthEndpoint: health,
+	}, nil
+}
+
+func envBool(name string, fallback bool) (bool, error) {
+	value, ok := os.LookupEnv(name)
+	if !ok || strings.TrimSpace(value) == "" {
+		return fallback, nil
+	}
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	default:
+		return false, fmt.Errorf("%s must be true or false", name)
+	}
 }
 
 func batchSetting(name string, fallback, maximum int) (int, error) {

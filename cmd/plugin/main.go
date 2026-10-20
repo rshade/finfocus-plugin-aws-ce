@@ -45,6 +45,11 @@ func main() {
 		logger.Error().Err(err).Msg("Invalid batch configuration")
 		os.Exit(1)
 	}
+	web, err := webConfigFromEnv()
+	if err != nil {
+		logger.Error().Err(err).Msg("Invalid web configuration")
+		os.Exit(1)
+	}
 
 	// Create the plugin implementation
 	plugin := pricing.NewCalculator()
@@ -59,6 +64,7 @@ func main() {
 		Port:         port,
 		MaxBatchSize: maxBatchSize,
 		BatchWorkers: batchWorkers,
+		Web:          web,
 	}
 
 	// Serve otherwise resolves port zero from the environment a second time.
