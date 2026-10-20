@@ -81,6 +81,27 @@ func TestMapSavingsPlansRecommendations(t *testing.T) {
 		})
 	}
 }
+func TestMapSavingsPlansRecommendationsEmpty(t *testing.T) {
+	pages := []costexplorer.GetSavingsPlansPurchaseRecommendationOutput{{
+		SavingsPlansPurchaseRecommendation: &types.SavingsPlansPurchaseRecommendation{},
+	}}
+	recs, err := mapSavingsPlansRecommendations(pages)
+	require.NoError(t, err)
+	require.Empty(t, recs)
+	pages[0].SavingsPlansPurchaseRecommendation.SavingsPlansType = types.SupportedSavingsPlansTypeComputeSp
+	recs, err = mapSavingsPlansRecommendations(pages)
+	require.NoError(t, err)
+	require.Empty(t, recs)
+	pages[0].SavingsPlansPurchaseRecommendation.SavingsPlansType = types.SupportedSavingsPlansTypeSagemakerSp
+	_, err = mapSavingsPlansRecommendations(pages)
+	require.Error(t, err)
+	pages[0].SavingsPlansPurchaseRecommendation.SavingsPlansType = ""
+	pages[0].SavingsPlansPurchaseRecommendation.SavingsPlansPurchaseRecommendationDetails = []types.SavingsPlansPurchaseRecommendationDetail{{
+		AccountId: aws.String("123"), EstimatedMonthlySavingsAmount: aws.String("1"), CurrencyCode: aws.String("USD"),
+	}}
+	_, err = mapSavingsPlansRecommendations(pages)
+	require.Error(t, err)
+}
 func TestRecommendationMoney(t *testing.T) {
 	for _, value := range []string{"", "-1", "no", "NaN", "Inf", "1e309", "0x1p2", "1_000", "+1", " 1"} {
 		t.Run(value, func(t *testing.T) {

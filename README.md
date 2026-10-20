@@ -341,5 +341,9 @@ FINFOCUS_AWS_LIVE=true go test -tags awslive ./test/live -run '^TestAWSRecommend
 This reads real AWS data and may incur AWS API charges. The test validates
 returned records and explicitly reports empty datasets. It doesn't require the
 core binary. Ordinary tests and tagged runs without `FINFOCUS_AWS_LIVE=true`
-never contact AWS for this test. Nobody has run live recommendation
-verification as part of this implementation.
+never contact AWS for this test. On 2026-10-20, `TestAWSRecommendations` with
+`tailscale-phase-2/aws-oidc` received zero EC2 rightsizing rows. Compute and
+EC2 Instance Savings Plans each returned a recommendation object with no plan
+type and no details. A blank plan type with no details is an empty result. After
+that mapping change, the same live check passed with empty datasets for
+rightsizing, `TERMINATE`, and Savings Plans.
