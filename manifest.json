@@ -1,23 +1,23 @@
 {
-  "metadata":  {
-    "name":  "aws-ce",
-    "version":  "0.1.0",
-    "description":  "FinFocus plugin for aws-ce",
-    "author":  "rshade",
-    "license":  "Apache-2.0",
-    "keywords":  [
+  "metadata": {
+    "name": "aws-ce",
+    "version": "0.1.0",
+    "description": "FinFocus plugin for aws-ce",
+    "author": "rshade",
+    "license": "Apache-2.0",
+    "keywords": [
       "finfocus",
       "cost",
       "plugin",
       "aws"
     ]
   },
-  "specification":  {
-    "specVersion":  "v0.7.5",
-    "supportedProviders":  [
+  "specification": {
+    "specVersion": "v0.7.5",
+    "supportedProviders": [
       "aws"
     ],
-    "capabilities":  [
+    "capabilities": [
       "actual_cost"
     ]
   }
