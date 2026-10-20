@@ -146,7 +146,8 @@ the labels in your console.
 - **Resource-level data.** Select resource-level data at daily granularity for
   EC2 or for all services, then save. AWS can take up to 48 hours to apply the
   change and blocks further changes for 48 hours after saving. It covers the
-  last 14 days only.
+  last 14 days only. Days before AWS starts collecting have no data, and
+  the plugin returns `NotFound` for them instead of a zero cost.
 - **Rightsizing.** Check Rightsizing and save. AWS can take up to 24 hours to
   produce recommendations. Only a regular or management account can enable it.
 - **Savings Plans recommendations.** AWS must already hold a recommendation

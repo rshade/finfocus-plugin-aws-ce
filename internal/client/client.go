@@ -537,7 +537,11 @@ func (c *Client) getCostWithResources(ctx context.Context, resourceIDs []string,
 			},
 		})
 	}
-	filter := andFilters(&types.Expression{And: parts}, extraFilter)
+	filters := make([]*types.Expression, 0, len(parts)+1)
+	for i := range parts {
+		filters = append(filters, &parts[i])
+	}
+	filter := andFilters(append(filters, extraFilter)...)
 	metrics := []string{metricUnblendedCost}
 	if identity.reservation != "" || identity.savings != "" {
 		metrics = append(metrics, metricAmortizedCost)
@@ -679,6 +683,17 @@ const (
 	dimSavingsPlanARN   = "SAVINGS_PLAN_ARN"
 )
 
+// groupedByResource reports a resource-level query. An empty group list there
+// means AWS holds no data for the resource, and its zero Total is not a cost.
+func groupedByResource(dimensions []string) bool {
+	for _, dim := range dimensions {
+		if dim == string(types.DimensionResourceId) {
+			return true
+		}
+	}
+	return false
+}
+
 func commitmentDimension(dimensions []string) bool {
 	for _, dim := range dimensions {
 		if dim == dimReservationID || dim == dimSavingsPlanARN {
@@ -711,7 +726,7 @@ func parseResultPeriodsWithIdentity(periods []types.ResultByTime, dimensions []s
 			results = append(results, row)
 		}
 
-		if len(resultByTime.Groups) == 0 && len(resultByTime.Total) > 0 {
+		if len(resultByTime.Groups) == 0 && len(resultByTime.Total) > 0 && !groupedByResource(dimensions) {
 			if _, ok := resultByTime.Total[metricUnblendedCost]; ok {
 				row, err := rowFromMetricsWithIdentity(resultByTime.Total, startDate, endDate, resultByTime.Estimated, nil, nil, identity)
 				if err != nil {
