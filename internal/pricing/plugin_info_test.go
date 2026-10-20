@@ -12,7 +12,7 @@ const (
 	pluginInfoName        = "aws-ce"
 	pluginInfoVersion     = "0.1.0"
 	pluginInfoSpecVersion = "v0.7.8"
-	pluginInfoRPCs        = "GetActualCost,GetProjectedCost,Supports,GetPluginInfo,BatchCost"
+	pluginInfoRPCs        = "GetActualCost,GetProjectedCost,GetBudgets,Supports,GetPluginInfo,BatchCost"
 )
 
 func TestGetPluginInfo(t *testing.T) {
@@ -49,8 +49,8 @@ func TestGetPluginInfo_GRPC(t *testing.T) {
 	if !hasCapability(caps, pbc.PluginCapability_PLUGIN_CAPABILITY_PROJECTED_COSTS) {
 		t.Fatalf("capabilities %v do not contain PROJECTED_COSTS", caps)
 	}
-	if len(caps) != 2 {
-		t.Fatalf("capabilities = %v, want actual and projected costs", caps)
+	if len(caps) != 3 || !hasCapability(caps, pbc.PluginCapability_PLUGIN_CAPABILITY_BUDGETS) {
+		t.Fatalf("capabilities = %v, want actual, projected, and budgets", caps)
 	}
 	if got := resp.GetMetadata()["supported_rpcs"]; got != pluginInfoRPCs {
 		t.Fatalf("supported_rpcs = %q, want %q", got, pluginInfoRPCs)
@@ -79,8 +79,8 @@ func assertPluginInfo(t *testing.T, resp *pbc.GetPluginInfoResponse) {
 		t.Fatalf("providers = %v, want [aws]", providers)
 	}
 	caps := resp.GetCapabilities()
-	if len(caps) != 2 || caps[0] != pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS || caps[1] != pbc.PluginCapability_PLUGIN_CAPABILITY_PROJECTED_COSTS {
-		t.Fatalf("capabilities = %v, want actual and projected costs", caps)
+	if len(caps) != 3 || caps[2] != pbc.PluginCapability_PLUGIN_CAPABILITY_BUDGETS {
+		t.Fatalf("capabilities = %v, want actual, projected, and budgets", caps)
 	}
 	meta := resp.GetMetadata()
 	if len(meta) != 1 {

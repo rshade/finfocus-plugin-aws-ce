@@ -102,5 +102,11 @@ func pluginSettings() []*pbc.PluginSetting {
 			Type:        pbc.PluginSettingType_PLUGIN_SETTING_TYPE_STRING,
 			Description: "Comma-separated Access-Control-Allow-Headers values. Empty uses the SDK Connect header set.",
 		},
+		{
+			Key:         "aws_account_id",
+			Env:         AccountIDEnv,
+			Type:        pbc.PluginSettingType_PLUGIN_SETTING_TYPE_STRING,
+			Description: "AWS account for Budgets. Empty uses STS GetCallerIdentity.",
+		},
 	}
 }

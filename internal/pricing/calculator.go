@@ -41,19 +41,24 @@ type Calculator struct {
 	maxRequestsPerMinute int
 	requestMu            sync.Mutex
 	requestTimes         []time.Time
+	// budgets overrides the AWS Budgets client. Nil builds one on demand.
+	budgets budgetLister
+	// accountID overrides STS when FINFOCUS_AWS_ACCOUNT_ID is empty.
+	accountID func(context.Context) (string, error)
 }
 
 var (
 	_ pluginsdk.SupportsProvider             = (*Calculator)(nil)
 	_ pluginsdk.PluginInfoProvider           = (*Calculator)(nil)
 	_ pluginsdk.PerRequestCredentialConsumer = (*Calculator)(nil)
+	_ pluginsdk.BudgetsProvider              = (*Calculator)(nil)
 )
 
 const (
 	pluginName = "aws-ce"
 	// specVersion must keep the leading v. pluginsdk.ValidateSpecVersion rejects "0.7.0".
 	specVersion   = "v0.7.8"
-	supportedRPCs = "GetActualCost,GetProjectedCost,Supports,GetPluginInfo,BatchCost"
+	supportedRPCs = "GetActualCost,GetProjectedCost,GetBudgets,Supports,GetPluginInfo,BatchCost"
 )
 
 // NewCalculator creates a new AWS Cost Explorer cost calculator plugin.
@@ -107,6 +112,7 @@ func (c *Calculator) GetPluginInfo(ctx context.Context, _ *pbc.GetPluginInfoRequ
 		Capabilities: []pbc.PluginCapability{
 			pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS,
 			pbc.PluginCapability_PLUGIN_CAPABILITY_PROJECTED_COSTS,
+			pbc.PluginCapability_PLUGIN_CAPABILITY_BUDGETS,
 		},
 		Settings: pluginSettings(),
 	}, nil
@@ -131,6 +137,7 @@ func (c *Calculator) Supports(ctx context.Context, req *pbc.SupportsRequest) (*p
 	response := &pbc.SupportsResponse{CapabilitiesEnum: []pbc.PluginCapability{
 		pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS,
 		pbc.PluginCapability_PLUGIN_CAPABILITY_PROJECTED_COSTS,
+		pbc.PluginCapability_PLUGIN_CAPABILITY_BUDGETS,
 	}}
 	resource := req.GetResource()
 	switch {
