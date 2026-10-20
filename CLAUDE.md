@@ -218,11 +218,18 @@ plain `vX.Y.Z` tag and release. The release-created event runs `goreleaser`.
 ## AWS recommendations for issue #13
 
 `GetRecommendations` implements EC2 rightsizing and Compute/EC2 Instance Savings
-Plans together. See `specs/005-aws-ce-recommendations-plugin/spec.md` and README
+Plans together. Issue #27 uses that rightsizing path. AWS accepts service
+`AmazonEC2` for `GetRightsizingRecommendation`, and the plugin copies `TERMINATE` and `MODIFY`
+savings from AWS. See `specs/005-aws-ce-recommendations-plugin/spec.md` and README
 for defaults, filters, permissions, and limitations. Keep SDK validation,
 selection, pagination, summary helpers, and `zerolog` operation logging. Preserve
 request-scoped credentials, retry budgets, the 100-page AWS cap, and all-source
 failure semantics. Never generate recommendations, purchase plans, or mutate
 resources. Ordinary tests use offline fixtures. The `awslive` recommendation
 test also requires `FINFOCUS_AWS_LIVE=true`. Don't run it without an explicit
-request for real AWS verification. Live verification remains pending.
+request for real AWS verification. On 2026-10-20,
+`TestAWSRecommendations` with `tailscale-phase-2/aws-oidc` received zero EC2
+rightsizing rows. Compute and EC2 Instance Savings Plans each returned a
+recommendation object with no plan type and no details. A blank plan type with
+no details is an empty result. After that mapping change, the same live check
+passed with empty datasets for rightsizing, `TERMINATE`, and Savings Plans.

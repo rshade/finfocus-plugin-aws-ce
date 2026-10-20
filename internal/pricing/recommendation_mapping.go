@@ -166,6 +166,10 @@ func mapSavingsPlansRecommendations(pages []costexplorer.GetSavingsPlansPurchase
 		if p == nil || len(p.SavingsPlansPurchaseRecommendationDetails) == 0 {
 			continue
 		}
+		// AWS returns this object with a blank type when the account has no rows.
+		if p.SavingsPlansType == "" && len(p.SavingsPlansPurchaseRecommendationDetails) == 0 {
+			continue
+		}
 		if p.SavingsPlansType != types.SupportedSavingsPlansTypeComputeSp && p.SavingsPlansType != types.SupportedSavingsPlansTypeEc2InstanceSp {
 			return nil, fmt.Errorf("unsupported savings plan type")
 		}
