@@ -26,6 +26,7 @@ func TestSupports(t *testing.T) {
 		supported   bool
 		reasonHas   string
 		plainReason bool
+		scope       bool
 	}{
 		{
 			name: "valid EC2 ARN",
@@ -101,6 +102,44 @@ func TestSupports(t *testing.T) {
 			plainReason: true,
 		},
 		{
+			name: "Pulumi EC2 instance without identifiers",
+			req: &pbc.SupportsRequest{Resource: &pbc.ResourceDescriptor{
+				Provider:     "aws",
+				ResourceType: "aws:ec2/instance:Instance",
+				Region:       "us-east-1",
+				Sku:          "t3.micro",
+			}},
+			supported: true,
+			reasonHas: "14 days",
+		},
+		{
+			name: "Pulumi account scope without identifiers",
+			req: &pbc.SupportsRequest{Resource: &pbc.ResourceDescriptor{
+				Provider:     "aws",
+				ResourceType: "aws:account",
+			}},
+			supported: true,
+			scope:     true,
+		},
+		{
+			name: "Pulumi service scope without identifiers",
+			req: &pbc.SupportsRequest{Resource: &pbc.ResourceDescriptor{
+				Provider:     "aws",
+				ResourceType: "aws:service",
+			}},
+			supported: true,
+			scope:     true,
+		},
+		{
+			name: "Pulumi S3 bucket without identifiers",
+			req: &pbc.SupportsRequest{Resource: &pbc.ResourceDescriptor{
+				Provider:     "aws",
+				ResourceType: "aws:s3/bucket:Bucket",
+			}},
+			supported: false,
+			reasonHas: "aws:ec2/instance:Instance",
+		},
+		{
 			name:      "nil resource",
 			req:       &pbc.SupportsRequest{},
 			supported: false,
@@ -134,6 +173,10 @@ func TestSupports(t *testing.T) {
 				t.Fatalf("plugin filled legacy capabilities or metrics: %#v", resp)
 			}
 			switch {
+			case tc.supported && tc.scope:
+				if resp.GetReason() != "" {
+					t.Fatalf("scope reason = %q, want empty", resp.GetReason())
+				}
 			case tc.supported:
 				if !strings.Contains(resp.GetReason(), "14 days") || !strings.Contains(resp.GetReason(), "opt-in") {
 					t.Fatalf("supported reason = %q, want resource limitations", resp.GetReason())

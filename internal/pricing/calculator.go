@@ -134,6 +134,8 @@ func (c *Calculator) Supports(ctx context.Context, req *pbc.SupportsRequest) (*p
 		response.Reason = invalidResourceReason("resource descriptor is required")
 	case resource.GetProvider() != "aws":
 		response.Reason = fmt.Sprintf("provider %q is not supported; aws-ce only supports provider \"aws\"", resource.GetProvider())
+	case resource.GetId() == "" && resource.GetArn() == "":
+		response.Supported, response.Reason = supportsByResourceType(resource.GetResourceType())
 	default:
 		plan, err := c.planCostQuery(logger, &pbc.GetActualCostRequest{Resource: resource})
 		if err != nil {
@@ -146,6 +148,23 @@ func (c *Calculator) Supports(ctx context.Context, req *pbc.SupportsRequest) (*p
 		}
 	}
 	return response, nil
+}
+
+const pulumiEC2InstanceType = "aws:ec2/instance:Instance"
+
+// supportsByResourceType answers for hosts that ask before they know a cloud
+// id. The engine's Supports call carries the Pulumi type but no id or ARN, so
+// the type alone decides. GetActualCost still needs an EC2 instance id.
+func supportsByResourceType(resourceType string) (bool, string) {
+	switch strings.ToLower(resourceType) {
+	case strings.ToLower(pulumiEC2InstanceType):
+		return true, "EC2 resource costs require Cost Explorer resource-level opt-in, an instance id, and cover the last 14 days"
+	case "aws:account", "aws:service":
+		return true, ""
+	}
+	return false, invalidResourceReason(fmt.Sprintf(
+		"resource type %q has no cost lookup; supported types are %s, aws:account and aws:service",
+		resourceType, pulumiEC2InstanceType))
 }
 
 func invalidResourceReason(detail string) string {

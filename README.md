@@ -84,6 +84,11 @@ error. To query totals, set `resource.provider` to `aws` and choose:
 | `aws:service` | Exact AWS Cost Explorer service name | That service only |
 
 The legacy `resource_id` value `aws-account-total` also selects account totals.
+
+`Supports` also answers when the host sends a resource type and no id or ARN, as the FinFocus
+engine does. It accepts the Pulumi type `aws:ec2/instance:Instance` plus `aws:account` and
+`aws:service`, and declines other types with the supported list. `GetActualCost` still needs the
+instance id or a total label.
 The SDK still requires a non-empty `resource_id` when using a descriptor.
 Service and account queries cover the last 14 months.
 
