@@ -667,7 +667,7 @@ func (c *Calculator) GetServiceActualCost(ctx context.Context, serviceName strin
 			return 0, "", errors.New(msg)
 		}
 		if code, ok := awsAPIErrorCode(err); ok {
-			c.logger.Error().Str("service", serviceName).Msg(awsAPIErrorText(code))
+			c.logger.Error().Str("service", serviceName).Msg(awsFailureText(err, code))
 		} else {
 			c.logger.Error().Err(err).Str("service", serviceName).Msg("Failed to get service costs")
 		}
@@ -706,7 +706,7 @@ func (c *Calculator) GetAccountActualCost(ctx context.Context, startTime, endTim
 			return 0, "", errors.New(msg)
 		}
 		if code, ok := awsAPIErrorCode(err); ok {
-			c.logger.Error().Msg(awsAPIErrorText(code))
+			c.logger.Error().Msg(awsFailureText(err, code))
 		} else {
 			c.logger.Error().Err(err).Msg("Failed to get account costs")
 		}

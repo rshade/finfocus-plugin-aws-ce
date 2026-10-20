@@ -30,6 +30,22 @@ shared cache, so another request can't reuse its costs or credentials.
 
 ## Permissions and failure handling
 
+Each feature calls different AWS operations. A permission error names the
+operation, so match it against this table.
+
+| Feature | Operation in the error text | IAM action | Needs beyond IAM |
+| --- | --- | --- | --- |
+| Account and service actual costs | Cost Explorer GetCostAndUsage, GetDimensionValues | `ce:GetCostAndUsage`, `ce:GetDimensionValues` | |
+| EC2 and other resource actual costs | Cost Explorer GetCostAndUsageWithResources | `ce:GetCostAndUsageWithResources` | Resource-level data opt-in |
+| Account and service projection | Cost Explorer GetCostForecast, GetCostAndUsage | `ce:GetCostForecast`, `ce:GetCostAndUsage` | |
+| EC2 Spot comparison | EC2 DescribeSpotPriceHistory, Pricing GetProducts | `ec2:DescribeSpotPriceHistory`, `pricing:GetProducts` | |
+| Budgets | Budgets DescribeBudgets | `budgets:ViewBudget` | |
+| Anomalies | Cost Explorer GetAnomalies | `ce:GetAnomalies` | |
+| Rightsizing recommendations | Cost Explorer GetRightsizingRecommendation | `ce:GetRightsizingRecommendation` | Rightsizing enabled |
+| Savings Plans recommendations | Cost Explorer GetSavingsPlansPurchaseRecommendation | `ce:GetSavingsPlansPurchaseRecommendation` | An existing AWS recommendation |
+
+See the README section on AWS account prerequisites for the account settings.
+
 Allow `ce:GetDimensionValues` for commitment discovery,
 `ce:GetCostAndUsage` for service totals,
 `ce:GetCostAndUsageWithResources` for resource queries, and

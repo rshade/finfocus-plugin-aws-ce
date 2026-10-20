@@ -11,6 +11,10 @@ forecast a single resource, so any other resource gets `InvalidArgument`
 instead of a service or account total. The plugin doesn't calculate its own
 forecast.
 
+An EC2 instance that carries an instance type and an availability zone is the
+exception: `GetProjectedCost` returns a Spot price quote for it, not a
+forecast. See [Spot comparison and plugin routing](#spot-comparison-and-plugin-routing).
+
 ## Quick start
 
 Install Go 1.27.2 and use an AWS identity with Cost Explorer read permissions.
@@ -98,6 +102,60 @@ and malformed role ARNs return `InvalidArgument` with
 `ERROR_CODE_INVALID_CREDENTIALS`. Invalid credentials never fall back to process
 credentials. Credential-bearing requests bypass the shared cache, and the plugin
 excludes their values from logs and returned errors. See [AWS credentials](docs/CREDENTIALS.md).
+
+## Spot comparison and plugin routing
+
+For an EC2 instance with an instance type and an availability zone,
+`GetProjectedCost` returns the current Spot price, with the on-demand rate and
+an interruption score alongside it. The response is a Spot quote, not the
+price of an on-demand instance. The plugin has no setting that turns the Spot
+quote off.
+
+FinFocus core uses the first plugin that answers a projected-cost request. At
+equal priority it queries plugins in alphabetical order, so it asks `aws-ce`
+before `aws-public`. If you install both and a resource carries a type and a
+zone, the Spot price can replace the on-demand list price. To keep list prices
+for projected costs and use `aws-ce` for the rest, give each plugin its
+features in the core routing file. This example comes from the FinFocus core
+documentation. It hasn't run against this plugin.
+
+```yaml
+routing:
+  plugins:
+    - name: aws-public
+      features: [ProjectedCosts]
+      priority: 20
+    - name: aws-ce
+      features: [ActualCosts, Recommendations]
+      priority: 10
+```
+
+## AWS account prerequisites
+
+Some features need a setting in the AWS account as well as IAM permission.
+Without it AWS returns an access error even when the policy is correct. You make every
+setting here in the management (payer) account. Steps follow the AWS
+Cost Management documentation, parts of which AWS marks as legacy, so confirm
+the labels in your console.
+
+| Feature | Setting | Where |
+| --- | --- | --- |
+| EC2 instance and other resource costs | Resource-level data at daily granularity | Billing and Cost Management, Cost Management preferences, granular data options |
+| Rightsizing recommendations | Rightsizing | Billing and Cost Management, Cost Management preferences, General tab |
+
+- **Resource-level data.** Select resource-level data at daily granularity for
+  EC2 or for all services, then save. AWS can take up to 48 hours to apply the
+  change and blocks further changes for 48 hours after saving. It covers the
+  last 14 days only.
+- **Rightsizing.** Check Rightsizing and save. AWS can take up to 24 hours to
+  produce recommendations. Only a regular or management account can enable it.
+- **Savings Plans recommendations.** AWS must already hold a recommendation
+  for the account. The plugin never asks AWS to generate one.
+
+The [permissions table](docs/CREDENTIALS.md#permissions-and-failure-handling)
+lists the IAM action for each feature. A permission error names the AWS
+operation that was denied, for example
+`retrieving costs failed: AccessDeniedException (Cost Explorer GetRightsizingRecommendation)`.
 
 ## Actual cost behavior
 
