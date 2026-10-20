@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -55,6 +56,10 @@ var (
 	instanceTypePattern = regexp.MustCompile(`^[a-z0-9-]+\.[a-z0-9.]+$`)
 	awsNamePattern      = regexp.MustCompile(`^[a-z0-9-]+$`)
 )
+
+func spotComparisonFromEnv() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv(SpotComparisonEnv)), "true")
+}
 
 func wantsSpotComparison(resource *pbc.ResourceDescriptor) bool {
 	return isEC2Instance(resource.GetResourceType()) && instanceTypeOf(resource) != "" && availabilityZoneOf(resource) != ""

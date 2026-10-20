@@ -14,6 +14,8 @@ const (
 	// HealthEndpointEnv enables the SDK /healthz endpoint. The SDK serves it on
 	// the plugin listener, and only while Connect is enabled.
 	HealthEndpointEnv = "FINFOCUS_HEALTH_ENDPOINT"
+	// SpotComparisonEnv opts in to Spot quotes from GetProjectedCost.
+	SpotComparisonEnv = "FINFOCUS_AWS_CE_SPOT_COMPARISON"
 	// WebEnabledEnv serves Connect, gRPC-Web, and gRPC on the plugin listener.
 	WebEnabledEnv = "FINFOCUS_WEB_ENABLED"
 	// CORSAllowedOriginsEnv is a comma-separated origin list. Empty disables CORS.
@@ -68,6 +70,13 @@ func pluginSettings() []*pbc.PluginSetting {
 			Env:         maxRequestsEnv,
 			Type:        pbc.PluginSettingType_PLUGIN_SETTING_TYPE_INT,
 			Description: "Cost Explorer page budget per minute. Each page costs $0.01. Unset or 0 means no limit.",
+		},
+		{
+			Key:          "spot_comparison",
+			Env:          SpotComparisonEnv,
+			Type:         pbc.PluginSettingType_PLUGIN_SETTING_TYPE_BOOL,
+			DefaultValue: "false",
+			Description:  "Answer GetProjectedCost for an EC2 instance with a type and a zone with a Spot quote. A Spot quote is not the on-demand price, so leave this off when another plugin prices instances.",
 		},
 		{
 			Key:          "health_endpoint",
