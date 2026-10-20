@@ -38,6 +38,7 @@ func TestGetPluginInfo_Settings(t *testing.T) {
 		CORSAllowedOriginsEnv:   "",
 		CORSAllowCredentialsEnv: "false",
 		CORSAllowedHeadersEnv:   "",
+		AccountIDEnv:            "",
 	}
 	got := make(map[string]string, len(settings))
 	for _, setting := range settings {

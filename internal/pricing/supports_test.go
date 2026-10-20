@@ -167,7 +167,7 @@ func TestSupports(t *testing.T) {
 			if resp.GetSupported() != tc.supported {
 				t.Fatalf("supported = %v, want %v (reason %q)", resp.GetSupported(), tc.supported, resp.GetReason())
 			}
-			if len(resp.GetCapabilitiesEnum()) != 2 || resp.GetCapabilitiesEnum()[0] != pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS || resp.GetCapabilitiesEnum()[1] != pbc.PluginCapability_PLUGIN_CAPABILITY_PROJECTED_COSTS {
+			if len(resp.GetCapabilitiesEnum()) != 3 || resp.GetCapabilitiesEnum()[0] != pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS || resp.GetCapabilitiesEnum()[2] != pbc.PluginCapability_PLUGIN_CAPABILITY_BUDGETS {
 				t.Fatalf("typed capabilities = %v, want actual and projected costs", resp.GetCapabilitiesEnum())
 			}
 			if len(resp.GetCapabilities()) != 0 || len(resp.GetSupportedMetrics()) != 0 {

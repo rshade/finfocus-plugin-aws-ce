@@ -59,6 +59,7 @@ credential values into source files or logs.
 | `FINFOCUS_CORS_ALLOWED_ORIGINS` | Comma-separated browser origins. Empty allows none | Empty |
 | `FINFOCUS_CORS_ALLOW_CREDENTIALS` | Allow credentialed cross-origin requests | `false` |
 | `FINFOCUS_CORS_ALLOWED_HEADERS` | Comma-separated allowed request headers. Empty uses the SDK set | SDK default |
+| `FINFOCUS_AWS_ACCOUNT_ID` | Account for AWS Budgets. Empty uses STS `GetCallerIdentity` | Empty |
 
 `FINFOCUS_HEALTH_ENDPOINT=true` turns Connect on even when
 `FINFOCUS_WEB_ENABLED=false`. The SDK serves `/healthz` only in Connect mode,
