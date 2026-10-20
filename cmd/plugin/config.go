@@ -23,6 +23,23 @@ func batchSettingsFromEnv() (int, int, error) {
 	return size, workers, nil
 }
 
+// documentedSettings are the plugin environment variables described in
+// docs/CONFIGURATION.md. Names stay in this file so that page cannot drift.
+const documentedSettings = `
+FINFOCUS_PLUGIN_PORT
+FINFOCUS_LOG_LEVEL
+FINFOCUS_LOG_FILE
+FINFOCUS_AWS_CE_MAX_BATCH_SIZE
+FINFOCUS_AWS_CE_BATCH_WORKERS
+FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE
+FINFOCUS_HEALTH_ENDPOINT
+FINFOCUS_WEB_ENABLED
+FINFOCUS_CORS_ALLOWED_ORIGINS
+FINFOCUS_CORS_ALLOW_CREDENTIALS
+FINFOCUS_CORS_ALLOWED_HEADERS
+FINFOCUS_AWS_ACCOUNT_ID
+`
+
 // webConfigFromEnv reads the health, Connect, and CORS settings.
 // Health defaults off. The SDK mounts /healthz only in Connect mode, and
 // Connect does not run the gRPC trace interceptor. Turning health on also

@@ -29,8 +29,8 @@ request and returns discovery metadata without contacting AWS.
 | `version` | string | Build version. Release builds inject the release version |
 | `spec_version` | string | `v0.7.8` |
 | `providers` | repeated string | `aws` |
-| `capabilities` | repeated `PluginCapability` | `PLUGIN_CAPABILITY_ACTUAL_COSTS`, `PLUGIN_CAPABILITY_PROJECTED_COSTS`, `PLUGIN_CAPABILITY_BUDGETS` |
-| `metadata` | map of strings | `supported_rpcs` lists `GetActualCost,GetProjectedCost,GetBudgets,Supports,GetPluginInfo,BatchCost` |
+| `capabilities` | repeated `PluginCapability` | Actual costs, forecasts, budgets, and recommendations |
+| `metadata` | map of strings | `supported_rpcs` lists `GetActualCost,GetProjectedCost,GetBudgets,GetRecommendations,Supports,GetPluginInfo,BatchCost` |
 | `settings` | repeated `PluginSetting` | Plugin settings, environment names, types, and applicable defaults |
 
 The [pinned SDK revision](../go.mod) can differ from the reported protocol
@@ -60,7 +60,7 @@ types when requesting costs.
 | --- | --- | --- |
 | `supported` | `bool` | Whether the descriptor has a supported query |
 | `reason` | string | Rejection reason, resource opt-in requirements, or unverified support |
-| `capabilities_enum` | repeated `PluginCapability` | Actual costs, forecasts, and budgets |
+| `capabilities_enum` | repeated `PluginCapability` | Actual costs, forecasts, budgets, and recommendations |
 | `capabilities` | map of `bool` values | Legacy field. Use `capabilities_enum` |
 | `supported_metrics` | repeated `MetricKind` | Empty. No sustainability metrics |
 
@@ -299,6 +299,18 @@ scope, descriptor-based identity resolution, or FOCUS records. A batch's
 batches forward the complete descriptor and use the forecast scope described
 for `GetProjectedCost`. Batch requests don't retrieve budgets.
 
+## GetRecommendations
+
+`GetRecommendations` calls Cost Explorer `GetAnomalies` for the last 90 days.
+Each row uses category `ANOMALY` and action `INVESTIGATE`. The plugin doesn't
+score or detect anomalies. It passes the page token through. A request for
+another category returns an empty list. Target resources return
+`InvalidArgument` because the call is account scoped. The plugin copies AWS
+`TotalImpact` to metadata `total_impact` and leaves `EstimatedSavings` unset,
+because that figure records unexpected spend, not a savings estimate. The
+plugin sets a confidence score only when the AWS current score is already
+between 0 and 1.
+
 ## Errors and unsupported operations
 
 Single-resource failures return a gRPC status. Some also attach an `ErrorDetail`
@@ -319,8 +331,9 @@ with a protocol error code. Don't assume every failure includes that detail.
 | `Unimplemented` | None | Unsupported operation |
 
 `GetPricingSpec` and `EstimateCost` don't supply costs.
-Recommendations, recommendation dismissal/history, and direct `DryRun`
-aren't supported. The SDK returns `Unimplemented` for those valid requests.
+Recommendation dismissal and history aren't supported. Direct `DryRun`
+returns `InvalidArgument` for forecasts. The SDK returns `Unimplemented` for
+operations this plugin doesn't implement.
 `ResolveResourceTypes` has no configured mapping registry. Use `Supports` to
 check the plugin's accepted inputs. Cost parsing isn't registered.
 
@@ -336,3 +349,4 @@ resource-level opt-in. Allow for billing-data delay when choosing dates, and see
 - [Protocol and integration tests](../test/integration/gRPC_test.go)
 - [Forecast scope and response mapping](../internal/pricing/projected.go)
 - [Budget mapping](../internal/pricing/budgets.go)
+- [Anomaly mapping](../internal/pricing/anomalies.go)

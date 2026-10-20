@@ -222,6 +222,9 @@ procedure. Setting `FINFOCUS_TEST_MODE` alone doesn't make a live query offline.
 | Unexpectedly old costs | Check cache expiry and AWS billing-data delay |
 | `NotFound` for projected costs | AWS returned no forecast rows for the next 30 days |
 | Budget account unavailable | Set `FINFOCUS_AWS_ACCOUNT_ID` or check process credentials for STS account lookup |
+| `/healthz` isn't available | Set `FINFOCUS_HEALTH_ENDPOINT=true`. The default is off |
+| Browser preflight fails | List the origin in `FINFOCUS_CORS_ALLOWED_ORIGINS`. Don't combine `*` with credentials |
+| Trace id is missing | Connect mode leaves the gRPC trace header unread. Leave health and web off for native gRPC |
 
 Cost Explorer data can lag by 24 hours or longer, with resource-level data taking
 up to 48 hours. Newly created resources may have no billed usage. Missing data
