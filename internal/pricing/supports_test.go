@@ -250,3 +250,19 @@ func hasCapability(caps []pbc.PluginCapability, want pbc.PluginCapability) bool 
 	}
 	return false
 }
+
+func TestSupportsEC2InstanceStaysSupportedForActuals(t *testing.T) {
+	t.Parallel()
+
+	resp, err := NewCalculator().Supports(context.Background(), &pbc.SupportsRequest{Resource: &pbc.ResourceDescriptor{
+		Provider:     "aws",
+		ResourceType: "aws:ec2/instance:Instance",
+		Region:       "us-west-2",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !resp.GetSupported() {
+		t.Fatalf("EC2 instance declined for every capability (%q); that would also remove actual costs", resp.GetReason())
+	}
+}

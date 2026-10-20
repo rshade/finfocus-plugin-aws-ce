@@ -33,7 +33,7 @@ shared cache, so another request can't reuse its costs or credentials.
 Allow `ce:GetDimensionValues` for commitment discovery,
 `ce:GetCostAndUsage` for service totals,
 `ce:GetCostAndUsageWithResources` for resource queries, and
-`ce:GetCostForecast` for `GetProjectedCost`, and
+`ce:GetCostForecast` and `ce:GetCostAndUsage` for `GetProjectedCost`, and
 `budgets:ViewBudget` for `GetBudgets`, and `ce:GetAnomalies` for
 anomaly recommendations. Budgets uses its own endpoint.
 `FINFOCUS_AWS_ACCOUNT_ID` selects the account. When it's empty, the plugin

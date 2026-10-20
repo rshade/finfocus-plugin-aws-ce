@@ -38,7 +38,7 @@ To prevent scope creep and architectural drift, this project adheres to the foll
 | Remote procedure call | Status | AWS API |
 |-----|--------|---------|
 | `GetActualCost` | ✅ Offline protocol/contract verified | `GetCostAndUsage`, `GetCostAndUsageWithResources` |
-| `GetProjectedCost` | ✅ Proxies AWS values | `GetCostForecast` for the next 30 Coordinated Universal Time days |
+| `GetProjectedCost` | ✅ Proxies AWS values | Month-to-date `GetCostAndUsage` plus `GetCostForecast` to the end of the Coordinated Universal Time month, for `aws:account` and `aws:service` only |
 
 ### SDK compliance for v0.7.8
 

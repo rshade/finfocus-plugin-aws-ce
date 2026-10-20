@@ -202,35 +202,47 @@ error instead of an incomplete successful record.
 
 ## GetProjectedCost
 
-`GetProjectedCost(GetProjectedCostRequest) → GetProjectedCostResponse` proxies
-AWS `GetCostForecast`. The request requires `resource` with provider `aws` and
-non-empty `resource_type`. `dry_run: true` returns `InvalidArgument`.
+`GetProjectedCost(GetProjectedCostRequest) → GetProjectedCostResponse` projects
+the current UTC calendar month for an account or a service. The request
+requires `resource` with provider `aws` and non-empty `resource_type`.
+`dry_run: true` returns `InvalidArgument`.
 
-The window starts at the next UTC midnight and spans 30 days, with `DAILY`
-granularity, `UNBLENDED_COST`, and an 80 percent prediction interval request.
-The caller doesn't select dates through this method.
+The plugin reads two things from Cost Explorer and adds them:
+
+1. Month-to-date `AmortizedCost` from the first of the month up to, but not
+   including, today, with `MONTHLY` granularity. This call is skipped on the
+   first day of the month.
+2. A `GetCostForecast` from today to the first day of the next month, with
+   `MONTHLY` granularity, `AMORTIZED_COST`, and an 80 percent prediction
+   interval request.
+
+The caller doesn't select dates through this method. `AmortizedCost` spreads
+Savings Plan and reservation fees over the usage they cover. `UnblendedCost`
+would show the fee as its own charge and covered usage at the on-demand rate.
 
 | Resource | Forecast scope |
 | --- | --- |
+| Type `aws:account` | All costs visible to the credentials |
 | Type `aws:service` with a non-empty id | Exact Cost Explorer service name in `id` |
-| Type `aws:ec2/instance:Instance` | All EC2 compute costs visible to the credentials |
-| Other resource descriptors | All costs visible to the credentials |
+| Any other resource, or `aws:service` without an id | Declined with `InvalidArgument` and `ERROR_CODE_INVALID_RESOURCE` |
 
-An instance id or ARN doesn't restrict a forecast to that individual resource.
-The plugin doesn't create a forecast model or apportion account or service
-forecasts to individual resources.
+Cost Explorer cannot forecast one resource, and resource-level data covers 14
+days and needs an opt-in on the payer account. An instance id or ARN doesn't
+restrict a forecast, so the plugin declines such requests rather than return a
+service or account total as that resource's price. Use a plugin that prices
+resources from list prices for single resources.
 
 | Response field | Meaning |
 | --- | --- |
-| `cost_per_month` | Sum of AWS daily means over the 30-day window |
+| `cost_per_month` | Month-to-date amortized cost plus the forecast mean for the rest of the month |
 | `currency` | Currency from the forecast response |
-| `prediction_interval_lower`, `prediction_interval_upper` | AWS bounds, only when exactly one row supplies both |
+| `prediction_interval_lower`, `prediction_interval_upper` | AWS bounds, only when exactly one row supplies both, plus month-to-date cost |
 | `confidence_level` | Requested interval level when that single row supplies bounds |
 
 Several rows leave prediction bounds unset because the plugin doesn't combine
 intervals. The handler doesn't use the actual-cost cache. It shares the Cost
-Explorer request budget and error mapping. Missing forecast rows return
-`NotFound`.
+Explorer request budget and error mapping and makes at most two requests.
+Missing forecast rows return `NotFound`.
 
 ## `GetBudgets`
 

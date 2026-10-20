@@ -111,7 +111,7 @@ Grant these actions to the identity that performs the queries:
 `ce:GetDimensionValues` supports reservation and Savings Plan discovery for
 every actual-cost query. `ce:GetCostAndUsage` supplies account and service totals.
 `ce:GetCostAndUsageWithResources` supplies resource costs.
-`ce:GetCostForecast` supplies projections, and `budgets:ViewBudget` permits
+`ce:GetCostForecast` and `ce:GetCostAndUsage` supply projections, and `budgets:ViewBudget` permits
 reading budgets. Grant only the operations the installation needs. Budget
 queries use the process credentials and the account in `FINFOCUS_AWS_ACCOUNT_ID`,
 or call STS `GetCallerIdentity` when that setting is empty.
@@ -220,7 +220,8 @@ procedure. Setting `FINFOCUS_TEST_MODE` alone doesn't make a live query offline.
 | Non-EC2 resource has no costs | Check the ARN. These resource identity forms lack live verification |
 | `ResourceExhausted` | Reduce batch concurrency or wait for the local or AWS rate limit to reset |
 | Unexpectedly old costs | Check cache expiry and AWS billing-data delay |
-| `NotFound` for projected costs | AWS returned no forecast rows for the next 30 days |
+| `InvalidArgument` for projected costs | The request is for a single resource, not `aws:account` or `aws:service` with an id |
+| `NotFound` for projected costs | AWS returned no forecast rows from today to the end of the UTC month |
 | Budget account unavailable | Set `FINFOCUS_AWS_ACCOUNT_ID` or check process credentials for STS account lookup |
 | `/healthz` isn't available | Set `FINFOCUS_HEALTH_ENDPOINT=true`. The default is off |
 | Browser preflight fails | List the origin in `FINFOCUS_CORS_ALLOWED_ORIGINS`. Don't combine `*` with credentials |

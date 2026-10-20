@@ -45,6 +45,8 @@ type Calculator struct {
 	budgets budgetLister
 	// accountID overrides STS when FINFOCUS_AWS_ACCOUNT_ID is empty.
 	accountID func(context.Context) (string, error)
+	// now overrides the wall clock. Nil uses time.Now.
+	now func() time.Time
 }
 
 var (
@@ -219,9 +221,13 @@ func (c *Calculator) initClient(ctx context.Context, logger zerolog.Logger) erro
 	return nil
 }
 
-// GetProjectedCost proxies AWS Cost Explorer GetCostForecast.
-// The plugin does not compute a forecast. Interval fields are copied from AWS
-// or left unset. The queried window is the next 30 UTC days.
+// GetProjectedCost proxies AWS Cost Explorer GetCostForecast for an account or
+// a service. Cost Explorer cannot forecast one resource, so any other resource
+// is declined rather than priced at a service or account total.
+// CostPerMonth is the projected total for the current UTC calendar month: the
+// AmortizedCost already billed before today plus the Cost Explorer forecast from
+// today to the last day of the month. The prediction interval comes from AWS
+// and is shifted by the month-to-date actuals.
 func (c *Calculator) GetProjectedCost(ctx context.Context, req *pbc.GetProjectedCostRequest) (*pbc.GetProjectedCostResponse, error) {
 	logger := c.traceLogger(ctx)
 	done := pluginsdk.LogOperation(logger, "GetProjectedCost")
@@ -237,8 +243,15 @@ func (c *Calculator) GetProjectedCost(ctx context.Context, req *pbc.GetProjected
 	if req.GetDryRun() {
 		return nil, status.Error(codes.InvalidArgument, "dry run is not supported for Cost Explorer forecasts")
 	}
+	if !forecastScopeSupported(resource) {
+		return nil, statusWithDetail(
+			codes.InvalidArgument,
+			"projected cost is available for aws:service and aws:account only; Cost Explorer cannot forecast a single resource",
+			pbc.ErrorCode_ERROR_CODE_INVALID_RESOURCE,
+		)
+	}
 
-	start, end := forecastWindow(time.Now().UTC())
+	monthStart, today, monthEnd := projectionWindow(c.currentTime())
 	var pages int
 	ctx = c.withCostBudget(ctx, &pages)
 	ce, perRequest, err := c.clientForCall(ctx, logger)
@@ -248,7 +261,16 @@ func (c *Calculator) GetProjectedCost(ctx context.Context, req *pbc.GetProjected
 		}
 		return nil, status.Errorf(codes.Internal, "client initialization failed: %v", err)
 	}
-	forecasts, err := ce.GetCostForecast(ctx, forecastFilter(resource), start, end, string(types.GranularityDaily))
+	filter := forecastFilter(resource)
+	var monthToDate float64
+	var monthToDateCurrency string
+	if today.After(monthStart) {
+		monthToDate, monthToDateCurrency, err = ce.GetPeriodCost(ctx, filter, monthStart, today)
+	}
+	var forecasts []client.ForecastResult
+	if err == nil {
+		forecasts, err = ce.GetCostForecast(ctx, filter, today, monthEnd, string(types.GranularityMonthly))
+	}
 	if err != nil {
 		if errors.Is(err, client.ErrRateLimited) {
 			return nil, statusWithDetail(codes.ResourceExhausted, err.Error(), pbc.ErrorCode_ERROR_CODE_RATE_LIMITED)
@@ -267,7 +289,14 @@ func (c *Calculator) GetProjectedCost(ctx context.Context, req *pbc.GetProjected
 		}
 		return nil, status.Error(codes.Internal, "getting cost forecast failed")
 	}
-	return forecastResponse(forecasts), nil
+	return forecastResponse(forecasts, monthToDate, monthToDateCurrency), nil
+}
+
+func (c *Calculator) currentTime() time.Time {
+	if c.now != nil {
+		return c.now()
+	}
+	return time.Now()
 }
 
 // GetActualCost retrieves actual historical costs from AWS Cost Explorer.
