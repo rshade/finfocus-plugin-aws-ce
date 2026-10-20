@@ -146,6 +146,21 @@ func TestMapSavingsPlansRecommendationsMetadata(t *testing.T) {
 	_, err = mapSavingsPlansRecommendations(pages)
 	require.Error(t, err)
 }
+func TestMapSavingsPlansRecommendationsWithoutAccount(t *testing.T) {
+	pages := []costexplorer.GetSavingsPlansPurchaseRecommendationOutput{{
+		SavingsPlansPurchaseRecommendation: &types.SavingsPlansPurchaseRecommendation{SavingsPlansType: types.SupportedSavingsPlansTypeComputeSp, AccountScope: types.AccountScopePayer, TermInYears: types.TermInYearsOneYear, PaymentOption: types.PaymentOptionNoUpfront,
+			SavingsPlansPurchaseRecommendationDetails: []types.SavingsPlansPurchaseRecommendationDetail{
+				{CurrencyCode: aws.String("USD"), EstimatedMonthlySavingsAmount: aws.String("300"), HourlyCommitmentToPurchase: aws.String("1.5")}}}}}
+	recs, err := mapSavingsPlansRecommendations(pages)
+	require.NoError(t, err)
+	require.Len(t, recs, 1)
+	require.Equal(t, "account:payer:savings-plan", recs[0].Resource.Id)
+	require.NotContains(t, recs[0].Metadata, "account_id")
+	require.NoError(t, pluginsdk.ValidateRecommendation(recs[0]))
+	pages[0].SavingsPlansPurchaseRecommendation.AccountScope = types.AccountScopeLinked
+	_, err = mapSavingsPlansRecommendations(pages)
+	require.Error(t, err)
+}
 func TestRecommendationProjectionInvalid(t *testing.T) {
 	for _, v := range []string{"", "-1", "NaN", "Inf", "bad", "1e309", "0x1p2", "1_000", "+1", " 1"} {
 		t.Run(v, func(t *testing.T) {
