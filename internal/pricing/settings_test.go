@@ -33,6 +33,7 @@ func TestGetPluginInfo_Settings(t *testing.T) {
 		BatchSizeEnv:            strconv.Itoa(pluginsdk.DefaultMaxBatchSize),
 		BatchWorkersEnv:         strconv.Itoa(pluginsdk.DefaultBatchWorkers),
 		maxRequestsEnv:          "",
+		SpotComparisonEnv:       "false",
 		HealthEndpointEnv:       "false",
 		WebEnabledEnv:           "false",
 		CORSAllowedOriginsEnv:   "",

@@ -11,9 +11,10 @@ forecast a single resource, so any other resource gets `InvalidArgument`
 instead of a service or account total. The plugin doesn't calculate its own
 forecast.
 
-An EC2 instance that carries an instance type and an availability zone is the
-exception: `GetProjectedCost` returns a Spot price quote for it, not a
-forecast. See [Spot comparison and plugin routing](#spot-comparison-and-plugin-routing).
+An opt-in setting changes that for one case: with
+`FINFOCUS_AWS_CE_SPOT_COMPARISON=true`, an EC2 instance that carries an
+instance type and an availability zone gets a Spot price quote. See
+[Spot comparison](#spot-comparison).
 
 ## Quick start
 
@@ -69,6 +70,7 @@ credential values into source files or logs.
 | `FINFOCUS_AWS_CE_MAX_BATCH_SIZE` | Batch limit, integer from 1 to 1000 | 100 |
 | `FINFOCUS_AWS_CE_BATCH_WORKERS` | Concurrent batch workers, integer from 1 to 50 | 10 |
 | `FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` | CE request attempt budget per minute | Unlimited when unset or `0` |
+| `FINFOCUS_AWS_CE_SPOT_COMPARISON` | `true` answers EC2 instance projections with a Spot quote | `false` |
 | `FINFOCUS_HEALTH_ENDPOINT` | Serve SDK `/healthz` on the plugin port. `true` also enables Connect | `false` |
 | `FINFOCUS_WEB_ENABLED` | Serve Connect and gRPC-Web beside gRPC on the plugin port | `false` |
 | `FINFOCUS_CORS_ALLOWED_ORIGINS` | Comma-separated browser origins. Empty allows none | Empty |
@@ -103,21 +105,23 @@ and malformed role ARNs return `InvalidArgument` with
 credentials. Credential-bearing requests bypass the shared cache, and the plugin
 excludes their values from logs and returned errors. See [AWS credentials](docs/CREDENTIALS.md).
 
-## Spot comparison and plugin routing
+## Spot comparison
 
-For an EC2 instance with an instance type and an availability zone,
-`GetProjectedCost` returns the current Spot price, with the on-demand rate and
-an interruption score alongside it. The response is a Spot quote, not the
-price of an on-demand instance. The plugin has no setting that turns the Spot
-quote off.
+The Spot comparison is off by default. Set `FINFOCUS_AWS_CE_SPOT_COMPARISON=true`
+to turn it on. With it on, `GetProjectedCost` for an EC2 instance with an
+instance type and an availability zone returns the current Spot price, with the
+on-demand rate and an interruption score alongside it. With it off, the same
+request returns `InvalidArgument`, and FinFocus core falls back to the next
+plugin, such as `aws-public`, which prices the instance at its on-demand rate.
 
-FinFocus core uses the first plugin that answers a projected-cost request. At
-equal priority it queries plugins in alphabetical order, so it asks `aws-ce`
-before `aws-public`. If you install both and a resource carries a type and a
-zone, the Spot price can replace the on-demand list price. To keep list prices
-for projected costs and use `aws-ce` for the rest, give each plugin its
-features in the core routing file. This example comes from the FinFocus core
-documentation. It hasn't run against this plugin.
+Leave it off when another plugin prices your instances. A Spot quote is not the
+price of an on-demand instance. FinFocus core uses the first plugin that
+answers a projected-cost request, and at equal priority it asks `aws-ce` before
+`aws-public`. With the comparison on, the Spot price can replace the on-demand
+list price in a stack total, and cost drift then reads a false difference.
+Turn it on for a run that asks what Spot would cost, ideally with routing
+that sends only those requests here. The routing example below comes from the
+FinFocus core documentation. It hasn't run against this plugin.
 
 ```yaml
 routing:

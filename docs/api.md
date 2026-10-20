@@ -207,8 +207,9 @@ error instead of an incomplete successful record.
 ## GetProjectedCost
 
 `GetProjectedCost(GetProjectedCostRequest) → GetProjectedCostResponse` projects
-the current UTC calendar month for an account or a service, and compares Spot
-with on-demand for one EC2 instance. The request
+the current UTC calendar month for an account or a service. When
+`FINFOCUS_AWS_CE_SPOT_COMPARISON=true`, it also compares Spot with on-demand for
+one EC2 instance. The request
 requires `resource` with provider `aws` and non-empty `resource_type`.
 `dry_run: true` returns `InvalidArgument`.
 
@@ -229,7 +230,7 @@ would show the fee as its own charge and covered usage at the on-demand rate.
 | --- | --- |
 | Type `aws:account` | All costs visible to the credentials |
 | Type `aws:service` with a non-empty id | Exact Cost Explorer service name in `id` |
-| EC2 instance with an instance type and an availability zone | Spot comparison described below |
+| EC2 instance with an instance type and an availability zone | Spot comparison described below when `FINFOCUS_AWS_CE_SPOT_COMPARISON=true`, otherwise declined |
 | Any other resource, or `aws:service` without an id | Declined with `InvalidArgument` and `ERROR_CODE_INVALID_RESOURCE` |
 
 Cost Explorer cannot forecast one resource, and resource-level data covers 14
@@ -240,8 +241,10 @@ resources from list prices for single resources.
 
 ### Spot comparison
 
-An EC2 instance request that includes an instance type and an availability zone
-returns a Spot quote instead of a forecast. The instance type comes from
+The comparison is off by default. With `FINFOCUS_AWS_CE_SPOT_COMPARISON=true`,
+an EC2 instance request that includes an instance type and an availability zone
+returns a Spot quote instead of a forecast. With it off, the request gets
+`InvalidArgument` like any other single resource. The instance type comes from
 `attributes.instanceType` or `attributes.instance_type`, then `sku`, then tags.
 The zone comes from `attributes.availabilityZone` or `attributes.availability_zone`,
 then tags. `attributes` win when the same input is also on a tag. The SDK still
@@ -265,7 +268,7 @@ on-demand product leaves both fields unset. A present zero is a real price.
 The Spot response is a quote for a Spot instance, not the cost of an on-demand
 instance. FinFocus core takes the first plugin that answers, and at equal
 priority `aws-ce` precedes `aws-public`. See
-[Spot comparison and plugin routing](../README.md#spot-comparison-and-plugin-routing)
+[Spot comparison](../README.md#spot-comparison)
 for the routing setting that keeps list prices for projected costs.
 
 Interruption frequency comes from the public Spot advisor feed. Closed buckets

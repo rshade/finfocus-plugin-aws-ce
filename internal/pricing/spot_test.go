@@ -78,6 +78,7 @@ func TestSpotComparisonUsesZonePriceAndOnDemand(t *testing.T) {
 	spots := &fakeSpotHourly{hourly: 0.03}
 	demands := &fakeOnDemand{hourly: 0.10, ok: true}
 	calc := NewCalculator()
+	calc.spotComparison = true
 	calc.spotQuote = spots
 	calc.onDemandQuote = demands
 	calc.spotRisk = fakeRisk{value: spotInterruption{Label: "5-10%", Score: 0.10, Known: true}}
@@ -122,6 +123,7 @@ func TestSpotComparisonUsesZonePriceAndOnDemand(t *testing.T) {
 
 func TestSpotComparisonOpenBucketLeavesScoreUnset(t *testing.T) {
 	calc := NewCalculator()
+	calc.spotComparison = true
 	calc.spotQuote = &fakeSpotHourly{hourly: 0.03}
 	calc.onDemandQuote = &fakeOnDemand{hourly: 0.10, ok: true}
 	calc.spotRisk = fakeRisk{value: spotInterruption{Label: ">20%", Known: true}}
@@ -139,6 +141,7 @@ func TestSpotComparisonOpenBucketLeavesScoreUnset(t *testing.T) {
 
 func TestSpotComparisonOmitsUnknownOnDemand(t *testing.T) {
 	calc := NewCalculator()
+	calc.spotComparison = true
 	calc.spotQuote = &fakeSpotHourly{hourly: 0.03}
 	calc.onDemandQuote = &fakeOnDemand{}
 	calc.spotRisk = fakeRisk{value: spotInterruption{Label: "<5%", Score: 0.05, Known: true}}
@@ -156,6 +159,7 @@ func TestSpotComparisonOmitsUnknownOnDemand(t *testing.T) {
 
 func TestSpotComparisonAdvisorFailureStillReturnsPrice(t *testing.T) {
 	calc := NewCalculator()
+	calc.spotComparison = true
 	calc.spotQuote = &fakeSpotHourly{hourly: 0.03}
 	calc.onDemandQuote = &fakeOnDemand{hourly: 0.10, ok: true}
 	calc.spotRisk = fakeRisk{err: context.DeadlineExceeded}
@@ -173,6 +177,7 @@ func TestSpotComparisonAdvisorFailureStillReturnsPrice(t *testing.T) {
 
 func TestSpotComparisonMissingPrice(t *testing.T) {
 	calc := NewCalculator()
+	calc.spotComparison = true
 	calc.spotQuote = &fakeSpotHourly{err: client.ErrNoSpotPrice}
 	calc.onDemandQuote = &fakeOnDemand{hourly: 0.10, ok: true}
 	calc.spotRisk = fakeRisk{}
@@ -221,5 +226,31 @@ func TestSpotAdvisorParsesBuckets(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Fatalf("feed calls=%d", calls)
+	}
+}
+
+func TestSpotComparisonIsOffByDefault(t *testing.T) {
+	t.Setenv(SpotComparisonEnv, "")
+	spots := &fakeSpotHourly{hourly: 0.03}
+	calc := NewCalculator()
+	calc.spotQuote = spots
+	calc.onDemandQuote = &fakeOnDemand{hourly: 0.10, ok: true}
+
+	_, err := calc.GetProjectedCost(context.Background(), spotRequest())
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("got %v, want InvalidArgument so another plugin can price the instance", err)
+	}
+	if spots.calls != 0 {
+		t.Fatalf("spot lookups=%d, want 0 while the comparison is off", spots.calls)
+	}
+}
+
+func TestSpotComparisonEnvSwitch(t *testing.T) {
+	cases := map[string]bool{"": false, "false": false, "no": false, "1": false, "true": true, " TRUE ": true}
+	for value, want := range cases {
+		t.Setenv(SpotComparisonEnv, value)
+		if got := NewCalculator().spotComparison; got != want {
+			t.Errorf("%q: spotComparison=%v, want %v", value, got, want)
+		}
 	}
 }

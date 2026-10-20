@@ -114,7 +114,7 @@ make test-integration
   environment variable. A test checks the list with `ValidatePluginSettings`.
 - Never add `Parse`, the cost-parsing remote procedure call, to this plugin. `aws-public` owns `Parse` for the `aws` provider.
 - The plugin also doesn't adopt `GetRecommendationHistory` or the `ParsedResource` action hint. They serve projected-cost and recommendation plugins, not an actual-cost plugin.
-- An EC2 `GetProjectedCost` with an instance type and an availability zone is a Spot comparison.
+- With `FINFOCUS_AWS_CE_SPOT_COMPARISON=true`, an EC2 `GetProjectedCost` with an instance type and an availability zone is a Spot comparison. It is off by default so a Spot quote never replaces an on-demand price.
   Account and service requests stay on `ce:GetCostForecast`. Any other single resource returns `InvalidArgument`.
   Read `attributes` before `sku` and tags. `DescribeSpotPriceHistory` filters instance type, product description, and zone.
   Linux uses `Linux/UNIX`. `pricing:GetProducts` in `us-east-1` supplies the shared-tenancy on-demand hourly rate.

@@ -45,6 +45,9 @@ type Calculator struct {
 	budgets budgetLister
 	// accountID overrides STS when FINFOCUS_AWS_ACCOUNT_ID is empty.
 	accountID func(context.Context) (string, error)
+	// spotComparison answers EC2 instance projections with a Spot quote.
+	// SpotComparisonEnv turns it on. It is off by default.
+	spotComparison bool
 	// now overrides the wall clock. Nil uses time.Now.
 	now func() time.Time
 	// spotQuote, onDemandQuote, and spotRisk override the live Spot comparison.
@@ -92,6 +95,7 @@ func NewCalculator() *Calculator {
 		cacheScope:           rand.Text(),
 		logger:               logger,
 		maxRequestsPerMinute: maxRequestsPerMinuteFromEnv(),
+		spotComparison:       spotComparisonFromEnv(),
 	}
 }
 
@@ -251,7 +255,7 @@ func (c *Calculator) GetProjectedCost(ctx context.Context, req *pbc.GetProjected
 	if req.GetDryRun() {
 		return nil, status.Error(codes.InvalidArgument, "dry run is not supported for Cost Explorer forecasts")
 	}
-	if wantsSpotComparison(resource) {
+	if c.spotComparison && wantsSpotComparison(resource) {
 		return c.quoteSpot(ctx, logger, req)
 	}
 	if !forecastScopeSupported(resource) {

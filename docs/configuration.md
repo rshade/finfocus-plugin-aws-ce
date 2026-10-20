@@ -18,6 +18,7 @@ that launches it. `GetPluginInfo.settings` advertises the settings below.
 | `FINFOCUS_AWS_CE_MAX_BATCH_SIZE` | `100` | Maximum resources per batch, integer from 1 to 1000 |
 | `FINFOCUS_AWS_CE_BATCH_WORKERS` | `10` | Concurrent batch workers, integer from 1 to 50 |
 | `FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` | `0`, unlimited | Cost Explorer attempts and Budgets pages allowed in a rolling minute |
+| `FINFOCUS_AWS_CE_SPOT_COMPARISON` | `false` | `true` answers `GetProjectedCost` for an EC2 instance that has a type and a zone with a Spot quote. Off returns `InvalidArgument` so another plugin can price it |
 | `FINFOCUS_HEALTH_ENDPOINT` | `false` | Serve `/healthz` on the plugin listener and enable Connect |
 | `FINFOCUS_WEB_ENABLED` | `false` | Serve Connect and gRPC-Web alongside gRPC |
 | `FINFOCUS_CORS_ALLOWED_ORIGINS` | Empty | Comma-separated browser origins. Empty allows none |
