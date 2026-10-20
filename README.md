@@ -2,7 +2,7 @@
 
 `finfocus-plugin-aws-ce` retrieves actual AWS costs through Cost Explorer for
 FinFocus. The plugin name is `aws-ce`, and it implements the `finfocus-spec`
-v0.7.8 protocol. It advertises actual costs and Cost Explorer forecasts.
+v0.7.8 protocol. It advertises actual costs, Cost Explorer forecasts, and optimization recommendations.
 `GetProjectedCost` proxies `GetCostForecast` for the next 30 Coordinated
 Universal Time days. A single forecast row copies AWS prediction bounds and
 the requested 80 percent interval. Several rows sum the means and leave the
@@ -212,7 +212,9 @@ to an existing executable. `make e2e`, also available as `make test-e2e`, uses
 an isolated registry, synthetic credentials, and a local fake AWS endpoint.
 It asserts actual cost results from core. A successful exit with no data fails.
 `make conformance` runs the official Standard suite against the plugin's
-actual-only capabilities. Ordinary tests never query live AWS services.
+advertised capabilities against offline AWS fixtures. The pinned suite does not
+yet exercise recommendations, so a companion RPC check covers that capability.
+Ordinary tests never query live AWS services.
 
 The SDK dependency pins `v0.7.9-0.20261020013049-bc3a94391af7`, which includes
 the [upstream capability-aware conformance fix](https://github.com/rshade/finfocus-spec/pull/652).
@@ -236,3 +238,82 @@ each document you edit, as described in the contributor guide.
 Licensed under [Apache 2.0](LICENSE). Report problems in the
 [repository issue tracker](https://github.com/rshade/finfocus-plugin-aws-ce/issues).
 Release-token maintenance and development rules are in [CLAUDE.md](CLAUDE.md).
+
+## Optimization recommendations
+
+`GetRecommendations` reads existing AWS Cost Explorer recommendations. The AWS
+identity needs `ce:GetRightsizingRecommendation` and
+`ce:GetSavingsPlansPurchaseRecommendation`, in addition to permissions needed by
+other RPCs. Cost Explorer must be enabled and the account must already have
+eligible usage and recommendation datasets. Enable rightsizing recommendations
+in AWS and allow AWS time to prepare its dataset. Savings Plans recommendations
+must already be available; this plugin never starts recommendation generation,
+purchases commitments, or modifies resources. Payer visibility and AWS account
+permissions determine which recommendations are available.
+
+An unfiltered request queries EC2 rightsizing and both Compute and EC2 Instance
+Savings Plans. Rightsizing uses `AmazonEC2`, benefits considered, and
+same-instance-family targets. Only the first AWS-ranked modify target becomes a
+recommendation; alternative targets are not added together. Savings Plans use
+payer scope, `THIRTY_DAYS`, `ONE_YEAR`, and `NO_UPFRONT` for both `COMPUTE_SP` and
+`EC2_INSTANCE_SP`. These parameters cannot be overridden through resource tags
+or this RPC. AWS supplies savings estimates; priority is neutral `MEDIUM`, and
+confidence, ROI, and break-even metrics are absent.
+
+For a running gRPC plugin with reflection enabled, request examples are:
+
+```bash
+grpcurl -plaintext -d '{}' localhost:PORT finfocus.v1.CostSourceService/GetRecommendations
+grpcurl -plaintext -d '{"filter":{"actionType":"RECOMMENDATION_ACTION_TYPE_RIGHTSIZE","accountId":"123456789012","region":"us-east-1"},"projectionPeriod":"annual","pageSize":50}' localhost:PORT finfocus.v1.CostSourceService/GetRecommendations
+grpcurl -plaintext -d '{"filter":{"actionType":"RECOMMENDATION_ACTION_TYPE_PURCHASE_COMMITMENT"}}' localhost:PORT finfocus.v1.CostSourceService/GetRecommendations
+```
+
+Action and category filters select applicable sources before AWS access. EC2
+resource filters accept `ec2`, `ec2:Instance`, and `aws:ec2/instance:Instance`;
+Savings Plans use `savingsplans:Account`. Account filters are pushed to AWS;
+rightsizing region filters are also pushed to AWS. Other filters apply to mapped
+records. Target resources require provider and type, and supplied SKU, region,
+tags, ID, and ARN constrain the match. At most 100 targets are accepted. Account
+identity is retained in recommendation metadata as `account_id`.
+
+Savings Plans are account-level purchase opportunities, not purchased plan ARNs
+or existing EC2 instances. Compute plans without a region cannot match regional
+or EC2 instance targets. Missing confidence or generation timestamps cannot
+satisfy filters requiring those fields. Excluded recommendation IDs are honored;
+there is no persistent dismissal store.
+
+The default projection is `monthly`; `daily` divides AWS monthly savings by 30
+and `annual` multiplies them by 12. These are display conversions, not new AWS
+forecasts. Minimum savings uses the selected period. Original monthly savings
+and the conversion convention remain in metadata. Savings across rightsizing
+and commitments can overlap; page totals are potential opportunities and must
+not be treated as guaranteed additive savings.
+
+Pagination defaults to 50 records and caps pages at 1000. Pass the returned
+`nextPageToken` unchanged on the next otherwise identical request. Sorting has
+an ID tie-breaker; offset pagination queries AWS again and provides no snapshot
+consistency when AWS regenerates data. Summaries describe the returned page
+only. Each AWS query follows up to 100 pages and rejects repeated tokens.
+Retries consume the configured request budget. Results are not cached across
+requests, and per-request credentials and assume-role settings apply to every
+selected source.
+
+Empty datasets return a successful empty response. Invalid filters, projections,
+targets, and tokens return `InvalidArgument` before AWS access. Permission,
+throttling, cancellation, and deadline failures use the existing AWS error
+mapping. Unavailable datasets return an availability/precondition error;
+malformed financial data and mixed currencies return `DataLoss`. Any selected
+source failure fails the entire RPC, with no partial result.
+
+Live verification requires explicit opt-in and existing AWS datasets:
+
+```bash
+make build
+FINFOCUS_AWS_LIVE=true go test -tags awslive ./test/live -run '^TestAWSRecommendations$' -v -count=1
+```
+
+This reads real AWS data and may incur AWS API charges. The test validates
+returned records and explicitly reports empty datasets. It does not require the
+core binary. Ordinary tests and tagged runs without `FINFOCUS_AWS_LIVE=true`
+never contact AWS for this test. Live recommendation verification has not been
+run as part of this implementation.

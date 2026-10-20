@@ -95,7 +95,8 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 Integration tests build the plugin and query its real gRPC server through
 `internal/testutil.StartPlugin`. The custom checks in `test/conformance` cover
 protocol validation and use `pluginsdk.ValidateFocusRecord` for FOCUS records.
-The repository doesn't run the upstream SDK conformance suite.
+`make conformance` runs the pinned upstream Standard suite against offline AWS
+fixtures, with a companion recommendation RPC check.
 
 ```bash
 make test-integration
@@ -107,7 +108,7 @@ make test-integration
   environment variable. A test checks the list with `ValidatePluginSettings`.
 - Never add `Parse`, the cost-parsing remote procedure call, to this plugin. `aws-public` owns `Parse` for the `aws` provider.
 - The plugin also doesn't adopt `GetRecommendationHistory`, the Spot on-demand equivalent field, or the `ParsedResource`
-  action hint. They serve projected-cost and recommendation plugins, not an actual-cost plugin.
+  action hint. These fields remain outside this plugin’s implemented RPC scope.
 
 ## Dependencies
 
@@ -199,3 +200,15 @@ Before the first release PR, the owner confirms the secret exists and that a
 manual Release Please run succeeds without missing-token or authentication
 errors. Agents don't read or set the token. Merge the release PR to create a
 plain `vX.Y.Z` tag and release. The release-created event runs `goreleaser`.
+
+## AWS recommendations (issue #13)
+
+`GetRecommendations` implements EC2 rightsizing and Compute/EC2 Instance Savings
+Plans together. See `specs/005-aws-ce-recommendations-plugin/spec.md` and README
+for defaults, filters, permissions, and limitations. Keep SDK validation,
+selection, pagination, summary helpers, and `zerolog` operation logging. Preserve
+request-scoped credentials, retry budgets, the 100-page AWS cap, and all-source
+failure semantics. Never generate recommendations, purchase plans, or mutate
+resources. Ordinary tests use offline fixtures. The `awslive` recommendation
+test additionally requires `FINFOCUS_AWS_LIVE=true`; do not run it without an
+explicit request for real AWS verification. Live verification remains pending.

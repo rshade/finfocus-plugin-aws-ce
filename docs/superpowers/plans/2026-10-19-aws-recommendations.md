@@ -44,6 +44,7 @@
 ### Task 1: Retrieve recommendations through the existing AWS client
 
 **Interfaces:**
+
 - Define `RecommendationsAPI` with AWS SDK signatures for `GetRightsizingRecommendation` and `GetSavingsPlansPurchaseRecommendation`.
 - Produce `(*Client).ListRightsizingRecommendations(ctx context.Context, input costexplorer.GetRightsizingRecommendationInput) ([]costexplorer.GetRightsizingRecommendationOutput, error)`.
 - Produce `(*Client).ListSavingsPlansRecommendations(ctx context.Context, input costexplorer.GetSavingsPlansPurchaseRecommendationInput) ([]costexplorer.GetSavingsPlansPurchaseRecommendationOutput, error)`.
@@ -58,6 +59,7 @@
 ### Task 2: Map AWS recommendations without fabricating metrics
 
 **Interfaces:**
+
 - Consume the AWS outputs from Task 1.
 - Produce `mapRightsizingRecommendations(pages []costexplorer.GetRightsizingRecommendationOutput) ([]*pbc.Recommendation, error)`.
 - Produce `mapSavingsPlansRecommendations(pages []costexplorer.GetSavingsPlansPurchaseRecommendationOutput) ([]*pbc.Recommendation, error)`.
@@ -74,6 +76,7 @@
 ### Task 3: Implement validated recommendation selection and response pages
 
 **Interfaces:**
+
 - Consume Task 1 methods via `clientForCall`, and Task 2 mapping/projection functions.
 - Produce `(*Calculator).GetRecommendations(ctx context.Context, req *pbc.GetRecommendationsRequest) (*pbc.GetRecommendationsResponse, error)`.
 - Keep auxiliary validation and matching functions private to `recommendations.go`.

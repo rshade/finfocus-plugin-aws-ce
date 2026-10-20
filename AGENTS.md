@@ -107,3 +107,15 @@ Use `sdk.go` for the main entry point.
 - `ParsePortFlag()` parses `--port`. Call `flag.Parse()` first.
 - `Serve(ctx, config)` starts the gRPC server.
 - Implement `BudgetsProvider` and `RecommendationsProvider` for new features.
+
+## AWS recommendations (issue #13)
+
+`GetRecommendations` implements EC2 rightsizing and Compute/EC2 Instance Savings
+Plans together. See `specs/005-aws-ce-recommendations-plugin/spec.md` and README
+for defaults, filters, permissions, and limitations. Keep SDK validation,
+selection, pagination, summary helpers, and `zerolog` operation logging. Preserve
+request-scoped credentials, retry budgets, the 100-page AWS cap, and all-source
+failure semantics. Never generate recommendations, purchase plans, or mutate
+resources. Ordinary tests use offline fixtures. The `awslive` recommendation
+test additionally requires `FINFOCUS_AWS_LIVE=true`; do not run it without an
+explicit request for real AWS verification. Live verification remains pending.
