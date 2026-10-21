@@ -18,6 +18,7 @@ For credential sources and host-supplied credentials, see
 | EC2 rightsizing recommendations | `ce:GetRightsizingRecommendation` | [Rightsizing enabled](#account-settings) |
 | Savings Plans recommendations | `ce:GetSavingsPlansPurchaseRecommendation` | An existing AWS recommendation |
 | Non-EC2 reservation recommendations | `ce:GetReservationPurchaseRecommendation` | RDS, Redshift, ElastiCache, or OpenSearch usage |
+| Historical carbon reports (opt-in) | `sustainability:GetEstimatedCarbonEmissions` | `carbon_enabled=true` and published monthly data visible to the credentials |
 | Assume a host-supplied `role_arn` | `sts:AssumeRole` on the source identity | A [trust policy](#assume-a-role) on the target role |
 
 `GetRecommendations` with no filter queries rightsizing, both Savings Plans types,
@@ -26,8 +27,9 @@ denied, so grant all four recommendation actions together or narrow the request
 with a [resource type filter](recommendations.md#choose-sources). `GetCallerIdentity`
 in STS needs no IAM permission.
 
-Cost Explorer, Budgets, and Price List are billing services, so their IAM actions
-accept only `"Resource": "*"`.
+Cost Explorer, Budgets, Price List, and the Sustainability report action accept
+only `"Resource": "*"`. See [historical carbon permissions](CREDENTIALS.md#historical-carbon-permissions)
+for visibility rules and a minimal report policy.
 
 ## Full policy
 
@@ -63,6 +65,12 @@ This policy covers every feature. Remove statements you don't need.
       "Sid": "Budgets",
       "Effect": "Allow",
       "Action": "budgets:ViewBudget",
+      "Resource": "*"
+    },
+    {
+      "Sid": "HistoricalCarbon",
+      "Effect": "Allow",
+      "Action": "sustainability:GetEstimatedCarbonEmissions",
       "Resource": "*"
     },
     {

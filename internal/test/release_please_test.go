@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rshade/finfocus-spec/sdk/go/registry"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -82,6 +83,9 @@ func TestPluginManifests(t *testing.T) {
 		require.Equal(t, "aws-ce", metadata["name"])
 		spec, ok := manifest["specification"].(map[string]any)
 		require.True(t, ok)
-		require.Equal(t, []any{"actual_cost"}, spec["capabilities"])
+		require.Equal(t, []any{"actual_costs", "projected_costs", "budgets", "recommendations", "batch_cost"}, spec["capabilities"])
+		for _, capability := range spec["capabilities"].([]any) {
+			require.True(t, registry.IsValidPluginCapability(capability.(string)), "%s: %v", name, capability)
+		}
 	}
 }

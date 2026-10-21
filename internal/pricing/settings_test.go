@@ -34,6 +34,7 @@ func TestGetPluginInfo_Settings(t *testing.T) {
 		BatchWorkersEnv:         strconv.Itoa(DefaultBatchWorkers),
 		maxRequestsEnv:          "",
 		SpotComparisonEnv:       "false",
+		CarbonEnabledEnv:        "false",
 		HealthEndpointEnv:       "false",
 		WebEnabledEnv:           "false",
 		CORSAllowedOriginsEnv:   "",

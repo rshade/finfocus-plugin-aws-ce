@@ -11,9 +11,10 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.339.0
 	github.com/aws/aws-sdk-go-v2/service/pricing v1.49.4
 	github.com/aws/aws-sdk-go-v2/service/sts v1.51.4
+	github.com/aws/aws-sdk-go-v2/service/sustainability v1.9.4
 	github.com/aws/smithy-go v1.28.5
 	github.com/rs/zerolog v1.35.1
-	github.com/rshade/finfocus-spec v0.7.9-0.20261020013049-bc3a94391af7
+	github.com/rshade/finfocus-spec v0.7.9
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12

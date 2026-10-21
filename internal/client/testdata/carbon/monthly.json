@@ -1,0 +1,1 @@
+{"Results": [{"DimensionsValues": {"USAGE_ACCOUNT_ID": "123456789012", "REGION": "eu-west-1", "SERVICE": "AmazonEC2"}, "EmissionsValues": {"TOTAL_MBM_CARBON_EMISSIONS": {"Unit": "MTCO2e", "Value": 1.25}}, "ModelVersion": "2.0.0", "TimePeriod": {"Start": "2026-01-01T00:00:00Z", "End": "2026-02-01T00:00:00Z"}}], "NextToken": "aws-next"}

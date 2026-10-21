@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap outlines the development path for `finfocus-plugin-aws-ce`, prioritizing direct API integration, FOCUS standard compliance, and adherence to the `finfocus-spec` v0.7.8.
+This roadmap outlines the development path for `finfocus-plugin-aws-ce`, prioritizing direct API integration, FOCUS standard compliance, and adherence to the `finfocus-spec` v0.7.9.
 
 > **Constitutional reference:** all features must comply with [CONTEXT.md](./CONTEXT.md) boundaries. The project rejects features that violate these boundaries.
 
@@ -33,8 +33,7 @@ That earlier comparison predates the current commitment-discovery path.
 The current live harness remains unverified. Resource-level verification is separate.
 The whole-repository Markdown check passes. Vulnerability
 scanning reports gRPC v1.84.0 through a vulnerability database version-range mismatch.
-The upstream advisory lists this stable version as patched. See the
-[audit security correction](./docs/audit-2026-10-07.md#security-correction-on-2026-10-07).
+The upstream advisory lists this stable version as patched.
 The owner removed Docker support.
 The v0.1.0 release includes binary archives and checksums. On 2026-10-19 the owner closed the issues this release
 finished and the duplicates listed under [Rejected and out of scope](#rejected-and-out-of-scope).

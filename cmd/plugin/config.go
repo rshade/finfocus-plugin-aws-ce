@@ -40,6 +40,7 @@ FINFOCUS_CORS_ALLOWED_ORIGINS
 FINFOCUS_CORS_ALLOW_CREDENTIALS
 FINFOCUS_CORS_ALLOWED_HEADERS
 FINFOCUS_AWS_ACCOUNT_ID
+FINFOCUS_AWS_CARBON_ENABLED
 `
 
 // webConfigFromEnv reads the health, Connect, and CORS settings.
@@ -121,3 +122,6 @@ func batchSetting(name string, fallback, maximum int) (int, error) {
 	}
 	return number, nil
 }
+
+// carbonSettingsFromEnv validates the opt-in before constructing any AWS client.
+func carbonSettingsFromEnv() (bool, error) { return envBool(pricing.CarbonEnabledEnv, false) }

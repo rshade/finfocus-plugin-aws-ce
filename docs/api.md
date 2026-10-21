@@ -36,6 +36,11 @@ request and returns discovery metadata without contacting AWS.
 The [pinned SDK revision](../go.mod) can differ from the reported protocol
 version. AWS credential-chain settings aren't part of `settings`.
 
+The `carbon_enabled` BOOL setting is always advertised, with environment name
+`FINFOCUS_AWS_CARBON_ENABLED` and default `false`. Enabling it adds the distinct
+`HISTORICAL_CARBON` capability and appends `GetCarbonEmissions` to
+`metadata.supported_rpcs`. It does not advertise projected `CARBON` support.
+
 ### Supports
 
 `Supports(SupportsRequest) → SupportsResponse` checks whether the plugin can
@@ -62,11 +67,61 @@ types when requesting costs.
 | `reason` | string | Rejection reason, resource opt-in requirements, or unverified support |
 | `capabilities_enum` | repeated `PluginCapability` | Actual costs, forecasts, budgets, and recommendations |
 | `capabilities` | map of `bool` values | Legacy field. Use `capabilities_enum` |
-| `supported_metrics` | repeated `MetricKind` | Empty. No sustainability metrics |
+| `supported_metrics` | repeated `MetricKind` | Empty. Historical inventory uses its own report RPC |
 
 Unsupported resources return `supported: false`, not a failed remote procedure
 call. This check doesn't contact AWS or confirm permissions, resource existence,
 Cost Explorer opt-in, or available billing data.
+
+## GetCarbonEmissions
+
+`GetCarbonEmissions(GetCarbonEmissionsRequest) → GetCarbonEmissionsResponse`
+retrieves AWS-reported monthly emissions estimates. It requires the
+`carbon_enabled` opt-in and is separate from resource cost queries.
+
+| Request field | Type | Requirement and behavior |
+| --- | --- | --- |
+| `start`, `end` | `Timestamp` | Required inclusive start and exclusive end, at UTC month boundaries; end follows start |
+| `account_ids`, `regions`, `services` | repeated string | Optional exact AWS dimension filters; OR within a dimension, AND across dimensions |
+| `method` | `CarbonAccountingMethod` | Market-based or location-based; unspecified selects market-based |
+| `scope` | `CarbonEmissionsScope` | Total, scope 1, scope 2, or scope 3; unspecified selects total |
+| `page_size` | int32 | Zero selects 50; explicit range 1 to 1000 |
+| `page_token` | string | Opaque continuation from this plugin, with the same query and credential context |
+
+Continuation tokens bind the resolved base AWS credentials and any target role.
+Rotating credentials in the default chain invalidates an existing continuation;
+restart the report with the new credentials. Invalid token signatures, queries,
+and expired tokens are rejected before credential acquisition. A valid token
+may require credential acquisition to check its caller binding, but a caller
+mismatch is rejected before creating the report client or assuming the explicit
+target role. Signed cursors contain credential-context hashes, never credential
+values.
+
+Each `records` entry retains its stable `id`, provider `aws`, source
+`aws-sustainability`, usage account, region, service, original monthly start/end,
+resolved method/scope, AWS `model_version`, explicit `value` in `gCO2e`, and
+`retrieved_at`. Missing numeric values and malformed provenance fail validation.
+AWS values in `MTCO2e` are converted to grams with a factor of 1000000.
+
+`next_page_token` is empty on the last page. Pass nonempty tokens back unchanged
+with the same query and credentials. Tokens expire after 15 minutes and become
+invalid when the plugin restarts. A walk is limited to 100 AWS pages; repeated
+AWS tokens or results beyond that limit fail instead of silently truncating.
+Clients must collect all pages successfully before presenting a report.
+
+An empty result means no available records, without asserting why. Only an
+explicit AWS zero produces a zero-valued record. Do not assign monthly
+aggregates to individual resources, prorate partial months, add market-based
+and location-based totals, or add overlapping scope totals.
+
+A valid disabled request returns `FailedPrecondition` before credential or AWS
+access. The SDK may reject a malformed request first with `InvalidArgument`.
+Permission failures return `PermissionDenied`, invalid sessions return
+`Unauthenticated`, throttling returns `ResourceExhausted`, and cancellation
+retains the caller's cancellation status. No carbon data is cached.
+
+See [historical carbon reporting](carbon.md) for configuration, permissions,
+reporting limitations and the companion FinFocus command.
 
 ## GetActualCost
 

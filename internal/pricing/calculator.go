@@ -26,6 +26,9 @@ import (
 
 // Calculator implements the FinFocus plugin interface for AWS Cost Explorer.
 type Calculator struct {
+	carbonEnabled bool
+	openCarbon    func(context.Context, client.Config) (carbonReader, error)
+	carbonKey     string
 	*pluginsdk.BasePlugin
 	ceClient      *client.Client
 	cache         *CacheManager
@@ -66,18 +69,28 @@ var (
 	_ pluginsdk.PluginInfoProvider           = (*Calculator)(nil)
 	_ pluginsdk.PerRequestCredentialConsumer = (*Calculator)(nil)
 	_ pluginsdk.RecommendationsProvider      = (*Calculator)(nil)
+	_ pluginsdk.HistoricalCarbonProvider     = (*Calculator)(nil)
 	_ pluginsdk.BudgetsProvider              = (*Calculator)(nil)
 )
 
 const (
 	pluginName = "aws-ce"
 	// specVersion must keep the leading v. pluginsdk.ValidateSpecVersion rejects "0.7.0".
-	specVersion   = "v0.7.8"
+	specVersion   = "v0.7.9"
 	supportedRPCs = "GetActualCost,GetProjectedCost,GetBudgets,GetRecommendations,Supports,GetPluginInfo,BatchCost"
 )
 
+// CalculatorOption configures a calculator before requests are served.
+type CalculatorOption func(*Calculator)
+
+// WithCarbonEnabled enables historical aggregate emissions reporting.
+// The caller must validate environment configuration before constructing the calculator.
+func WithCarbonEnabled(enabled bool) CalculatorOption {
+	return func(c *Calculator) { c.carbonEnabled = enabled }
+}
+
 // NewCalculator creates a new AWS Cost Explorer cost calculator plugin.
-func NewCalculator() *Calculator {
+func NewCalculator(options ...CalculatorOption) *Calculator {
 	base := pluginsdk.NewBasePlugin(pluginName)
 
 	// Configure supported providers
@@ -92,8 +105,9 @@ func NewCalculator() *Calculator {
 	// Configure logger with component field
 	logger := log.With().Str("component", "finfocus-plugin-aws-ce").Logger()
 
-	return &Calculator{
+	calc := &Calculator{
 		BasePlugin:           base,
+		carbonKey:            rand.Text(),
 		ceClient:             nil, // Will be initialized lazily
 		cache:                cm,
 		cacheScope:           rand.Text(),
@@ -103,6 +117,10 @@ func NewCalculator() *Calculator {
 		maxWait:              maxWaitFromEnv(),
 		batcher:              newResourceBatcher(batchWindowFromEnv()),
 	}
+	for _, option := range options {
+		option(calc)
+	}
+	return calc
 }
 
 // traceLogger attaches the context trace id once. WithTrace on the returned
@@ -119,7 +137,7 @@ func (c *Calculator) GetPluginInfo(ctx context.Context, _ *pbc.GetPluginInfoRequ
 	done := pluginsdk.LogOperation(logger, "GetPluginInfo")
 	defer done()
 
-	return &pbc.GetPluginInfoResponse{
+	response := &pbc.GetPluginInfoResponse{
 		Name:        pluginName,
 		Version:     version.Version,
 		SpecVersion: specVersion,
@@ -135,7 +153,12 @@ func (c *Calculator) GetPluginInfo(ctx context.Context, _ *pbc.GetPluginInfoRequ
 			pbc.PluginCapability_PLUGIN_CAPABILITY_BATCH_COST,
 		},
 		Settings: pluginSettings(),
-	}, nil
+	}
+	if c.carbonEnabled {
+		response.Capabilities = append(response.Capabilities, pbc.PluginCapability_PLUGIN_CAPABILITY_HISTORICAL_CARBON)
+		response.Metadata["supported_rpcs"] += ",GetCarbonEmissions"
+	}
+	return response, nil
 }
 
 // NewCalculatorWithClient creates a calculator with a pre-configured client.
