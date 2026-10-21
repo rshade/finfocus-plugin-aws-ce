@@ -1,0 +1,7 @@
+{
+  // OpenSpec generates change artifacts that start at an H2 heading.
+  "config": {
+    "extends": "../../.markdownlint.json",
+    "MD041": false
+  }
+}
