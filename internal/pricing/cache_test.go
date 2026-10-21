@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
 	"github.com/rs/zerolog"
+	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
 	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -244,6 +245,7 @@ func TestGetActualCost_RateLimit(t *testing.T) {
 		api := pagingCostAPI(1, false)
 		calc, buf := cachedCalc(t, api)
 		calc.maxRequestsPerMinute = 3
+		calc.maxWait = 0
 		start, end := closedHistoryWindow()
 		req := costRequest("AmazonS3", "", start, end, nil)
 		if _, err := calc.GetActualCost(context.Background(), req); err != nil {
@@ -269,6 +271,7 @@ func TestGetActualCost_RateLimit(t *testing.T) {
 		api := pagingCostAPI(5, false)
 		calc, _ := cachedCalc(t, api)
 		calc.maxRequestsPerMinute = 3
+		calc.maxWait = 0
 		start, end := closedHistoryWindow()
 		_, err := calc.GetActualCost(context.Background(), costRequest("AmazonS3", "", start, end, nil))
 		assertRateLimited(t, err)
@@ -365,4 +368,32 @@ func ceRequestCounts(t *testing.T, buf *bytes.Buffer) []int {
 		counts = append(counts, int(n))
 	}
 	return counts
+}
+
+func TestGetActualCost_OverBudgetQueuesAndCompletes(t *testing.T) {
+	api := pagingCostAPI(1, false)
+	calc, _ := cachedCalc(t, api)
+	var waits []time.Duration
+	calc.maxRequestsPerMinute = 3
+	calc.pacerOnce.Do(func() {
+		calc.pacer = client.NewPacer(client.PacerConfig{
+			PerMinute: 3, MaxWait: 2 * time.Minute,
+			Sleep: func(_ context.Context, d time.Duration) error { waits = append(waits, d); return nil },
+		})
+	})
+	start, end := closedHistoryWindow()
+	if _, err := calc.GetActualCost(context.Background(), costRequest("AmazonS3", "", start, end, nil)); err != nil {
+		t.Fatalf("first call: %v", err)
+	}
+	req2 := costRequest("service-total", "", start, end, nil)
+	req2.Resource = &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:service", Id: "Amazon Elastic Compute Cloud - Compute"}
+	if _, err := calc.GetActualCost(context.Background(), req2); err != nil {
+		t.Fatalf("an over-budget request should wait its turn, got %v", err)
+	}
+	if len(waits) == 0 {
+		t.Fatal("the second request used the budget up and should have queued")
+	}
+	if len(api.costCalls) != 2 {
+		t.Fatalf("endpoint calls = %d, want both queries to complete", len(api.costCalls))
+	}
 }

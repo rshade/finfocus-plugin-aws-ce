@@ -136,6 +136,11 @@ make test-integration
 - `GetRecommendations` combines optimization opportunities and anomalies. Category `ANOMALY` selects `ce:GetAnomalies` for the last 90 days
 - Vale and reviewdog skip `CHANGELOG.md` because Release Please generates it
 - Client initializes on the first API call
+- Cost Explorer requests go through one shared `client.Pacer` (`internal/client/pacer.go`). Over budget they queue up to `FINFOCUS_AWS_CE_MAX_WAIT_SECONDS`, and an AWS throttle starts a shared cooldown. Tests that expect the old fail-fast set `calc.maxWait = 0`
+- Resource-level lookups join through `resourceBatcher` (`internal/pricing/batcher.go`), keyed by account, service and period. A group with one caller gets its rows unsplit. Splitting assumes the row key is the bare RESOURCE_ID, which isn't verified against real account data
+- Commitment discovery is cached for five minutes and single-flighted per client. Reservation and Savings Plan lookups run side by side, so test servers and hooks must tolerate concurrent calls
+- `BATCH_COST` is advertised without a custom `BatchCostHandler`: the SDK fan-out (50 workers by default) feeds the batcher. The SDK's batch result helpers are unexported, so a handler would copy them
+- `make test` fails `TestMakeInstallLocal` and `TestPluginSubprocessGRPC` intermittently when the whole suite runs at once, on unchanged `main` too. Each passes when run alone
 
 ## Plugin SDK reference for v0.5.2
 

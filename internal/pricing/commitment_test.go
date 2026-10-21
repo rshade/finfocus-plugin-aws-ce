@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -266,6 +267,7 @@ func TestGetActualCostCommitmentAttributionThroughRPC(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
+	sort.Strings(discoveries)
 	if !reflect.DeepEqual(discoveries, []string{"RESERVATION_ID", "SAVINGS_PLAN_ARN"}) || len(queries) != 3 {
 		t.Fatalf("discoveries=%v queries=%d", discoveries, len(queries))
 	}

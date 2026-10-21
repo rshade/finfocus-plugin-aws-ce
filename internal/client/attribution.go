@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -46,13 +47,24 @@ func (c *Client) attributedCosts(ctx context.Context, filter *types.Expression, 
 	if err != nil {
 		return nil, err
 	}
-	reservations, err := c.commitmentIDs(ctx, filter, interval, types.DimensionReservationId)
-	if err != nil {
-		return nil, err
+	var reservations, savings []string
+	var reservationErr, savingsErr error
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		reservations, reservationErr = c.commitmentIDs(ctx, filter, interval, types.DimensionReservationId)
+	}()
+	go func() {
+		defer wg.Done()
+		savings, savingsErr = c.commitmentIDs(ctx, filter, interval, types.DimensionSavingsPlanArn)
+	}()
+	wg.Wait()
+	if reservationErr != nil {
+		return nil, reservationErr
 	}
-	savings, err := c.commitmentIDs(ctx, filter, interval, types.DimensionSavingsPlanArn)
-	if err != nil {
-		return nil, err
+	if savingsErr != nil {
+		return nil, savingsErr
 	}
 	var rows []CostResult
 	reservationFilter := dimensionFilter(types.DimensionReservationId, reservations)
@@ -86,6 +98,16 @@ func (c *Client) attributedCosts(ctx context.Context, filter *types.Expression, 
 }
 
 func (c *Client) commitmentIDs(ctx context.Context, filter *types.Expression, interval *types.DateInterval, dimension types.Dimension) ([]string, error) {
+	key, err := discoveryKey(dimension, interval, filter)
+	if err != nil {
+		return c.discoverCommitmentIDs(ctx, filter, interval, dimension)
+	}
+	return c.discovery.get(ctx, key, func(ctx context.Context) ([]string, error) {
+		return c.discoverCommitmentIDs(ctx, filter, interval, dimension)
+	})
+}
+
+func (c *Client) discoverCommitmentIDs(ctx context.Context, filter *types.Expression, interval *types.DateInterval, dimension types.Dimension) ([]string, error) {
 	var token *string
 	var ids []string
 	seen := make(map[string]bool)

@@ -13,7 +13,7 @@ func TestBatchSettings(t *testing.T) {
 		wantMax, wantWorkers int
 		bad                  string
 	}{
-		{name: "defaults", wantMax: 100, wantWorkers: 10},
+		{name: "defaults", wantMax: 100, wantWorkers: 50},
 		{name: "configured", max: "12", workers: "3", wantMax: 12, wantWorkers: 3},
 		{name: "invalid size", max: "abc", bad: "FINFOCUS_AWS_CE_MAX_BATCH_SIZE"},
 		{name: "negative workers", workers: "-1", bad: "FINFOCUS_AWS_CE_BATCH_WORKERS"},

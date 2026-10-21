@@ -212,6 +212,7 @@ func TestRecommendationsBudget(t *testing.T) {
 	m := &recommendationAPI{rights: rightsizingFixture()}
 	c := recommendationCalculator(m)
 	c.maxRequestsPerMinute = 1
+	c.maxWait = 0
 	r, err := c.GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{})
 	require.Nil(t, r)
 	require.Equal(t, codes.ResourceExhausted, status.Code(err))

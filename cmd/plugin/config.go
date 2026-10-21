@@ -16,7 +16,7 @@ func batchSettingsFromEnv() (int, int, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	workers, err := batchSetting(pricing.BatchWorkersEnv, pluginsdk.DefaultBatchWorkers, pluginsdk.MaxBatchWorkers)
+	workers, err := batchSetting(pricing.BatchWorkersEnv, pricing.DefaultBatchWorkers, pluginsdk.MaxBatchWorkers)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -32,6 +32,8 @@ FINFOCUS_LOG_FILE
 FINFOCUS_AWS_CE_MAX_BATCH_SIZE
 FINFOCUS_AWS_CE_BATCH_WORKERS
 FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE
+FINFOCUS_AWS_CE_MAX_WAIT_SECONDS
+FINFOCUS_AWS_CE_BATCH_WINDOW_MS
 FINFOCUS_HEALTH_ENDPOINT
 FINFOCUS_WEB_ENABLED
 FINFOCUS_CORS_ALLOWED_ORIGINS
