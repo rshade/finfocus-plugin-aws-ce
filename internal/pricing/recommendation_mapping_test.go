@@ -93,8 +93,10 @@ func TestMapSavingsPlansRecommendationsEmpty(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, recs)
 	pages[0].SavingsPlansPurchaseRecommendation.SavingsPlansType = types.SupportedSavingsPlansTypeSagemakerSp
-	_, err = mapSavingsPlansRecommendations(pages)
-	require.Error(t, err)
+	// Empty datasets have no recommendations to validate, regardless of plan type.
+	recs, err = mapSavingsPlansRecommendations(pages)
+	require.NoError(t, err)
+	require.Empty(t, recs)
 	pages[0].SavingsPlansPurchaseRecommendation.SavingsPlansType = ""
 	pages[0].SavingsPlansPurchaseRecommendation.SavingsPlansPurchaseRecommendationDetails = []types.SavingsPlansPurchaseRecommendationDetail{{
 		AccountId: aws.String("123"), EstimatedMonthlySavingsAmount: aws.String("1"), CurrencyCode: aws.String("USD"),

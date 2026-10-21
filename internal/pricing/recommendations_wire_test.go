@@ -9,6 +9,8 @@ import (
 	"net"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
+	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
 	"github.com/rs/zerolog"
 	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
 	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
@@ -18,6 +20,42 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
+
+type emptySavingsPlansAPI struct {
+	recommendationAPI
+	planType types.SupportedSavingsPlansType
+}
+
+func (m *emptySavingsPlansAPI) GetSavingsPlansPurchaseRecommendation(context.Context, *costexplorer.GetSavingsPlansPurchaseRecommendationInput, ...func(*costexplorer.Options)) (*costexplorer.GetSavingsPlansPurchaseRecommendationOutput, error) {
+	return &costexplorer.GetSavingsPlansPurchaseRecommendationOutput{
+		SavingsPlansPurchaseRecommendation: &types.SavingsPlansPurchaseRecommendation{SavingsPlansType: m.planType},
+	}, nil
+}
+
+func TestRecommendationsEmptySDKResponse(t *testing.T) {
+	for _, planType := range []types.SupportedSavingsPlansType{"", types.SupportedSavingsPlansTypeComputeSp, types.SupportedSavingsPlansTypeSagemakerSp} {
+		t.Run("plan_type="+string(planType), func(t *testing.T) {
+			api := &emptySavingsPlansAPI{planType: planType}
+			calc := NewCalculatorWithClient(client.NewClientWithAPI(api, "us-east-1"))
+			srv := pluginsdk.NewTestServer(t, calc)
+			defer srv.Close()
+			resp, err := srv.Client().GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{
+				Filter: &pbc.RecommendationFilter{Category: pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_COST},
+			})
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.Empty(t, resp.GetRecommendations())
+			require.Empty(t, resp.GetNextPageToken())
+			summary := resp.GetSummary()
+			require.NotNil(t, summary)
+			require.NoError(t, pluginsdk.ValidateRecommendationSummary(summary))
+			require.Zero(t, summary.GetTotalRecommendations())
+			require.Zero(t, summary.GetTotalEstimatedSavings())
+			require.Empty(t, summary.GetCurrency())
+			require.Equal(t, "monthly", summary.GetProjectionPeriod())
+		})
+	}
+}
 
 func TestRecommendationsWire(t *testing.T) {
 	var logs bytes.Buffer

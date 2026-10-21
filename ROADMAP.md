@@ -22,6 +22,7 @@ This roadmap outlines the development path for `finfocus-plugin-aws-ce`, priorit
 | ✅ Done | [#14](https://github.com/rshade/finfocus-plugin-aws-ce/issues/14) | ARN Support - Primary identifier in `GetActualCostRequest` |
 | ✅ Done | [#2](https://github.com/rshade/finfocus-plugin-aws-ce/issues/2) | Initial plugin creation for real AWS billing data |
 | ✅ Done | [#7](https://github.com/rshade/finfocus-plugin-aws-ce/issues/7) | Establish continuous delivery infrastructure |
+| ✅ Done | [#57](https://github.com/rshade/finfocus-plugin-aws-ce/issues/57) | Adopt OpenSpec after v0.1.0 and freeze Spec Kit history |
 
 Offline verification covers release plumbing, actual-cost behavior, integration,
 and protocol tests. The current foundation adds real core integration and the
@@ -97,8 +98,8 @@ rule sets requiring a status-check migration when the workflow changed.
 
 | Status | Issue | Technical Thesis | Boundary Guardrail |
 |--------|-------|------------------|-------------------|
-| 🔬 Research | [#13](https://github.com/rshade/finfocus-plugin-aws-ce/issues/13) | Optimization recommendations across services | Proxy AWS recommendations only |
-| 🔬 Research | [#27](https://github.com/rshade/finfocus-plugin-aws-ce/issues/27) | Rightsizing - `ce:GetRightsizingRecommendation` | Don't calculate utilization locally |
+| ✅ Done | [#13](https://github.com/rshade/finfocus-plugin-aws-ce/issues/13) | Optimization recommendations: EC2 rightsizing and Compute/EC2 Instance Savings Plans | Proxy AWS recommendations only |
+| ✅ Done | [#27](https://github.com/rshade/finfocus-plugin-aws-ce/issues/27) | EC2 rightsizing through `ce:GetRightsizingRecommendation`, delivered with #13 | Don't calculate utilization locally |
 | 🔬 Research | [#32](https://github.com/rshade/finfocus-plugin-aws-ce/issues/32) | Savings Plans Recommendations | Rely on AWS for return on investment and break-even math |
 | 🔬 Research | [#33](https://github.com/rshade/finfocus-plugin-aws-ce/issues/33) | Reserved Instance Recommendations | Target non-compute services such as RDS and Redshift |
 
@@ -114,18 +115,13 @@ rule sets requiring a status-check migration when the workflow changed.
 |--------|-------|------------------|-------------------|
 | 🔬 Research | [#30](https://github.com/rshade/finfocus-plugin-aws-ce/issues/30) | What-if `EstimateCost` via Pricing API | Disclaimer: list prices only |
 | ✅ Done | [#34](https://github.com/rshade/finfocus-plugin-aws-ce/issues/34) | Spot Market Advisor | Zone Spot price plus the Price List on-demand rate, same monthly basis |
+| ✅ Done | [#56](https://github.com/rshade/finfocus-plugin-aws-ce/issues/56) | Price EC2 Spot-labeled nodes in `GetProjectedCost` instead of always quoting on-demand | Report AWS Spot and Price List rates. Never pick the cheapest zone |
 
 ### Standards and compliance
 
 | Status | Issue | Technical Thesis | Boundary Guardrail |
 |--------|-------|------------------|-------------------|
 | 🔬 Research | [#29](https://github.com/rshade/finfocus-plugin-aws-ce/issues/29) | Greenops discovery via Carbon API | **Blocked:** no public AWS Carbon API |
-
-## Icebox and backlog
-
-| Status | Issue | Description |
-|--------|-------|-------------|
-| 📋 Backlog | [#3](https://github.com/rshade/finfocus-plugin-aws-ce/issues/3) | Adopt pluginsdk/mapping for property extraction |
 
 ## Rejected and out of scope
 
@@ -134,6 +130,7 @@ rule sets requiring a status-check migration when the workflow changed.
 | ❌ Rejected | Smart sizing in development mode | Violates "No Logic" boundary. Policy-as-Code belongs in core engine. |
 | ❌ Blocked | Greenops/Carbon Metrics | No public AWS API available for synchronous queries |
 | ❌ Closed | [#1](https://github.com/rshade/finfocus-plugin-aws-ce/issues/1) | Wrong repo - belongs to `aws-public` plugin |
+| ❌ Closed | [#3](https://github.com/rshade/finfocus-plugin-aws-ce/issues/3) | Adopt pluginsdk/mapping for property extraction. Closed by the owner |
 | ❌ Closed | [#4](https://github.com/rshade/finfocus-plugin-aws-ce/issues/4) | Duplicate of #24 |
 | ❌ Closed | [#9](https://github.com/rshade/finfocus-plugin-aws-ce/issues/9) | Duplicate of #25 |
 | ❌ Closed | [#10](https://github.com/rshade/finfocus-plugin-aws-ce/issues/10) | Duplicate of #26 |
