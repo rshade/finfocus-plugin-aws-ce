@@ -16,9 +16,11 @@ that launches it. `GetPluginInfo.settings` advertises the settings below.
 | `FINFOCUS_LOG_LEVEL` | `info` | Entry-point log level: `trace`, `debug`, `info`, `warn`, `error`, `fatal`, or `panic` |
 | `FINFOCUS_LOG_FILE` | Unset, standard error | Absolute filename for SDK log output |
 | `FINFOCUS_AWS_CE_MAX_BATCH_SIZE` | `100` | Maximum resources per batch, integer from 1 to 1000 |
-| `FINFOCUS_AWS_CE_BATCH_WORKERS` | `10` | Concurrent batch workers, integer from 1 to 50 |
+| `FINFOCUS_AWS_CE_BATCH_WORKERS` | `50` | Concurrent batch workers, integer from 1 to 50 |
 | `FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` | `0`, unlimited | Cost Explorer attempts and Budgets pages allowed in a rolling minute |
 | `FINFOCUS_AWS_CE_SPOT_COMPARISON` | `false` | `true` answers `GetProjectedCost` for an EC2 instance that has a type and a zone with a Spot quote. Off returns `InvalidArgument` so another plugin can price it |
+| `FINFOCUS_AWS_CE_MAX_WAIT_SECONDS` | `90` | Longest a request queues for the budget or an AWS throttle cooldown. `0` fails an over-budget request at once |
+| `FINFOCUS_AWS_CE_BATCH_WINDOW_MS` | `50` | How long resource cost lookups wait for others to join one Cost Explorer query, up to 5000. `0` queries each resource alone |
 | `FINFOCUS_HEALTH_ENDPOINT` | `false` | Serve `/healthz` on the plugin listener and enable Connect |
 | `FINFOCUS_WEB_ENABLED` | `false` | Serve Connect and gRPC-Web alongside gRPC |
 | `FINFOCUS_CORS_ALLOWED_ORIGINS` | Empty | Comma-separated browser origins. Empty allows none |
@@ -92,6 +94,28 @@ export FINFOCUS_AWS_CE_MAX_BATCH_SIZE=50
 export FINFOCUS_AWS_CE_BATCH_WORKERS=5
 export FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE=60
 ```
+
+### Queuing, throttling, and batching
+
+Cost Explorer has a low request rate limit, and each request costs $0.01.
+The plugin queues requests instead of failing them:
+
+- **Budget:** with `FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` set, a request over
+  the budget waits for a free slot, up to `FINFOCUS_AWS_CE_MAX_WAIT_SECONDS`.
+  A wait that would pass the caller's own deadline fails at once with
+  `ResourceExhausted`, since it can't finish.
+- **AWS throttling:** when AWS throttles a request, every caller shares one
+  cooldown that starts at 1 second and doubles up to 1 minute. The rate budget
+  also halves, then recovers by one request per minute window after 30 quiet
+  seconds.
+- **Joined queries:** resource-level lookups for the same account, service,
+  and period that arrive within `FINFOCUS_AWS_CE_BATCH_WINDOW_MS`, or until 50
+  resource IDs are waiting, share one `GetCostAndUsageWithResources` query.
+  Requests that use per-request credentials never share a query.
+- **Commitment discovery:** the Reservation and Savings Plan lookups run side
+  by side, and their results are reused for five minutes.
+- **BatchCost:** the plugin advertises the `BATCH_COST` capability, so FinFocus
+  sends one `BatchCost` request instead of one request per resource.
 
 ### Web transport, health, and browser access
 

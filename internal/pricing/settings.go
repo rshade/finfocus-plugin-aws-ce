@@ -11,6 +11,10 @@ const (
 	BatchSizeEnv    = "FINFOCUS_AWS_CE_MAX_BATCH_SIZE"
 	BatchWorkersEnv = "FINFOCUS_AWS_CE_BATCH_WORKERS"
 
+	// DefaultBatchWorkers is the SDK maximum, so a whole batch reaches the
+	// resource batcher together and shares Cost Explorer queries.
+	DefaultBatchWorkers = pluginsdk.MaxBatchWorkers
+
 	// HealthEndpointEnv enables the SDK /healthz endpoint. The SDK serves it on
 	// the plugin listener, and only while Connect is enabled.
 	HealthEndpointEnv = "FINFOCUS_HEALTH_ENDPOINT"
@@ -62,7 +66,7 @@ func pluginSettings() []*pbc.PluginSetting {
 			Key:          "batch_workers",
 			Env:          BatchWorkersEnv,
 			Type:         pbc.PluginSettingType_PLUGIN_SETTING_TYPE_INT,
-			DefaultValue: strconv.Itoa(pluginsdk.DefaultBatchWorkers),
+			DefaultValue: strconv.Itoa(DefaultBatchWorkers),
 			Description:  "Concurrent BatchCost workers, from 1 to " + strconv.Itoa(pluginsdk.MaxBatchWorkers) + ".",
 		},
 		{

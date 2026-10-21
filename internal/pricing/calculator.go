@@ -39,8 +39,12 @@ type Calculator struct {
 	openClient func(context.Context, client.Config) (*client.Client, error)
 	// maxRequestsPerMinute is the Cost Explorer page budget. Zero means no limit.
 	maxRequestsPerMinute int
-	requestMu            sync.Mutex
-	requestTimes         []time.Time
+	// maxWait is how long a request may queue behind the budget. Zero refuses at once.
+	maxWait   time.Duration
+	pacerOnce sync.Once
+	pacer     *client.Pacer
+	// batcher joins resource cost lookups that arrive together. Nil queries each alone.
+	batcher *resourceBatcher
 	// budgets overrides the AWS Budgets client. Nil builds one on demand.
 	budgets budgetLister
 	// accountID overrides STS when FINFOCUS_AWS_ACCOUNT_ID is empty.
@@ -96,6 +100,8 @@ func NewCalculator() *Calculator {
 		logger:               logger,
 		maxRequestsPerMinute: maxRequestsPerMinuteFromEnv(),
 		spotComparison:       spotComparisonFromEnv(),
+		maxWait:              maxWaitFromEnv(),
+		batcher:              newResourceBatcher(batchWindowFromEnv()),
 	}
 }
 
@@ -106,7 +112,7 @@ func (c *Calculator) traceLogger(ctx context.Context) zerolog.Logger {
 }
 
 // GetPluginInfo returns discovery metadata for this plugin.
-// Capabilities list costs, forecasts, budgets, and recommendations. Leaving the list
+// Capabilities list costs, forecasts, budgets, recommendations, and batch costs. Leaving the list
 // empty would let the server infer every method the type has.
 func (c *Calculator) GetPluginInfo(ctx context.Context, _ *pbc.GetPluginInfoRequest) (*pbc.GetPluginInfoResponse, error) {
 	logger := c.traceLogger(ctx)
@@ -126,6 +132,7 @@ func (c *Calculator) GetPluginInfo(ctx context.Context, _ *pbc.GetPluginInfoRequ
 			pbc.PluginCapability_PLUGIN_CAPABILITY_PROJECTED_COSTS,
 			pbc.PluginCapability_PLUGIN_CAPABILITY_BUDGETS,
 			pbc.PluginCapability_PLUGIN_CAPABILITY_RECOMMENDATIONS,
+			pbc.PluginCapability_PLUGIN_CAPABILITY_BATCH_COST,
 		},
 		Settings: pluginSettings(),
 	}, nil
@@ -370,7 +377,7 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 
 	var clientCosts []client.CostResult
 	if plan.resourceLevel {
-		clientCosts, err = ce.GetAttributedCostWithResources(ctx, plan.resourceIDs, plan.serviceName, plan.accountID, startTime, endTime)
+		clientCosts, err = c.fetchResourceRows(ctx, ce, perRequest, plan, startTime, endTime, &pages)
 	} else {
 		var filter *types.Expression
 		if plan.serviceName != "" {
@@ -423,6 +430,22 @@ func (c *Calculator) GetActualCost(ctx context.Context, req *pbc.GetActualCostRe
 	logger.Info().Int("ce_requests", pages).Int("results_count", len(costs)).Msg("Retrieved costs from AWS")
 
 	return c.buildResponse(costs, expires, req.GetBillingAccountId(), plan.resourceLevel)
+}
+
+// fetchResourceRows queries resource-level costs. Lookups for the same account,
+// service and period that arrive together share one Cost Explorer query, except
+// per-request credentials, which never share a query with another caller.
+func (c *Calculator) fetchResourceRows(ctx context.Context, ce *client.Client, perRequest bool, plan costQueryPlan, start, end time.Time, pages *int) ([]client.CostResult, error) {
+	run := func(ctx context.Context, ids []string) ([]client.CostResult, error) {
+		return ce.GetAttributedCostWithResources(ctx, ids, plan.serviceName, plan.accountID, start, end)
+	}
+	if perRequest {
+		return run(ctx, plan.resourceIDs)
+	}
+	key := batchKey{service: plan.serviceName, account: plan.accountID, start: start.Unix(), end: end.Unix()}
+	rows, requests, err := c.batcher.fetch(ctx, key, plan.resourceIDs, run)
+	*pages += requests
+	return rows, err
 }
 
 type costQueryPlan struct {

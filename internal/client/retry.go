@@ -36,8 +36,16 @@ func WithRetry[T any](ctx context.Context, cfg RetryConfig, op RetryableFunc[T])
 
 	for i := 0; i <= cfg.MaxRetries; i++ {
 		result, err, retryable = op(ctx)
+		pacer := pacerFrom(ctx)
 		if err == nil {
+			pacer.Succeeded()
 			return result, nil
+		}
+		if pacer != nil && isThrottleError(err) {
+			pacer.Throttled()
+			if retryable && i < cfg.MaxRetries {
+				continue
+			}
 		}
 
 		if !retryable {

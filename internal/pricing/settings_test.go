@@ -31,7 +31,7 @@ func TestGetPluginInfo_Settings(t *testing.T) {
 		"FINFOCUS_LOG_LEVEL":    "info",
 		"FINFOCUS_LOG_FILE":     "",
 		BatchSizeEnv:            strconv.Itoa(pluginsdk.DefaultMaxBatchSize),
-		BatchWorkersEnv:         strconv.Itoa(pluginsdk.DefaultBatchWorkers),
+		BatchWorkersEnv:         strconv.Itoa(DefaultBatchWorkers),
 		maxRequestsEnv:          "",
 		SpotComparisonEnv:       "false",
 		HealthEndpointEnv:       "false",

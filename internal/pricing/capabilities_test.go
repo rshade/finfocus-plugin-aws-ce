@@ -16,8 +16,8 @@ func TestWireCapabilities(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(info.GetCapabilities()) != 4 || info.GetCapabilities()[2] != pbc.PluginCapability_PLUGIN_CAPABILITY_BUDGETS || info.GetCapabilities()[3] != pbc.PluginCapability_PLUGIN_CAPABILITY_RECOMMENDATIONS {
-		t.Fatalf("expected actual costs, projected costs, budgets, recommendations; info capabilities=%v", info.GetCapabilities())
+	if len(info.GetCapabilities()) != 5 || info.GetCapabilities()[2] != pbc.PluginCapability_PLUGIN_CAPABILITY_BUDGETS || info.GetCapabilities()[3] != pbc.PluginCapability_PLUGIN_CAPABILITY_RECOMMENDATIONS || info.GetCapabilities()[4] != pbc.PluginCapability_PLUGIN_CAPABILITY_BATCH_COST {
+		t.Fatalf("expected actual costs, projected costs, budgets, recommendations, batch costs; info capabilities=%v", info.GetCapabilities())
 	}
 	s3, err := srv.Client().Supports(ctx, &pbc.SupportsRequest{Resource: &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:s3/bucket:Bucket"}})
 	if err != nil || !s3.GetSupported() {

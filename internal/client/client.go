@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/smithy-go"
 )
 
 // CostExplorerAPI defines the interface for AWS Cost Explorer operations.
@@ -39,6 +40,7 @@ type Client struct {
 	cacheMu    sync.Mutex
 	spotCache  map[string]cachedHourly
 	priceCache map[string]cachedHourly
+	discovery  discoveryCache
 }
 
 // Config holds configuration for the AWS Cost Explorer client.
@@ -96,13 +98,38 @@ func WithPageHook(ctx context.Context, hook func() error) context.Context {
 	return context.WithValue(ctx, pageHookKey{}, hook)
 }
 
+type pacerKey struct{}
+
+// WithPacer queues every Cost Explorer attempt made with ctx behind p and
+// reports each throttle and success back to it. A nil p returns ctx.
+func WithPacer(ctx context.Context, p *Pacer) context.Context {
+	if p == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, pacerKey{}, p)
+}
+
+func pacerFrom(ctx context.Context) *Pacer {
+	p, _ := ctx.Value(pacerKey{}).(*Pacer)
+	return p
+}
+
 func runPageHook(ctx context.Context) error {
+	if err := pacerFrom(ctx).Acquire(ctx); err != nil {
+		return err
+	}
 	hook, _ := ctx.Value(pageHookKey{}).(func() error)
 	if hook == nil {
 		return nil
 	}
+	pageHookMu.Lock()
+	defer pageHookMu.Unlock()
 	return hook()
 }
+
+// pageHookMu keeps hook calls one at a time, because discovery and cost queries
+// for one request can run side by side.
+var pageHookMu sync.Mutex
 
 type staticCredentials struct {
 	accessKeyID     string
@@ -625,6 +652,20 @@ func isRetryableError(err error) bool {
 		contains(errMsg, "RateExceeded") ||
 		contains(errMsg, "RequestLimitExceeded") ||
 		contains(errMsg, "LimitExceededException")
+}
+
+// isThrottleError reports an AWS throttling response, as opposed to another
+// retryable failure such as a server error.
+func isThrottleError(err error) bool {
+	var api smithy.APIError
+	if errors.As(err, &api) {
+		switch api.ErrorCode() {
+		case "Throttling", "ThrottlingException", "ThrottledException", "RequestLimitExceeded",
+			"RequestThrottled", "TooManyRequestsException", "LimitExceededException", "RateExceeded":
+			return true
+		}
+	}
+	return false
 }
 
 func contains(s, substr string) bool {

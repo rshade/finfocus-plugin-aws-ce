@@ -68,9 +68,11 @@ credential values into source files or logs.
 | `FINFOCUS_LOG_LEVEL` | `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `panic` | `info` |
 | `FINFOCUS_LOG_FILE` | Absolute log filename. Unset uses stderr | Unset |
 | `FINFOCUS_AWS_CE_MAX_BATCH_SIZE` | Batch limit, integer from 1 to 1000 | 100 |
-| `FINFOCUS_AWS_CE_BATCH_WORKERS` | Concurrent batch workers, integer from 1 to 50 | 10 |
+| `FINFOCUS_AWS_CE_BATCH_WORKERS` | Concurrent batch workers, integer from 1 to 50 | 50 |
 | `FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` | CE request attempt budget per minute | Unlimited when unset or `0` |
 | `FINFOCUS_AWS_CE_SPOT_COMPARISON` | `true` answers EC2 instance projections with a Spot quote | `false` |
+| `FINFOCUS_AWS_CE_MAX_WAIT_SECONDS` | Longest a request queues for the budget or a throttle cooldown. `0` fails at once | 90 |
+| `FINFOCUS_AWS_CE_BATCH_WINDOW_MS` | Milliseconds resource lookups wait to share one CE query. `0` queries each alone | 50 |
 | `FINFOCUS_HEALTH_ENDPOINT` | Serve SDK `/healthz` on the plugin port. `true` also enables Connect | `false` |
 | `FINFOCUS_WEB_ENABLED` | Serve Connect and gRPC-Web beside gRPC on the plugin port | `false` |
 | `FINFOCUS_CORS_ALLOWED_ORIGINS` | Comma-separated browser origins. Empty allows none | Empty |
