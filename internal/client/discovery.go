@@ -60,6 +60,7 @@ func (d *discoveryCache) get(ctx context.Context, key string, load func(context.
 			found = false
 		}
 		if !found {
+			d.pruneLocked()
 			entry = &discoveryEntry{ready: make(chan struct{})}
 			d.entries[key] = entry
 			d.mu.Unlock()
@@ -81,6 +82,22 @@ func (d *discoveryCache) get(ctx context.Context, key string, load func(context.
 			continue
 		}
 		return nil, entry.err
+	}
+}
+
+// maxDiscoveryEntries bounds the cache, since keys vary with callers' accounts
+// and periods.
+const maxDiscoveryEntries = 256
+
+// pruneLocked drops expired entries, and every finished entry once the cache
+// is full. Lookups in flight are kept so their waiters still find them.
+func (d *discoveryCache) pruneLocked() {
+	now := d.clock()
+	full := len(d.entries) >= maxDiscoveryEntries
+	for key, entry := range d.entries {
+		if entry.finished() && (full || !now.Before(entry.expires)) {
+			delete(d.entries, key)
+		}
 	}
 }
 

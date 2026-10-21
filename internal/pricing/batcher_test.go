@@ -223,3 +223,17 @@ func TestCanceledCallerLeavesTheSharedQueryRunning(t *testing.T) {
 		t.Fatalf("the second caller should still get its cost, got %v", err)
 	}
 }
+
+func TestPerRequestCredentialsGetTheirOwnPacer(t *testing.T) {
+	t.Parallel()
+	calc := NewCalculator()
+	shared := calc.pacerFor(context.Background())
+	if shared != calc.pacerFor(context.Background()) {
+		t.Fatal("the plugin's own calls should share one pacer")
+	}
+	ctx := credentialContext(t, map[string]string{"access_key_id": "AKIAEXAMPLE", "secret_access_key": "example-secret"})
+	own := calc.pacerFor(ctx)
+	if own == shared || own == calc.pacerFor(ctx) {
+		t.Fatal("each per-request-credential call should get a pacer of its own")
+	}
+}

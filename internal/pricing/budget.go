@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
+	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
 )
 
 // maxRequestsEnv is the per-minute Cost Explorer page budget.
@@ -55,13 +56,23 @@ func parseMaxRequestsPerMinute(raw string) int {
 // counts attempts in pages. Over budget, a request waits its turn up to the
 // maximum wait instead of failing, and an AWS throttle slows every caller.
 func (c *Calculator) withCostBudget(ctx context.Context, pages *int) context.Context {
-	ctx = client.WithPacer(ctx, c.costPacer())
+	ctx = client.WithPacer(ctx, c.pacerFor(ctx))
 	return client.WithPageHook(ctx, func() error {
 		if pages != nil {
 			*pages++
 		}
 		return nil
 	})
+}
+
+// pacerFor keeps a caller's own AWS credentials out of the shared pacer, so a
+// throttle on one tenant's account can't slow the plugin's account or another
+// tenant. Such a call gets a pacer of its own.
+func (c *Calculator) pacerFor(ctx context.Context) *client.Pacer {
+	if creds, err := pluginsdk.ExtractCredentials(ctx); err == nil && creds.Len() > 0 {
+		return client.NewPacer(client.PacerConfig{PerMinute: c.maxRequestsPerMinute, MaxWait: c.maxWait, Sleep: pacerSleep})
+	}
+	return c.costPacer()
 }
 
 func (c *Calculator) costPacer() *client.Pacer {

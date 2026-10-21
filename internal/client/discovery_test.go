@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -124,5 +125,38 @@ func TestDiscoveryLeaderCancelDoesNotFailFollower(t *testing.T) {
 	}
 	if ids := <-followerDone; len(ids) != 1 || ids[0] != "r-2" {
 		t.Fatalf("follower ids = %v", ids)
+	}
+}
+
+func TestDiscoveryCacheStaysBounded(t *testing.T) {
+	t.Parallel()
+	var d discoveryCache
+	load := func(context.Context) ([]string, error) { return nil, nil }
+	for i := range maxDiscoveryEntries * 3 {
+		if _, err := d.get(context.Background(), fmt.Sprintf("key-%d", i), load); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := len(d.entries); n > maxDiscoveryEntries {
+		t.Fatalf("entries = %d, want at most %d", n, maxDiscoveryEntries)
+	}
+}
+
+func TestDiscoveryDropsExpiredEntriesOnInsert(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
+	d := discoveryCache{now: func() time.Time { return now }}
+	load := func(context.Context) ([]string, error) { return nil, nil }
+	for _, key := range []string{"a", "b"} {
+		if _, err := d.get(context.Background(), key, load); err != nil {
+			t.Fatal(err)
+		}
+	}
+	now = now.Add(discoveryTTL)
+	if _, err := d.get(context.Background(), "c", load); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(d.entries); n != 1 {
+		t.Fatalf("entries = %d, want only the new one", n)
 	}
 }
