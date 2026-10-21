@@ -81,3 +81,4 @@ Vantage
 VPC
 vuln
 interquartile
+cooldown

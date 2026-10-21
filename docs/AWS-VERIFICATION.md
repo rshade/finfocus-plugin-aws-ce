@@ -3,8 +3,9 @@
 Ordinary tests use local fake endpoints. Live checks require the `awslive`
 build tag, `FINFOCUS_AWS_LIVE=true`, and a configured FinFocus core executable.
 The Makefile target supplies the build tag after checking the environment gate.
-Use the existing Pulumi Environments, Secrets, and Configuration environment to
-supply AWS credentials to child processes. Tests exclude credentials from output.
+Supply AWS credentials to the test process through your normal credential
+manager, such as an AWS profile or a secrets tool that exports environment
+variables for one command. Tests exclude credentials from output.
 
 ## Run a live comparison
 
@@ -12,14 +13,14 @@ Build the pinned core executable, then run the comparison with authorized creden
 
 ```bash
 make core-install
-pulumi env run tailscale-phase-2/aws-oidc -- env \
+AWS_PROFILE=<profile> AWS_REGION=us-east-1 \
   FINFOCUS_AWS_LIVE=true AWS_EC2_METADATA_DISABLED=true AWS_MAX_ATTEMPTS=1 \
   make e2e-live
 ```
 
 Set `FINFOCUS_CORE_BINARY` to use an existing core executable instead.
-Don't use `pulumi env open` to print credentials. The check creates no cloud
-resources and changes neither the Pulumi environment nor IAM policies.
+Don't print credentials to the terminal or logs. The check creates no cloud
+resources and changes no IAM policies.
 
 The check uses seven days of daily costs ending two Coordinated Universal Time
 days ago. It scopes the comparison to one service, defaulting to
@@ -55,38 +56,37 @@ Offline fixtures separately exercise commitment partitions and their arithmetic.
 
 ## AWS permissions
 
-The existing AWS role needs the following read permissions:
+The comparison needs only `ce:GetDimensionValues` and `ce:GetCostAndUsage`. EC2
+resource queries are outside the comparison, and also need
+`ce:GetCostAndUsageWithResources` and the resource-data opt-in. The recommendations
+check needs the recommendation actions. See [AWS permissions](permissions.md) for
+the full table and policy.
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "FinFocusCostExplorerReadOnly",
-      "Effect": "Allow",
-      "Action": [
-        "ce:GetDimensionValues",
-        "ce:GetCostAndUsage",
-        "ce:GetCostAndUsageWithResources"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
+The plugin needs no IAM write permission. Missing permission is an explicit
+verification blocker, not a passing live comparison.
+
+## Verify recommendations
+
+The recommendations check reads real AWS data and may incur AWS API charges. It
+needs `FINFOCUS_AWS_LIVE=true`, the `awslive` build tag, and existing AWS datasets:
+
+```bash
+make build
+FINFOCUS_AWS_LIVE=true go test -tags awslive ./test/live -run '^TestAWSRecommendations$' -v -count=1
 ```
 
-`GetDimensionValues` supports commitment discovery. `GetCostAndUsage` supplies
-service costs. `GetCostAndUsageWithResources` supports EC2 queries, which are
-outside this comparison and also require resource data opt-in. See the
-[AWS permission reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ce.html).
-The plugin needs no IAM write permission or forecasting action. Missing
-permission is an explicit verification blocker, not a passing live comparison.
+The test validates returned records and reports empty datasets explicitly. It
+doesn't need the core binary. Ordinary tests, and tagged runs without
+`FINFOCUS_AWS_LIVE=true`, never contact AWS for this test. An account with no
+eligible usage returns successful empty datasets, which verifies API access and
+billing service names but not populated mapping. Offline fixtures cover populated
+mapping.
 
 ## Enable the manual workflow
 
 Run the live workflow manually from `main` and select its `run_live` input.
-It uses OpenID Connect (OIDC) for authentication and remains off until
-maintainers configure these repository variables:
+It uses OpenID Connect (OIDC) through Pulumi ESC for authentication and remains
+off until maintainers configure these repository variables:
 
 | Variable | Required value |
 | --- | --- |
@@ -115,17 +115,10 @@ Leave `FINFOCUS_AWS_LIVE` unset for the two Go commands. The tests verify
 comparison failures and request limits using synthetic data. `make e2e` runs
 real core against a fake endpoint. It never proves live AWS access.
 
-## Recorded verification
+## Verification status
 
-On 2026-10-06, `tailscale-phase-2/aws-oidc` supplied an AWS identity. The initial
-role policy denied `GetCostAndUsage`, and the plugin returned `PermissionDenied`.
-After the owner granted Cost Explorer read permission, a rerun matched nine
-service totals for 2026-09-27 through 2026-10-04, including exact decimal sums and
-period metadata. This result predates the current commitment-discovery path.
-It doesn't verify EC2 resource data, core integration, or another account.
-
-The 2026-10-19 foundation work implements the offline core test, conformance
-integration, and gated live harness. The owner chose offline implementation
-because authentication was unavailable. No live AWS calls ran during that
-continuation, and there is no new live result. A future authorized run must
-verify the current path before marking live acceptance complete.
+The repository ships the offline core test, the conformance suite, and the gated
+live harness. Offline tests establish protocol behavior, not live-account
+permissions or billing-data availability. Before relying on a new account, run the
+live comparison there and confirm the result matches the current
+commitment-discovery path.

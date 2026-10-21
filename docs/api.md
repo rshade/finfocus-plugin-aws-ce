@@ -2,7 +2,7 @@
 
 The AWS Cost Explorer plugin serves the `finfocus.v1.CostSourceService` gRPC
 interface on a local TCP port. It identifies itself as `aws-ce`, reports spec
-version `v0.7.8`, and advertises actual costs, forecasts, and budgets. This
+version `v0.7.9`, and advertises actual costs, forecasts, budgets, recommendations, and batch costs. This
 reference describes the current source checkout. See [deployment](deployment.md) to install and run it,
 and [configuration](configuration.md) for settings and credentials.
 
@@ -27,9 +27,9 @@ request and returns discovery metadata without contacting AWS.
 | --- | --- | --- |
 | `name` | string | `aws-ce` |
 | `version` | string | Build version. Release builds inject the release version |
-| `spec_version` | string | `v0.7.8` |
+| `spec_version` | string | `v0.7.9` |
 | `providers` | repeated string | `aws` |
-| `capabilities` | repeated `PluginCapability` | Actual costs, forecasts, budgets, and recommendations |
+| `capabilities` | repeated `PluginCapability` | Actual costs, projected costs, budgets, recommendations, and batch costs |
 | `metadata` | map of strings | `supported_rpcs` lists `GetActualCost,GetProjectedCost,GetBudgets,GetRecommendations,Supports,GetPluginInfo,BatchCost` |
 | `settings` | repeated `PluginSetting` | Plugin settings, environment names, types, and applicable defaults |
 
@@ -365,7 +365,8 @@ for `GetProjectedCost`. Batch requests don't retrieve budgets.
 anomalies by default. Category `COST` selects rightsizing and Savings Plans.
 Category `ANOMALY` or action `INVESTIGATE` selects anomalies. The shared source
 `aws-cost-explorer` includes both. Target-scoped requests query optimization
-opportunities only. See [recommendation details](../README.md#optimization-recommendations).
+opportunities only. See [recommendations](recommendations.md) for sources, filters, and parameters,
+and [AWS permissions](permissions.md) for the IAM actions each source needs.
 
 Anomaly requests call Cost Explorer `GetAnomalies` for the last 90 days.
 Each row uses category `ANOMALY` and action `INVESTIGATE`. The plugin doesn't

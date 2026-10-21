@@ -84,10 +84,12 @@ under your configured FinFocus registry.
 
 ## Grant AWS permissions
 
-Enable AWS Cost Explorer for the billing account. Querying individual
-resources also requires Cost Explorer resource-level data opt-in.
+Enable AWS Cost Explorer for the billing account, then attach an IAM policy to the
+identity that runs the plugin. [AWS permissions](permissions.md) has the complete
+least-privilege policy, the per-feature action table, role assumption with trust
+policies, the account settings that some features need, and network access.
 
-Grant these actions to the identity that performs the queries:
+For a read-only costs installation, this is the minimum:
 
 ```json
 {
@@ -96,13 +98,10 @@ Grant these actions to the identity that performs the queries:
     {
       "Effect": "Allow",
       "Action": [
-        "ce:GetDimensionValues",
         "ce:GetCostAndUsage",
         "ce:GetCostAndUsageWithResources",
-        "ce:GetCostForecast",
-        "ec2:DescribeSpotPriceHistory",
-        "pricing:GetProducts",
-        "budgets:ViewBudget"
+        "ce:GetDimensionValues",
+        "ce:GetCostForecast"
       ],
       "Resource": "*"
     }
@@ -110,20 +109,9 @@ Grant these actions to the identity that performs the queries:
 }
 ```
 
-`ce:GetDimensionValues` supports reservation and Savings Plan discovery for
-every actual-cost query. `ce:GetCostAndUsage` supplies account and service totals.
-`ce:GetCostAndUsageWithResources` supplies resource costs.
-`ce:GetCostForecast` and `ce:GetCostAndUsage` supply account and service projections.
-`ec2:DescribeSpotPriceHistory` and `pricing:GetProducts` supply an EC2 Spot
-comparison for one instance type and availability zone. `budgets:ViewBudget` permits
-reading budgets. Grant only the operations the installation needs. Budget
-queries use the process credentials and the account in `FINFOCUS_AWS_ACCOUNT_ID`,
-or call STS `GetCallerIdentity` when that setting is empty.
-
-For host-supplied `role_arn` credentials on actual-cost or forecast requests,
-the source identity also needs
-`sts:AssumeRole`, and the target role needs an appropriate trust policy and the
-Cost Explorer permissions. See [AWS credentials](CREDENTIALS.md).
+Add the budgets, recommendation, and Spot comparison actions only for the features
+you turn on. Querying individual resources also needs the Cost Explorer
+resource-level data opt-in.
 
 ## Configure authentication and startup
 
@@ -216,7 +204,7 @@ procedure. Setting `FINFOCUS_TEST_MODE` alone doesn't make a live query offline.
 | Address already in use | Choose another port or use `--port 0` |
 | No startup port announcement | Read standard error for port, batch-setting, or listener failures |
 | Missing AWS region | Set `AWS_REGION=us-east-1` or configure the selected profile's region |
-| `PermissionDenied` | Check all actions needed by the query, including `ce:GetDimensionValues`, and `ec2:DescribeSpotPriceHistory` plus `pricing:GetProducts` for a Spot comparison |
+| `PermissionDenied` | The error names the denied AWS operation. Match it against the [permissions table](permissions.md#permissions-by-feature). An unfiltered `GetRecommendations` needs all four recommendation actions, and `GetBudgets` always uses the process credentials |
 | `Unauthenticated` | Refresh the AWS session and include its session token |
 | `ERROR_CODE_INVALID_CREDENTIALS` | Check the supported host credential keys, complete key pair, and role ARN |
 | `NotFound` for an EC2 instance | Check resource opt-in, instance identity, lookback, and data availability |

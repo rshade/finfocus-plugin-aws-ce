@@ -15,9 +15,10 @@ that launches it. `GetPluginInfo.settings` advertises the settings below.
 | `FINFOCUS_PLUGIN_PORT` | `0`, automatic port | Local gRPC port, unless `--port` overrides it |
 | `FINFOCUS_LOG_LEVEL` | `info` | Entry-point log level: `trace`, `debug`, `info`, `warn`, `error`, `fatal`, or `panic` |
 | `FINFOCUS_LOG_FILE` | Unset, standard error | Absolute filename for SDK log output |
+| `FINFOCUS_LOG_FILE_PERMISSIONS` | `0644` | Octal creation mode for a new log file. See [Logging](#logging) |
 | `FINFOCUS_AWS_CE_MAX_BATCH_SIZE` | `100` | Maximum resources per batch, integer from 1 to 1000 |
 | `FINFOCUS_AWS_CE_BATCH_WORKERS` | `50` | Concurrent batch workers, integer from 1 to 50 |
-| `FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` | `0`, unlimited | Cost Explorer attempts and Budgets pages allowed in a rolling minute |
+| `FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` | `0`, unlimited | Cost Explorer attempts and Budgets pages allowed in a rolling minute. Each Cost Explorer page costs $0.01 |
 | `FINFOCUS_AWS_CE_SPOT_COMPARISON` | `false` | `true` answers `GetProjectedCost` for an EC2 instance that has a type and a zone with a Spot quote. Off returns `InvalidArgument` so another plugin can price it |
 | `FINFOCUS_AWS_CE_MAX_WAIT_SECONDS` | `90` | Longest a request queues for the budget or an AWS throttle cooldown. `0` fails an over-budget request at once |
 | `FINFOCUS_AWS_CE_BATCH_WINDOW_MS` | `50` | How long resource cost lookups wait for others to join one Cost Explorer query, up to 5000. `0` queries each resource alone |
@@ -58,8 +59,7 @@ export FINFOCUS_LOG_FILE_PERMISSIONS=0600
 export FINFOCUS_LOG_LEVEL=debug
 ```
 
-`FINFOCUS_LOG_FILE_PERMISSIONS` is an additional SDK setting. It controls the
-creation mode for new log files, subject to the process file-creation mask.
+`FINFOCUS_LOG_FILE_PERMISSIONS` is an SDK setting. It controls the creation mode for new log files, subject to the process file-creation mask.
 The default is `0644`. Invalid octal values fall back to that default with a
 warning. It doesn't change permissions on an existing file.
 
@@ -80,12 +80,22 @@ the setting.
 
 The request budget accepts a positive integer and trims surrounding whitespace.
 Unset, zero, negative, or invalid integer values turn off the limit. Each Cost
-Explorer attempt counts, including commitment discovery, pagination, and retries. Batch
-workers share the same process budget. Reaching the limit returns
-`ResourceExhausted` without waiting for capacity. Requests age out after one
-minute. Forecast attempts and Budgets pages also consume the shared budget.
-For Budgets, exceeding the local limit returns `Internal`. Cache hits don't
-consume the budget, and STS requests aren't part of it.
+Explorer attempt counts, including commitment discovery, pagination, and retries.
+Forecast attempts and Budgets pages also consume the budget, while cache hits and
+STS requests don't. Batch workers share the same process budget, and a request ages
+out of the count after one minute.
+
+Reaching the limit doesn't fail a request at once. It queues for a free slot, as
+described in [Queuing, throttling, and batching](#queuing-throttling-and-batching),
+and returns `ResourceExhausted` only when the wait would exceed
+`FINFOCUS_AWS_CE_MAX_WAIT_SECONDS` or the caller's deadline. A Budgets call that
+exceeds the local limit returns `Internal`. Requests that carry host-supplied
+credentials get their own budget and throttle cooldown, so a throttled tenant
+doesn't slow the plugin's own account.
+
+`FINFOCUS_AWS_CE_MAX_WAIT_SECONDS` takes a whole number of seconds. Unlike the
+batch settings, an empty, negative, or invalid value doesn't stop startup. It
+selects the default of 90.
 
 For example:
 
@@ -181,8 +191,8 @@ export AWS_REGION=us-east-1
 For temporary environment credentials, obtain the key, secret, and token through
 your credential manager before starting FinFocus. See
 [AWS credentials](CREDENTIALS.md) for host-supplied credentials and failure
-handling. Use [the deployment policy](deployment.md#grant-aws-permissions) for
-the required Cost Explorer permissions.
+handling. See [AWS permissions](permissions.md) for the IAM actions, account
+settings, and network access each feature needs.
 
 ### Host-supplied credentials
 

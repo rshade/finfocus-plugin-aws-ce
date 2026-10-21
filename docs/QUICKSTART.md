@@ -30,7 +30,7 @@ export AWS_REGION=us-east-1
 You can also use environment credentials or workload credentials through the
 AWS SDK default chain. Temporary credentials need all three AWS key, secret
 and session-token variables. See [AWS credentials](CREDENTIALS.md) for exact
-host-supplied keys and IAM permissions. Enable Cost Explorer and its
+host-supplied keys and [AWS permissions](permissions.md) for the IAM policy. Enable Cost Explorer and its
 resource-level opt-in before querying an EC2 instance or another resource ARN.
 The plugin hasn't verified non-EC2 resource ids. Those queries cover the last 14 days.
 
@@ -76,7 +76,7 @@ Each paginated Cost Explorer request costs $0.01 in real use.
 | Symptom | Action |
 | --- | --- |
 | Missing AWS region | Set `AWS_REGION=us-east-1` or configure your profile's region |
-| `PermissionDenied` | Grant `ce:GetDimensionValues`, `ce:GetCostAndUsage`, `ce:GetCostAndUsageWithResources`, `ce:GetCostForecast` for projections, and `ec2:DescribeSpotPriceHistory` plus `pricing:GetProducts` for an EC2 Spot comparison |
+| `PermissionDenied` | The error names the denied AWS operation. Grant its IAM action from the [permissions table](permissions.md#permissions-by-feature) |
 | `Unauthenticated` | Refresh expired session credentials and include `AWS_SESSION_TOKEN` |
 | `InvalidArgument` with `ERROR_CODE_INVALID_CREDENTIALS` | Check supported key names, matching key pair, and role ARN |
 | Resource query has no data | Confirm resource opt-in, the id or ARN, the 14-day window and 24-to-48-hour data lag |

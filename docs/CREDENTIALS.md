@@ -28,46 +28,24 @@ A nonempty invalid credential set never falls back to process credentials.
 Each valid credential-bearing request builds its own client and bypasses the
 shared cache, so another request can't reuse its costs or credentials.
 
-## Permissions and failure handling
+## Permissions
 
-Each feature calls different AWS operations. A permission error names the
-operation, so match it against this table.
+Each feature calls different AWS operations and some need account settings. See
+[AWS permissions](permissions.md) for the action table, a ready-to-use policy, and
+the trust policy a `role_arn` needs. Assuming a role requires `sts:AssumeRole` on
+the source identity.
 
-| Feature | Operation in the error text | IAM action | Needs beyond IAM |
-| --- | --- | --- | --- |
-| Account and service actual costs | Cost Explorer GetCostAndUsage, GetDimensionValues | `ce:GetCostAndUsage`, `ce:GetDimensionValues` | |
-| EC2 and other resource actual costs | Cost Explorer GetCostAndUsageWithResources | `ce:GetCostAndUsageWithResources` | Resource-level data opt-in |
-| Account and service projection | Cost Explorer GetCostForecast, GetCostAndUsage | `ce:GetCostForecast`, `ce:GetCostAndUsage` | |
-| EC2 Spot comparison | EC2 DescribeSpotPriceHistory, Pricing GetProducts | `ec2:DescribeSpotPriceHistory`, `pricing:GetProducts` | |
-| Budgets | Budgets DescribeBudgets | `budgets:ViewBudget` | |
-| Anomalies | Cost Explorer GetAnomalies | `ce:GetAnomalies` | |
-| Rightsizing recommendations | Cost Explorer GetRightsizingRecommendation | `ce:GetRightsizingRecommendation` | Rightsizing enabled |
-| Savings Plans recommendations | Cost Explorer GetSavingsPlansPurchaseRecommendation | `ce:GetSavingsPlansPurchaseRecommendation` | An existing AWS recommendation |
-| Non-EC2 Reserved Instance recommendations | Cost Explorer GetReservationPurchaseRecommendation | `ce:GetReservationPurchaseRecommendation` | Eligible RDS, Redshift, ElastiCache, or OpenSearch usage |
+`GetBudgets` is the exception to host-supplied credentials. It always uses the
+process credential chain in `us-east-1`, and ignores request keys and `role_arn`.
+The account comes from `FINFOCUS_AWS_ACCOUNT_ID`, or from STS `GetCallerIdentity`
+when that is empty.
 
-See the README section on AWS account prerequisites for the account settings.
-
-Allow `ce:GetDimensionValues` for commitment discovery,
-`ce:GetCostAndUsage` for service totals,
-`ce:GetCostAndUsageWithResources` for resource queries, and
-`ce:GetCostForecast` and `ce:GetCostAndUsage` for an account or service projection,
-`ec2:DescribeSpotPriceHistory` and `pricing:GetProducts` for an EC2 Spot
-comparison, `budgets:ViewBudget` for `GetBudgets`, and `ce:GetAnomalies` for
-anomaly recommendations. Unfiltered recommendation requests also retrieve
-non-EC2 reservations and need `ce:GetReservationPurchaseRecommendation`.
-Use `savingsplans:Account`, `ec2:Instance`, `rds:Account`, `redshift:Account`,
-`elasticache:Account`, or `es:Account` as a recommendation resource type filter
-to restrict the selected optimization APIs. Budgets uses its own endpoint. The Price List call
-uses the `us-east-1` pricing endpoint. The Spot call uses the resource region.
-`FINFOCUS_AWS_ACCOUNT_ID` selects the account. When it's empty, the plugin
-calls STS `GetCallerIdentity`. Resource-level
-queries require the account's Cost Explorer resource opt-in and cover only
-the last 14 days. Assuming a role also requires `sts:AssumeRole` permission
-and an appropriate role trust policy.
+## Failure handling
 
 AWS access-denied errors return `PermissionDenied`. Expired or invalid AWS
 sessions return `Unauthenticated`. Generic per-request client and request
 failures return sanitized errors. Missing region configuration returns
 `FailedPrecondition` with an `AWS_REGION=us-east-1` setup action. This known-safe
-configuration hint contains no credential values. The plugin excludes credential values from logs
-and statuses, including diagnostics that echo keys, tokens, or role ARNs.
+configuration hint contains no credential values. The plugin excludes credential
+values from logs and statuses, including diagnostics that echo keys, tokens, or
+role ARNs.
