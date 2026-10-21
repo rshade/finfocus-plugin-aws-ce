@@ -16,6 +16,25 @@ type RecommendationsAPI interface {
 	GetSavingsPlansPurchaseRecommendation(context.Context, *costexplorer.GetSavingsPlansPurchaseRecommendationInput, ...func(*costexplorer.Options)) (*costexplorer.GetSavingsPlansPurchaseRecommendationOutput, error)
 }
 
+// ReservationRecommendationsAPI is optional so existing recommendation clients
+// can continue serving rightsizing and Savings Plans without RI support.
+type ReservationRecommendationsAPI interface {
+	GetReservationPurchaseRecommendation(context.Context, *costexplorer.GetReservationPurchaseRecommendationInput, ...func(*costexplorer.Options)) (*costexplorer.GetReservationPurchaseRecommendationOutput, error)
+}
+
+// ListReservationRecommendations retrieves every page within the shared retry and request budget.
+func (c *Client) ListReservationRecommendations(ctx context.Context, input costexplorer.GetReservationPurchaseRecommendationInput) ([]costexplorer.GetReservationPurchaseRecommendationOutput, error) {
+	api, ok := c.ceClient.(ReservationRecommendationsAPI)
+	if !ok {
+		return nil, errors.New("cost explorer client does not support reservation recommendations")
+	}
+	return recommendationPages(ctx, "getting reservation recommendations", input.NextPageToken, func(ctx context.Context, token *string) (*costexplorer.GetReservationPurchaseRecommendationOutput, error) {
+		pageInput := input
+		pageInput.NextPageToken = token
+		return api.GetReservationPurchaseRecommendation(ctx, &pageInput)
+	}, func(out *costexplorer.GetReservationPurchaseRecommendationOutput) *string { return out.NextPageToken })
+}
+
 // recommendationError retains the cause for classification without exposing AWS messages.
 type recommendationError struct {
 	operation string

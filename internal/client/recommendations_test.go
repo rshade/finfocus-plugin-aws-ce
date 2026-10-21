@@ -30,6 +30,23 @@ func (m *recommendationMock) GetSavingsPlansPurchaseRecommendation(_ context.Con
 	}
 	return &costexplorer.GetSavingsPlansPurchaseRecommendationOutput{NextPageToken: token}, err
 }
+
+func (m *recommendationMock) GetReservationPurchaseRecommendation(_ context.Context, in *costexplorer.GetReservationPurchaseRecommendationInput, _ ...func(*costexplorer.Options)) (*costexplorer.GetReservationPurchaseRecommendationOutput, error) {
+	token, err, empty := m.call(in.NextPageToken)
+	if empty {
+		return nil, err
+	}
+	return &costexplorer.GetReservationPurchaseRecommendationOutput{NextPageToken: token}, err
+}
+
+func TestListReservationRecommendations(t *testing.T) {
+	testRecommendationPages(t, func(ctx context.Context, c *Client) (int, error) {
+		in := costexplorer.GetReservationPurchaseRecommendationInput{Service: aws.String("Amazon Relational Database Service")}
+		pages, err := c.ListReservationRecommendations(ctx, in)
+		require.Nil(t, in.NextPageToken)
+		return len(pages), err
+	})
+}
 func TestListRightsizingRecommendations(t *testing.T) {
 	testRecommendationPages(t, func(ctx context.Context, c *Client) (int, error) {
 		in := costexplorer.GetRightsizingRecommendationInput{Service: aws.String("AmazonEC2")}

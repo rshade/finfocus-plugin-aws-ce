@@ -311,8 +311,9 @@ Release-token maintenance and development rules are in [CLAUDE.md](CLAUDE.md).
 ## Optimization recommendations
 
 `GetRecommendations` reads existing AWS Cost Explorer recommendations. The AWS
-identity needs `ce:GetRightsizingRecommendation` and
-`ce:GetSavingsPlansPurchaseRecommendation`, in addition to the permissions that
+identity needs `ce:GetRightsizingRecommendation`,
+`ce:GetSavingsPlansPurchaseRecommendation`, and
+`ce:GetReservationPurchaseRecommendation`, in addition to the permissions that
 other remote procedure calls need. You must enable Cost Explorer, and the account
 must already have eligible usage and recommendation datasets. Enable rightsizing
 recommendations in AWS and allow AWS time to prepare its dataset. Savings Plans
@@ -320,8 +321,9 @@ recommendations must already exist. This plugin never starts recommendation
 generation, purchases commitments, or modifies resources. Payer visibility and
 AWS account permissions determine which recommendations are available.
 
-An unfiltered request queries EC2 rightsizing and both Compute and EC2 Instance
-Savings Plans, plus account-scoped anomalies from the last 90 days. The AWS
+An unfiltered request queries EC2 rightsizing, both Compute and EC2 Instance
+Savings Plans, and RDS, Redshift, ElastiCache, and OpenSearch reservation purchase
+recommendations, plus account-scoped anomalies from the last 90 days. The AWS
 identity also needs `ce:GetAnomalies`. Use category `COST` to query only
 optimization opportunities. Use category `ANOMALY` or action `INVESTIGATE` to
 query only anomalies. Target-scoped requests query optimization opportunities
@@ -347,19 +349,46 @@ absent. AWS may omit the account ID on payer-scoped Savings Plans details. The
 plugin then uses resource `account:payer:savings-plan` and omits `account_id`
 metadata.
 
+Reserved Instance recommendations use
+[`GetReservationPurchaseRecommendation`](https://docs.aws.amazon.com/aws-cost-management/latest/APIReference/API_GetReservationPurchaseRecommendation.html)
+with payer scope, `THIRTY_DAYS`, `ONE_YEAR`, and `NO_UPFRONT`. EC2 RIs are excluded;
+EC2 commitment opportunities come from Savings Plans. MemoryDB and DynamoDB
+reservations are outside the supported scope. Requests use AWS billing service
+names, while `metadata.service` identifies `AmazonRDS`, `AmazonRedshift`,
+`AmazonElastiCache`, or `AmazonES`. OpenSearch uses the legacy billing service
+name `Amazon Elasticsearch Service` and `ESInstanceDetails`.
+
+Each reservation detail becomes a `PURCHASE_COMMITMENT` action with commitment
+type `reserved_instance` and AWS's recommended quantity. Monthly savings and
+currency come from AWS; upfront cost, recurring monthly cost, break-even months
+(when AWS supplies them), and service-specific instance details remain in
+metadata. These values are not locally calculated. Resource IDs such as
+`account:123456789012:reserved-instance:AmazonRDS` identify account purchase
+opportunities. They do not identify an existing database, cluster, or purchased
+reservation. Missing account identity is allowed for payer-scoped rows, labeled
+`payer`, with `account_id` omitted.
+
 For a running gRPC plugin with reflection enabled, request examples are:
 
 ```bash
 grpcurl -plaintext -d '{}' localhost:PORT finfocus.v1.CostSourceService/GetRecommendations
 grpcurl -plaintext -d '{"filter":{"actionType":"RECOMMENDATION_ACTION_TYPE_RIGHTSIZE","accountId":"123456789012","region":"us-east-1"},"projectionPeriod":"annual","pageSize":50}' localhost:PORT finfocus.v1.CostSourceService/GetRecommendations
 grpcurl -plaintext -d '{"filter":{"actionType":"RECOMMENDATION_ACTION_TYPE_PURCHASE_COMMITMENT"}}' localhost:PORT finfocus.v1.CostSourceService/GetRecommendations
+grpcurl -plaintext -d '{"filter":{"resourceType":"rds:Account","accountId":"123456789012","region":"us-east-1"}}' localhost:PORT finfocus.v1.CostSourceService/GetRecommendations
 ```
 
 Action and category filters select applicable sources before AWS access. EC2
 resource filters accept `ec2`, `ec2:Instance`, and `aws:ec2/instance:Instance`.
-Savings Plans use `savingsplans:Account`. The plugin sends account filters to
-AWS. Region filters apply exactly to mapped records using canonical AWS region
-codes. The plugin doesn't send rightsizing `REGION` filters to AWS, because AWS
+Savings Plans use `savingsplans:Account`. Reservations use `rds:Account`,
+`redshift:Account`, `elasticache:Account`, and `es:Account`; short service names
+and the AWS service codes above are accepted as aliases (`opensearch` also maps
+to `es:Account`). These filters query only their matching source, avoiding
+unrelated IAM permissions and datasets. `PURCHASE_COMMITMENT` without a resource
+type queries both Savings Plans types and all four reservation services.
+The plugin sends account filters to AWS. Reservations use the API's `AccountId`
+field, without positive dimension filter expressions. Region filters apply
+exactly to AWS region values in mapped records. The plugin doesn't send
+rightsizing `REGION` filters to AWS, because AWS
 requires region display names there. Target resource types restrict the selected
 AWS sources before credential initialization. Other filters apply to mapped
 records. Target resources require provider and type. A supplied stock keeping unit, region,
@@ -412,3 +441,9 @@ EC2 Instance Savings Plans each returned a recommendation object with no plan
 type and no details. A blank plan type with no details is an empty result. After
 that mapping change, the same live check passed with empty datasets for
 rightsizing, `TERMINATE`, and Savings Plans.
+
+The same environment also passed the reservation check on 2026-10-20: separate
+RDS, Redshift, ElastiCache, and OpenSearch requests and the combined commitment
+request all returned successful empty datasets through the plugin's SDK gRPC
+server. This verified API access, billing service names, and empty responses.
+Populated reservation mapping remains verified by offline fixtures.

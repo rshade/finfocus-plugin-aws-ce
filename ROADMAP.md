@@ -100,8 +100,8 @@ rule sets requiring a status-check migration when the workflow changed.
 |--------|-------|------------------|-------------------|
 | ✅ Done | [#13](https://github.com/rshade/finfocus-plugin-aws-ce/issues/13) | Optimization recommendations: EC2 rightsizing and Compute/EC2 Instance Savings Plans | Proxy AWS recommendations only |
 | ✅ Done | [#27](https://github.com/rshade/finfocus-plugin-aws-ce/issues/27) | EC2 rightsizing through `ce:GetRightsizingRecommendation`, delivered with #13 | Don't calculate utilization locally |
-| 🔬 Research | [#32](https://github.com/rshade/finfocus-plugin-aws-ce/issues/32) | Savings Plans Recommendations | Rely on AWS for return on investment and break-even math |
-| 🔬 Research | [#33](https://github.com/rshade/finfocus-plugin-aws-ce/issues/33) | Reserved Instance Recommendations | Target non-compute services such as RDS and Redshift |
+| ✅ Done | [#32](https://github.com/rshade/finfocus-plugin-aws-ce/issues/32) | Compute and EC2 Instance Savings Plans recommendations, delivered with #13 | Preserve AWS savings and upfront cost |
+| ✅ Done | [#33](https://github.com/rshade/finfocus-plugin-aws-ce/issues/33) | RDS, Redshift, ElastiCache, and OpenSearch Reserved Instance purchase recommendations | Proxy AWS estimates; exclude EC2 RIs |
 
 ### Cost comparison
 

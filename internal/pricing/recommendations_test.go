@@ -32,6 +32,10 @@ type recommendationAPI struct {
 	rightFail  error
 }
 
+func (m *recommendationAPI) GetReservationPurchaseRecommendation(context.Context, *costexplorer.GetReservationPurchaseRecommendationInput, ...func(*costexplorer.Options)) (*costexplorer.GetReservationPurchaseRecommendationOutput, error) {
+	return &costexplorer.GetReservationPurchaseRecommendationOutput{}, nil
+}
+
 func (m *recommendationAPI) GetRightsizingRecommendation(_ context.Context, in *costexplorer.GetRightsizingRecommendationInput, _ ...func(*costexplorer.Options)) (*costexplorer.GetRightsizingRecommendationOutput, error) {
 	m.calls = append(m.calls, "ec2")
 	m.rightInput = in

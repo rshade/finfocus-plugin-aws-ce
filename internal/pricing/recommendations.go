@@ -54,9 +54,10 @@ func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 		rights, plans = rights && targetRights, plans && targetPlans
 	}
 	var recs []*pbc.Recommendation
+	reservations := selectedReservationServices(req)
 	needAnomalies := combinedAnomalyRequest(req)
 	var ce *client.Client
-	if rights || plans || needAnomalies {
+	if rights || plans || len(reservations) > 0 || needAnomalies {
 		var pages int
 		ctx = c.withCostBudget(ctx, &pages)
 		var err error
@@ -97,6 +98,28 @@ func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 				recs = append(recs, mapped...)
 			}
 		}
+	}
+	for _, service := range reservations {
+		in := costexplorer.GetReservationPurchaseRecommendationInput{
+			Service: aws.String(service.name), AccountScope: types.AccountScopePayer,
+			LookbackPeriodInDays: types.LookbackPeriodInDaysThirtyDays,
+			TermInYears:          types.TermInYearsOneYear, PaymentOption: types.PaymentOptionNoUpfront,
+		}
+		// This API accepts an AccountId directly; do not reuse the positive
+		// dimension filters supported by rightsizing and Savings Plans.
+		if account := f.GetAccountId(); account != "" {
+			in.AccountId = aws.String(account)
+		}
+		pages, err := ce.ListReservationRecommendations(ctx, in)
+		if err != nil {
+			return nil, recommendationFailure(err)
+		}
+		mapped, err := mapReservationRecommendations(service.code, pages)
+		if err != nil {
+			logger.Error().Err(err).Str("service", service.code).Msg("invalid AWS reservation recommendation data")
+			return nil, status.Error(codes.DataLoss, "invalid AWS recommendation data: reservations")
+		}
+		recs = append(recs, mapped...)
 	}
 	if err := projectRecommendationSavings(recs, period); err != nil {
 		return nil, status.Error(codes.DataLoss, "invalid AWS recommendation projection")
@@ -201,6 +224,14 @@ func canonicalRecommendationType(s string) string {
 	switch s {
 	case "ec2", "aws:ec2/instance:Instance", "ec2:Instance":
 		return "ec2:Instance"
+	case "rds", "AmazonRDS":
+		return "rds:Account"
+	case "redshift", "AmazonRedshift":
+		return "redshift:Account"
+	case "elasticache", "AmazonElastiCache":
+		return "elasticache:Account"
+	case "es", "opensearch", "AmazonES":
+		return "es:Account"
 	}
 	return s
 }
@@ -328,7 +359,7 @@ func combinedAnomalyRequest(req *pbc.GetRecommendationsRequest) bool {
 	}
 	// Anomaly resource types are AWS service names, not optimization types.
 	switch canonicalRecommendationType(f.GetResourceType()) {
-	case "ec2:Instance", "savingsplans:Account":
+	case "ec2:Instance", "savingsplans:Account", "rds:Account", "redshift:Account", "elasticache:Account", "es:Account":
 		return false
 	}
 	return true

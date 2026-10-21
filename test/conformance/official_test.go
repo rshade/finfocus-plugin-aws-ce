@@ -110,7 +110,7 @@ func TestOfficialStandardConformance(t *testing.T) {
 		case "AWSInsightsIndexService.GetRightsizingRecommendation":
 			recommendations.Add(1)
 			_, _ = w.Write([]byte(`{"RightsizingRecommendations":[{"AccountId":"123456789012","RightsizingType":"TERMINATE","CurrentInstance":{"ResourceId":"i-0123456789abcdef0"},"TerminateRecommendationDetail":{"EstimatedMonthlySavings":"12.50","CurrencyCode":"USD"}}]}`))
-		case "AWSInsightsIndexService.GetSavingsPlansPurchaseRecommendation":
+		case "AWSInsightsIndexService.GetSavingsPlansPurchaseRecommendation", "AWSInsightsIndexService.GetReservationPurchaseRecommendation":
 			recommendations.Add(1)
 			_, _ = w.Write([]byte(`{}`))
 		case "AWSInsightsIndexService.GetDimensionValues":

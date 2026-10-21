@@ -43,6 +43,7 @@ operation, so match it against this table.
 | Anomalies | Cost Explorer GetAnomalies | `ce:GetAnomalies` | |
 | Rightsizing recommendations | Cost Explorer GetRightsizingRecommendation | `ce:GetRightsizingRecommendation` | Rightsizing enabled |
 | Savings Plans recommendations | Cost Explorer GetSavingsPlansPurchaseRecommendation | `ce:GetSavingsPlansPurchaseRecommendation` | An existing AWS recommendation |
+| Non-EC2 Reserved Instance recommendations | Cost Explorer GetReservationPurchaseRecommendation | `ce:GetReservationPurchaseRecommendation` | Eligible RDS, Redshift, ElastiCache, or OpenSearch usage |
 
 See the README section on AWS account prerequisites for the account settings.
 
@@ -52,7 +53,11 @@ Allow `ce:GetDimensionValues` for commitment discovery,
 `ce:GetCostForecast` and `ce:GetCostAndUsage` for an account or service projection,
 `ec2:DescribeSpotPriceHistory` and `pricing:GetProducts` for an EC2 Spot
 comparison, `budgets:ViewBudget` for `GetBudgets`, and `ce:GetAnomalies` for
-anomaly recommendations. Budgets uses its own endpoint. The Price List call
+anomaly recommendations. Unfiltered recommendation requests also retrieve
+non-EC2 reservations and need `ce:GetReservationPurchaseRecommendation`.
+Use `savingsplans:Account`, `ec2:Instance`, `rds:Account`, `redshift:Account`,
+`elasticache:Account`, or `es:Account` as a recommendation resource type filter
+to restrict the selected optimization APIs. Budgets uses its own endpoint. The Price List call
 uses the `us-east-1` pricing endpoint. The Spot call uses the resource region.
 `FINFOCUS_AWS_ACCOUNT_ID` selects the account. When it's empty, the plugin
 calls STS `GetCallerIdentity`. Resource-level
