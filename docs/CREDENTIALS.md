@@ -49,3 +49,31 @@ failures return sanitized errors. Missing region configuration returns
 configuration hint contains no credential values. The plugin excludes credential
 values from logs and statuses, including diagnostics that echo keys, tokens, or
 role ARNs.
+
+## Historical carbon permissions
+
+Only explicit `GetCarbonEmissions` requests need Sustainability permission.
+Enabling the setting, reading discovery metadata, and requesting monetary costs
+do not call Sustainability. Reports use the same default credential chain and
+per-request credential keys described above, including assume-role support.
+The service endpoint is `us-east-1`; usage-region filters select the reported
+regions without changing that endpoint.
+
+A read-only policy for this report is:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": "sustainability:GetEstimatedCarbonEmissions",
+    "Resource": "*"
+  }]
+}
+```
+
+Sustainability does not support resource ARN restrictions for this action.
+Account filters narrow a query within the caller's existing visibility; they
+do not grant access to another account. No S3 export or legacy
+`sustainability:GetCarbonFootprintSummary` permission is needed for this API.
+See the [AWS authorization reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_sustainability.html).

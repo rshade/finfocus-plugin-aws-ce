@@ -108,7 +108,7 @@ fixtures, with a companion recommendation remote procedure call check.
 make test-integration
 ```
 
-## Spec v0.7.8 features
+## Spec v0.7.9 features
 
 - `GetPluginInfo` advertises plugin settings from `internal/pricing/settings.go`. Add an entry there when the plugin reads a new
   environment variable. A test checks the list with `ValidatePluginSettings`.
@@ -123,6 +123,13 @@ make test-integration
   Advisor `r` maps to `0.05`, `0.10`, `0.15`, and `0.20`. The `>20%` bucket leaves the score at 0 and keeps the label in metadata.
   Don't derive the on-demand price from advisor field `s`, and don't pick the cheapest zone.
   Spot and on-demand rates cache for five minutes. The advisor document caches for one hour.
+
+## Documentation map
+
+- `docs/permissions.md` is the single source for IAM actions, role assumption, account settings, and network access. Update it, the README summary table, and the policy in `docs/deployment.md` whenever a feature calls a new AWS operation.
+- `docs/recommendations.md` holds `GetRecommendations` behavior. `docs/configuration.md` is the authoritative environment variable table. `internal/pricing/settings.go` must match it.
+- `manifest.json` and `manifest.yaml` are Release Please extra files and must stay in sync. Only `version` is read at runtime, by the Makefile. `specVersion` and `capabilities` use the SDK registry names, such as `actual_costs`. The reported spec version comes from `specVersion` in `internal/pricing/calculator.go`.
+- Don't name private environments, such as a Pulumi ESC environment, in committed docs.
 
 ## Dependencies
 
@@ -225,16 +232,12 @@ plain `vX.Y.Z` tag and release. The release-created event runs `goreleaser`.
 `GetRecommendations` implements EC2 rightsizing and Compute/EC2 Instance Savings
 Plans together. Issue #27 uses that rightsizing path. AWS accepts service
 `AmazonEC2` for `GetRightsizingRecommendation`, and the plugin copies `TERMINATE` and `MODIFY`
-savings from AWS. See `specs/005-aws-ce-recommendations-plugin/spec.md` and README
+savings from AWS. See `docs/recommendations.md` and `docs/permissions.md`
 for defaults, filters, permissions, and limitations. Keep SDK validation,
 selection, pagination, summary helpers, and `zerolog` operation logging. Preserve
 request-scoped credentials, retry budgets, the 100-page AWS cap, and all-source
 failure semantics. Never generate recommendations, purchase plans, or mutate
 resources. Ordinary tests use offline fixtures. The `awslive` recommendation
 test also requires `FINFOCUS_AWS_LIVE=true`. Don't run it without an explicit
-request for real AWS verification. On 2026-10-20,
-`TestAWSRecommendations` with `tailscale-phase-2/aws-oidc` received zero EC2
-rightsizing rows. Compute and EC2 Instance Savings Plans each returned a
-recommendation object with no plan type and no details. A blank plan type with
-no details is an empty result. After that mapping change, the same live check
-passed with empty datasets for rightsizing, `TERMINATE`, and Savings Plans.
+request for real AWS verification. A blank plan type with no details is an empty
+result.

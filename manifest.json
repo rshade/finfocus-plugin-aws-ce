@@ -2,8 +2,10 @@
   "metadata": {
     "name": "aws-ce",
     "version": "0.1.0",
-    "description": "FinFocus plugin for aws-ce",
+    "description": "FinFocus plugin that reads actual costs, forecasts, budgets, and optimization recommendations from AWS Cost Explorer",
     "author": "rshade",
+    "homepage": "https://github.com/rshade/finfocus-plugin-aws-ce",
+    "repository": "https://github.com/rshade/finfocus-plugin-aws-ce",
     "license": "Apache-2.0",
     "keywords": [
       "finfocus",
@@ -13,12 +15,16 @@
     ]
   },
   "specification": {
-    "specVersion": "v0.7.8",
+    "specVersion": "v0.7.9",
     "supportedProviders": [
       "aws"
     ],
     "capabilities": [
-      "actual_cost"
+      "actual_costs",
+      "projected_costs",
+      "budgets",
+      "recommendations",
+      "batch_cost"
     ]
   }
 }

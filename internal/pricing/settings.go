@@ -8,8 +8,10 @@ import (
 )
 
 const (
-	BatchSizeEnv    = "FINFOCUS_AWS_CE_MAX_BATCH_SIZE"
-	BatchWorkersEnv = "FINFOCUS_AWS_CE_BATCH_WORKERS"
+	// CarbonEnabledEnv opts in to historical aggregate emissions reporting.
+	CarbonEnabledEnv = "FINFOCUS_AWS_CARBON_ENABLED"
+	BatchSizeEnv     = "FINFOCUS_AWS_CE_MAX_BATCH_SIZE"
+	BatchWorkersEnv  = "FINFOCUS_AWS_CE_BATCH_WORKERS"
 
 	// DefaultBatchWorkers is the SDK maximum, so a whole batch reaches the
 	// resource batcher together and shares Cost Explorer queries.
@@ -35,6 +37,7 @@ const (
 // credential chain variables stay out: the AWS SDK owns them and some are secret.
 func pluginSettings() []*pbc.PluginSetting {
 	return []*pbc.PluginSetting{
+		{Key: "carbon_enabled", Env: CarbonEnabledEnv, Type: pbc.PluginSettingType_PLUGIN_SETTING_TYPE_BOOL, DefaultValue: "false", Description: "Enable historical aggregate AWS emissions reporting through GetCarbonEmissions. Requires a process restart."},
 		{
 			Key:         "plugin_port",
 			Env:         "FINFOCUS_PLUGIN_PORT",
@@ -73,7 +76,7 @@ func pluginSettings() []*pbc.PluginSetting {
 			Key:         "max_requests_per_minute",
 			Env:         maxRequestsEnv,
 			Type:        pbc.PluginSettingType_PLUGIN_SETTING_TYPE_INT,
-			Description: "Cost Explorer page budget per minute. Each page costs $0.01. Unset or 0 means no limit.",
+			Description: "AWS request attempt budget per minute, including historical carbon reports. Cost Explorer pages cost $0.01. Unset or 0 means no limit.",
 		},
 		{
 			Key:          "spot_comparison",

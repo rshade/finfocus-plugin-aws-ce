@@ -19,6 +19,7 @@ cost CLI. See the [FinFocus docs](https://rshade.github.io/finfocus/).
 | Recommendations | EC2 rightsizing, Savings Plans, reservation purchases, and cost anomalies that AWS already holds |
 | Batch costs | Fans one request out over many resources and shares Cost Explorer queries between them |
 | Spot comparison | Opt-in. Quotes the Spot price for an EC2 instance, with an on-demand rate and interruption score |
+| Historical carbon | Opt-in. Monthly AWS emissions estimates by account, region, and service, with model provenance |
 
 The plugin reads data only. It never creates budgets, purchases commitments, or
 changes resources, and it doesn't calculate its own forecasts. Cost Explorer can't
@@ -67,6 +68,7 @@ requirements.
 | Rightsizing | `ce:GetRightsizingRecommendation` |
 | Savings Plans recommendations | `ce:GetSavingsPlansPurchaseRecommendation` |
 | Reservation recommendations | `ce:GetReservationPurchaseRecommendation` |
+| Historical carbon reports | `sustainability:GetEstimatedCarbonEmissions` |
 | Assume a host-supplied role | `sts:AssumeRole` |
 
 Some features also need a setting in the AWS management account:
@@ -99,6 +101,7 @@ interactions.
 | `FINFOCUS_AWS_CE_BATCH_WINDOW_MS` | How long resource lookups wait to share one query. `0` queries each alone | `50` |
 | `FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` | Cost Explorer and Budgets request budget per minute | Unlimited |
 | `FINFOCUS_AWS_CE_MAX_WAIT_SECONDS` | Longest a request queues for the budget or a throttle cooldown. `0` fails at once | `90` |
+| `FINFOCUS_AWS_CARBON_ENABLED` | Enable historical aggregate emissions discovery; restart to apply | `false` |
 | `FINFOCUS_AWS_CE_SPOT_COMPARISON` | `true` answers EC2 instance projections with a Spot quote | `false` |
 | `FINFOCUS_AWS_ACCOUNT_ID` | Account for Budgets. Empty uses STS `GetCallerIdentity` | Empty |
 | `FINFOCUS_HEALTH_ENDPOINT` | Serve `/healthz` on the plugin port. Also turns on Connect | `false` |
@@ -145,6 +148,37 @@ routing:
 
 The comparison also fetches the public Spot Instance Advisor feed over HTTPS. See
 [network access](docs/permissions.md#network-access).
+
+## Historical carbon reporting
+
+Enable reporting with `export FINFOCUS_AWS_CARBON_ENABLED=true`, or use FinFocus
+plugin configuration:
+
+```yaml
+plugins:
+  aws-ce:
+    carbon_enabled: true
+```
+
+The setting defaults to `false` and requires a process restart. Enabling it adds
+`HISTORICAL_CARBON` and `GetCarbonEmissions` discovery without AWS access. It is
+separate from projected carbon estimates. Explicit reports retrieve monthly
+account/region/service estimates from the AWS Sustainability API and require
+`sustainability:GetEstimatedCarbonEmissions`. Ordinary monetary requests make no
+Sustainability calls, including when the setting is enabled.
+
+With the companion FinFocus core and SDK changes installed:
+
+```sh
+finfocus carbon actual --start 2026-08-01 --end 2026-09-01 --output json
+```
+
+Reports preserve accounting method, emissions scope, original month, AWS model
+version and source. Missing data is not zero, and aggregate totals are never
+assigned to individual resources. See [historical carbon reporting](docs/carbon.md)
+for permissions, publication timing and release coordination, and the
+[configuration reference](docs/configuration.md#historical-aggregate-emissions-opt-in)
+for accepted values and disabled behavior.
 
 ## Things to know about the data
 

@@ -53,7 +53,7 @@ To prevent scope creep and architectural drift, this project adheres to the foll
 | `GetActualCost` | ✅ Offline protocol/contract verified | `GetCostAndUsage`, `GetCostAndUsageWithResources` |
 | `GetProjectedCost` | ✅ Proxies AWS values | Month-to-date `GetCostAndUsage` plus `GetCostForecast` to the end of the Coordinated Universal Time month, for `aws:account` and `aws:service` only |
 
-### SDK compliance for v0.7.8
+### SDK compliance for v0.7.9
 
 The plugin uses standardized SDK helpers:
 
@@ -73,7 +73,7 @@ The plugin uses standardized SDK helpers:
 
 ### Future work and current limits
 
-The v0.7.8 SDK already provides budgets and recommendations interfaces and
+The v0.7.9 SDK already provides budgets and recommendations interfaces and
 FOCUS commitment fields. Those features need plugin implementations and
 verification. Their presence isn't evidence of a protocol gap. Anomaly
 mapping requires separate design work outside this release.

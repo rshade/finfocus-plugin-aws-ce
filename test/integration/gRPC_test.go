@@ -56,7 +56,8 @@ func TestPluginSubprocessGRPC(t *testing.T) {
 		_, _ = w.Write([]byte(`{"ResultsByTime":[{"Estimated":true,"TimePeriod":{"Start":"2026-09-20","End":"2026-09-21"},"Groups":[{"Keys":["i-0abc123def4567890"],"Metrics":{"UnblendedCost":{"Amount":"2.50","Unit":"USD"}}}]}]}`))
 	}))
 	defer fake.Close()
-	env := map[string]string{"AWS_ENDPOINT_URL_COST_EXPLORER": fake.URL, "AWS_ENDPOINT_URL": fake.URL, "AWS_IGNORE_CONFIGURED_ENDPOINT_URLS": "false", "AWS_ACCESS_KEY_ID": "test", "AWS_SECRET_ACCESS_KEY": "test", "AWS_SESSION_TOKEN": "", "AWS_PROFILE": "", "AWS_REGION": "us-east-1", "AWS_EC2_METADATA_DISABLED": "true", "FINFOCUS_LOG_FILE": "", "FINFOCUS_PLUGIN_PORT": "0", "FINFOCUS_LOG_LEVEL": "debug", "FINFOCUS_AWS_CE_MAX_BATCH_SIZE": "2", "FINFOCUS_AWS_CE_BATCH_WORKERS": "1"}
+	// Enabling carbon must not add a Sustainability call to ordinary cost RPCs.
+	env := map[string]string{"FINFOCUS_AWS_CARBON_ENABLED": "true", "AWS_ENDPOINT_URL_SUSTAINABILITY": fake.URL, "AWS_ENDPOINT_URL_COST_EXPLORER": fake.URL, "AWS_ENDPOINT_URL": fake.URL, "AWS_IGNORE_CONFIGURED_ENDPOINT_URLS": "false", "AWS_ACCESS_KEY_ID": "test", "AWS_SECRET_ACCESS_KEY": "test", "AWS_SESSION_TOKEN": "", "AWS_PROFILE": "", "AWS_REGION": "us-east-1", "AWS_EC2_METADATA_DISABLED": "true", "FINFOCUS_LOG_FILE": "", "FINFOCUS_PLUGIN_PORT": "0", "FINFOCUS_LOG_LEVEL": "debug", "FINFOCUS_AWS_CE_MAX_BATCH_SIZE": "2", "FINFOCUS_AWS_CE_BATCH_WORKERS": "1"}
 	proc := testutil.StartPlugin(t, env, "--port", "0")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -64,7 +65,7 @@ func TestPluginSubprocessGRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.GetName() != "aws-ce" || info.GetSpecVersion() != "v0.7.8" {
+	if info.GetName() != "aws-ce" || info.GetSpecVersion() != "v0.7.9" {
 		t.Fatalf("plugin info: %v", info)
 	}
 	supported, err := proc.Client.Supports(ctx, &pbc.SupportsRequest{Resource: &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "ec2", Id: "i-0abc123def4567890"}})

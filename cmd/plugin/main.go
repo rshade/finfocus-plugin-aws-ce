@@ -51,8 +51,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	carbonEnabled, err := carbonSettingsFromEnv()
+	if err != nil {
+		logger.Error().Err(err).Msg("Invalid carbon configuration")
+		os.Exit(1)
+	}
+
 	// Create the plugin implementation
-	plugin := pricing.NewCalculator()
+	plugin := pricing.NewCalculator(pricing.WithCarbonEnabled(carbonEnabled))
 
 	// Cancel the server context when the process receives a shutdown signal.
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
