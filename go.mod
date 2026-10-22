@@ -9,11 +9,11 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.9
 	github.com/aws/aws-sdk-go-v2/service/budgets v1.53.2
 	github.com/aws/aws-sdk-go-v2/service/costexplorer v1.74.2
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.339.0
-	github.com/aws/aws-sdk-go-v2/service/pricing v1.49.4
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.340.0
+	github.com/aws/aws-sdk-go-v2/service/pricing v1.50.0
 	github.com/aws/aws-sdk-go-v2/service/sts v1.51.4
 	github.com/aws/aws-sdk-go-v2/service/sustainability v1.9.4
-	github.com/aws/smithy-go v1.28.5
+	github.com/aws/smithy-go v1.28.6
 	github.com/rs/zerolog v1.35.1
 	github.com/rshade/finfocus-spec v0.7.10-0.20261021120617-e2a3a9929df6
 	github.com/stretchr/testify v1.12.1
