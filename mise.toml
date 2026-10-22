@@ -21,7 +21,7 @@ node = "24"
 
 # Markdown linting CLI.
 "npm:markdownlint-cli2" = "0.24.0"
-"npm:@fission-ai/openspec" = "1.14.1"
+"npm:@fission-ai/openspec" = "1.14.3"
 
 # Lints GitHub workflow YAML files.
 actionlint = "1.7.12"
