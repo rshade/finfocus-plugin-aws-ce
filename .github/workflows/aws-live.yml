@@ -51,7 +51,7 @@ jobs:
           token-expiration: 900
 
       - name: Open existing AWS environment
-        uses: pulumi/esc-action@v3
+        uses: pulumi/esc-action@v4
         with:
           environment: ${{ vars.PULUMI_ESC_ENVIRONMENT }}
           keys: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_SESSION_TOKEN,AWS_REGION
