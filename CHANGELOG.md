@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.2](https://github.com/rshade/finfocus-plugin-aws-ce/compare/v0.1.1...v0.1.2) (2026-10-31)
+
+
+### Features
+
+* **carbon:** add opt-in historical AWS emissions reports ([#87](https://github.com/rshade/finfocus-plugin-aws-ce/issues/87)) ([1e27059](https://github.com/rshade/finfocus-plugin-aws-ce/commit/1e27059db5f7fbe0fdedfc85d45824ce2eb37814)), closes [#29](https://github.com/rshade/finfocus-plugin-aws-ce/issues/29)
+
+
+### Bug Fixes
+
+* **deps:** update go dependencies ([#84](https://github.com/rshade/finfocus-plugin-aws-ce/issues/84)) ([071a3a6](https://github.com/rshade/finfocus-plugin-aws-ce/commit/071a3a6c0f1c82fe3d2da4355b090455a8750551))
+* **deps:** update go dependencies ([#88](https://github.com/rshade/finfocus-plugin-aws-ce/issues/88)) ([acf0aad](https://github.com/rshade/finfocus-plugin-aws-ce/commit/acf0aad75fc2f1e5280f0a8131780718576e333f))
+
+
+### Documentation
+
+* link AWS Cost Explorer and FinFocus from the README ([#85](https://github.com/rshade/finfocus-plugin-aws-ce/issues/85)) ([1178fa6](https://github.com/rshade/finfocus-plugin-aws-ce/commit/1178fa6147b77f7d847361529196b68e6f5d6ba5))
+
 ## [0.1.1](https://github.com/rshade/finfocus-plugin-aws-ce/compare/v0.1.0...v0.1.1) (2026-10-21)
 
 
