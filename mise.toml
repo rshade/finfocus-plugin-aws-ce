@@ -27,7 +27,7 @@ node = "24"
 actionlint = "1.7.12"
 
 # Prose linting for documentation.
-vale = "3.24.0"
+vale = "3.26.0"
 
 # Commitlint dependencies are locked in package-lock.json; install with npm ci.
 
