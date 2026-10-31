@@ -12,7 +12,7 @@ golangci-lint = "2.15.0"
 "go:golang.org/x/vuln/cmd/govulncheck" = "1.9.0"
 
 # Release binary building.
-goreleaser = "2.18.3"
+goreleaser = "2.19.0"
 
 # ------------------------------------------------------------------ docs & lint
 
