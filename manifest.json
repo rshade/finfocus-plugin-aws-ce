@@ -15,7 +15,7 @@
     ]
   },
   "specification": {
-    "specVersion": "v0.7.9",
+    "specVersion": "v0.7.11",
     "supportedProviders": [
       "aws"
     ],
