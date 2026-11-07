@@ -2,7 +2,7 @@
 
 `finfocus-plugin-aws-ce` (plugin name `aws-ce`) retrieves **actual AWS costs** from
 AWS Cost Explorer for [FinFocus](https://github.com/rshade/finfocus). It
-implements the `finfocus-spec` v0.7.9 protocol over gRPC.
+implements the `finfocus-spec` v0.7.11 protocol over gRPC.
 
 This plugin integrates [AWS Cost Explorer](https://aws.amazon.com/aws-cost-management/aws-cost-explorer/)
 ([documentation](https://docs.aws.amazon.com/cost-management/latest/userguide/ce-what-is.html))
@@ -18,7 +18,7 @@ cost CLI. See the [FinFocus docs](https://rshade.github.io/finfocus/).
 | Budgets | Reads AWS Budgets and reports spend and health status |
 | Recommendations | EC2 rightsizing, Savings Plans, reservation purchases, and cost anomalies that AWS already holds |
 | Batch costs | Fans one request out over many resources and shares Cost Explorer queries between them |
-| Spot comparison | Opt-in. Quotes the Spot price for an EC2 instance, with an on-demand rate and interruption score |
+| Spot comparison | Opt-in. Quotes the Spot price for an EC2 instance, with an on-demand rate and interruption score, and recommends moving target instances to Spot |
 | Historical carbon | Opt-in. Monthly AWS emissions estimates by account, region, and service, with model provenance |
 
 The plugin reads data only. It never creates budgets, purchases commitments, or
@@ -62,7 +62,7 @@ requirements.
 | Account and service costs | `ce:GetCostAndUsage`, `ce:GetDimensionValues` |
 | Resource costs | `ce:GetCostAndUsageWithResources`, `ce:GetDimensionValues` |
 | Projected costs | `ce:GetCostForecast`, `ce:GetCostAndUsage` |
-| Spot comparison | `ec2:DescribeSpotPriceHistory`, `pricing:GetProducts` |
+| Spot comparison and Spot recommendations | `ec2:DescribeSpotPriceHistory`, `pricing:GetProducts` |
 | Budgets | `budgets:ViewBudget` |
 | Anomalies | `ce:GetAnomalies` |
 | Rightsizing | `ce:GetRightsizingRecommendation` |
@@ -102,7 +102,7 @@ interactions.
 | `FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` | Cost Explorer and Budgets request budget per minute | Unlimited |
 | `FINFOCUS_AWS_CE_MAX_WAIT_SECONDS` | Longest a request queues for the budget or a throttle cooldown. `0` fails at once | `90` |
 | `FINFOCUS_AWS_CARBON_ENABLED` | Enable historical aggregate emissions discovery; restart to apply | `false` |
-| `FINFOCUS_AWS_CE_SPOT_COMPARISON` | `true` answers EC2 instance projections with a Spot quote | `false` |
+| `FINFOCUS_AWS_CE_SPOT_COMPARISON` | `true` answers EC2 instance projections with a Spot quote and adds move-to-Spot recommendations for target instances | `false` |
 | `FINFOCUS_AWS_ACCOUNT_ID` | Account for Budgets. Empty uses STS `GetCallerIdentity` | Empty |
 | `FINFOCUS_HEALTH_ENDPOINT` | Serve `/healthz` on the plugin port. Also turns on Connect | `false` |
 | `FINFOCUS_WEB_ENABLED` | Serve Connect and gRPC-Web beside gRPC | `false` |
@@ -126,6 +126,12 @@ returns the current Spot price, with the on-demand rate and an interruption scor
 With it off, the same request returns `InvalidArgument`, and FinFocus core falls back
 to the next plugin, such as `aws-public`, which prices the instance at its on-demand
 rate.
+
+The same switch makes `GetRecommendations` return a move-to-Spot recommendation for
+each EC2 target resource that has an instance type and an availability zone. It is
+a computed recommendation, labeled with the source `aws-spot-pricing`, with savings,
+`pricing_category` `DYNAMIC`, and an interruption risk score. See
+[Spot recommendations](docs/recommendations.md#spot-recommendations).
 
 Leave it off when another plugin prices your instances. FinFocus core uses the first
 plugin that answers a projected-cost request, and at equal priority it asks `aws-ce`

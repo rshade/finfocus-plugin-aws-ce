@@ -65,7 +65,7 @@ func TestPluginSubprocessGRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.GetName() != "aws-ce" || info.GetSpecVersion() != "v0.7.9" {
+	if info.GetName() != "aws-ce" || info.GetSpecVersion() != "v0.7.11" {
 		t.Fatalf("plugin info: %v", info)
 	}
 	supported, err := proc.Client.Supports(ctx, &pbc.SupportsRequest{Resource: &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "ec2", Id: "i-0abc123def4567890"}})

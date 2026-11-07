@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap outlines the development path for `finfocus-plugin-aws-ce`, prioritizing direct API integration, FOCUS standard compliance, and adherence to the `finfocus-spec` v0.7.9.
+This roadmap outlines the development path for `finfocus-plugin-aws-ce`, prioritizing direct API integration, FOCUS standard compliance, and adherence to the `finfocus-spec` v0.7.11.
 
 > **Constitutional reference:** all features must comply with [CONTEXT.md](./CONTEXT.md) boundaries. The project rejects features that violate these boundaries.
 
@@ -97,10 +97,11 @@ rule sets requiring a status-check migration when the workflow changed.
 
 | Status | Issue | Technical Thesis | Boundary Guardrail |
 |--------|-------|------------------|-------------------|
-| ✅ Done | [#13](https://github.com/rshade/finfocus-plugin-aws-ce/issues/13) | Optimization recommendations: EC2 rightsizing and Compute/EC2 Instance Savings Plans | Proxy AWS recommendations only |
+| ✅ Done | [#13](https://github.com/rshade/finfocus-plugin-aws-ce/issues/13) | Optimization recommendations: EC2 rightsizing and Compute/EC2 Instance Savings Plans | Proxy AWS recommendations only. The opt-in Spot recommendation below is the one computed exception |
 | ✅ Done | [#27](https://github.com/rshade/finfocus-plugin-aws-ce/issues/27) | EC2 rightsizing through `ce:GetRightsizingRecommendation`, delivered with #13 | Don't calculate utilization locally |
 | ✅ Done | [#32](https://github.com/rshade/finfocus-plugin-aws-ce/issues/32) | Compute and EC2 Instance Savings Plans recommendations, delivered with #13 | Preserve AWS savings and upfront cost |
 | ✅ Done | [#33](https://github.com/rshade/finfocus-plugin-aws-ce/issues/33) | RDS, Redshift, ElastiCache, and OpenSearch Reserved Instance purchase recommendations | Proxy AWS estimates; exclude EC2 RIs |
+| ✅ Done | OpenSpec change `add-spot-recommendations` | Move-to-Spot recommendations for EC2 target resources, with `pricing_category` `DYNAMIC` and an interruption risk score | Opt-in. Targets only, skip a target instead of failing, never pick the cheapest zone |
 
 ### Cost comparison
 

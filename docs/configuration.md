@@ -20,7 +20,7 @@ that launches it. `GetPluginInfo.settings` advertises the settings below.
 | `FINFOCUS_AWS_CE_BATCH_WORKERS` | `50` | Concurrent batch workers, integer from 1 to 50 |
 | `FINFOCUS_AWS_CE_MAX_REQUESTS_PER_MINUTE` | `0`, unlimited | AWS request attempts allowed in a rolling minute, including historical carbon reports. Each Cost Explorer page costs $0.01 |
 | `FINFOCUS_AWS_CARBON_ENABLED` | `false` | Opt in to historical aggregate AWS emissions reporting and advertise `HISTORICAL_CARBON` / `GetCarbonEmissions`. Restart to apply. Enabling and discovery make no AWS calls |
-| `FINFOCUS_AWS_CE_SPOT_COMPARISON` | `false` | `true` answers `GetProjectedCost` for an EC2 instance that has a type and a zone with a Spot quote. Off returns `InvalidArgument` so another plugin can price it |
+| `FINFOCUS_AWS_CE_SPOT_COMPARISON` | `false` | `true` answers `GetProjectedCost` for an EC2 instance that has a type and a zone with a Spot quote, and makes `GetRecommendations` add a move-to-Spot recommendation for each such target resource. Off returns `InvalidArgument` for the projection so another plugin can price it, and adds no Spot recommendation |
 | `FINFOCUS_AWS_CE_MAX_WAIT_SECONDS` | `90` | Longest a request queues for the budget or an AWS throttle cooldown. `0` fails an over-budget request at once |
 | `FINFOCUS_AWS_CE_BATCH_WINDOW_MS` | `50` | How long resource cost lookups wait for others to join one Cost Explorer query, up to 5000. `0` queries each resource alone |
 | `FINFOCUS_HEALTH_ENDPOINT` | `false` | Serve `/healthz` on the plugin listener and enable Connect |

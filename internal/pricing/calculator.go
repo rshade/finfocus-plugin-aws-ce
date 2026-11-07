@@ -76,7 +76,7 @@ var (
 const (
 	pluginName = "aws-ce"
 	// specVersion must keep the leading v. pluginsdk.ValidateSpecVersion rejects "0.7.0".
-	specVersion   = "v0.7.9"
+	specVersion   = "v0.7.11"
 	supportedRPCs = "GetActualCost,GetProjectedCost,GetBudgets,GetRecommendations,Supports,GetPluginInfo,BatchCost"
 )
 

@@ -121,6 +121,9 @@ func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 		}
 		recs = append(recs, mapped...)
 	}
+	if c.spotComparison && spotFilterAllows(f) {
+		recs = append(recs, c.spotRecommendations(ctx, logger, req.GetTargetResources())...)
+	}
 	if err := projectRecommendationSavings(recs, period); err != nil {
 		return nil, status.Error(codes.DataLoss, "invalid AWS recommendation projection")
 	}

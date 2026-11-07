@@ -20,7 +20,7 @@ const (
 	// HealthEndpointEnv enables the SDK /healthz endpoint. The SDK serves it on
 	// the plugin listener, and only while Connect is enabled.
 	HealthEndpointEnv = "FINFOCUS_HEALTH_ENDPOINT"
-	// SpotComparisonEnv opts in to Spot quotes from GetProjectedCost.
+	// SpotComparisonEnv opts in to Spot quotes from GetProjectedCost and move-to-Spot GetRecommendations rows.
 	SpotComparisonEnv = "FINFOCUS_AWS_CE_SPOT_COMPARISON"
 	// WebEnabledEnv serves Connect, gRPC-Web, and gRPC on the plugin listener.
 	WebEnabledEnv = "FINFOCUS_WEB_ENABLED"
@@ -83,7 +83,7 @@ func pluginSettings() []*pbc.PluginSetting {
 			Env:          SpotComparisonEnv,
 			Type:         pbc.PluginSettingType_PLUGIN_SETTING_TYPE_BOOL,
 			DefaultValue: "false",
-			Description:  "Answer GetProjectedCost for an EC2 instance with a type and a zone with a Spot quote. A Spot quote is not the on-demand price, so leave this off when another plugin prices instances.",
+			Description:  "Answer GetProjectedCost for an EC2 instance with a type and a zone with a Spot quote, and add a move-to-Spot recommendation to GetRecommendations for each such target resource. A Spot quote is not the on-demand price, so leave this off when another plugin prices instances.",
 		},
 		{
 			Key:          "health_endpoint",
