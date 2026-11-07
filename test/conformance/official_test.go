@@ -150,6 +150,25 @@ func TestOfficialStandardConformance(t *testing.T) {
 	if recErr != nil || len(recs.GetRecommendations()) != 2 || recs.GetSummary().GetTotalEstimatedSavings() != 12.5 {
 		t.Fatalf("offline recommendation RPC: response=%v error=%v", recs, recErr)
 	}
+	spotRecs, spotErr := process.Client.GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{
+		TargetResources: []*pbc.ResourceDescriptor{{
+			Provider: "aws", ResourceType: "aws:ec2/instance:Instance", Sku: "t3.micro", Region: "us-east-1", Id: resourceID,
+			Tags: map[string]string{"availability_zone": "us-east-1a"},
+		}},
+	})
+	if spotErr != nil || len(spotRecs.GetRecommendations()) != 1 {
+		t.Fatalf("offline Spot recommendation RPC: response=%v error=%v", spotRecs, spotErr)
+	}
+	spot := spotRecs.GetRecommendations()[0]
+	if spot.GetSource() != "aws-spot-pricing" ||
+		spot.GetPricingCategory() != pbc.FocusPricingCategory_FOCUS_PRICING_CATEGORY_DYNAMIC ||
+		spot.GetSpotInterruptionRiskScore() != 0 ||
+		spot.GetImpact().GetEstimatedSavings() < 4.67 || spot.GetImpact().GetEstimatedSavings() > 4.68 {
+		t.Fatalf("offline Spot recommendation content: %v", spot)
+	}
+	if err := pluginsdk.ValidateRecommendation(spot); err != nil {
+		t.Fatalf("offline Spot recommendation invalid: %v", err)
+	}
 	anomalyPage, anomalyErr := process.Client.GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{
 		Filter: &pbc.RecommendationFilter{Category: pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_ANOMALY},
 	})
@@ -221,6 +240,7 @@ func conformanceEnvironment(t *testing.T, endpoint string) map[string]string {
 		"AWS_ACCESS_KEY_ID": "test", "AWS_SECRET_ACCESS_KEY": "test", "AWS_EC2_METADATA_DISABLED": "true",
 		"AWS_CONFIG_FILE": emptyConfig, "AWS_SHARED_CREDENTIALS_FILE": emptyConfig, "AWS_MAX_ATTEMPTS": "1",
 		"FINFOCUS_LOG_FILE": "", "FINFOCUS_PLUGIN_PORT": "0", "FINFOCUS_TEST_MODE": "true",
+		"FINFOCUS_AWS_CE_SPOT_COMPARISON": "true",
 	} {
 		env[key] = value
 	}

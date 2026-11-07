@@ -75,11 +75,34 @@ func isEC2Instance(resourceType string) bool {
 	}
 }
 
+type spotQuote struct {
+	hourly      float64
+	onDemand    float64
+	hasOnDemand bool
+	risk        spotInterruption
+}
+
 func (c *Calculator) quoteSpot(ctx context.Context, logger zerolog.Logger, req *pbc.GetProjectedCostRequest) (*pbc.GetProjectedCostResponse, error) {
 	query, err := parseSpotQuery(req.GetResource())
 	if err != nil {
 		return nil, err
 	}
+	quote, err := c.spotQuoteFor(ctx, logger, query)
+	if err != nil {
+		return nil, err
+	}
+	hours := pluginsdk.DefaultMonthlyHours(req.GetUsageProfile())
+	resp := buildSpotResponse(query, quote, hours, time.Now().UTC())
+	if err := pluginsdk.ValidateGetProjectedCostResponse(resp); err != nil {
+		return nil, status.Error(codes.Internal, "spot quote response is invalid")
+	}
+	if resp.GetSpotInterruptionRiskScore() == 0 {
+		logger.Warn().Str("instance_type", query.instanceType).Msg("spot interruption score unavailable")
+	}
+	return resp, nil
+}
+
+func (c *Calculator) spotQuoteFor(ctx context.Context, logger zerolog.Logger, query spotQuery) (spotQuote, error) {
 	spots := c.spotQuote
 	demands := c.onDemandQuote
 	risks := c.spotRisk
@@ -88,9 +111,9 @@ func (c *Calculator) quoteSpot(ctx context.Context, logger zerolog.Logger, req *
 		ce, per, callErr := c.clientForCall(ctx, logger)
 		if callErr != nil {
 			if _, ok := status.FromError(callErr); ok {
-				return nil, callErr
+				return spotQuote{}, callErr
 			}
-			return nil, status.Errorf(codes.Internal, "client initialization failed: %v", callErr)
+			return spotQuote{}, status.Errorf(codes.Internal, "client initialization failed: %v", callErr)
 		}
 		perRequest = per
 		if spots == nil {
@@ -111,26 +134,18 @@ func (c *Calculator) quoteSpot(ctx context.Context, logger zerolog.Logger, req *
 
 	hourly, err := spots.LatestSpotPrice(ctx, query.region, query.instanceType, query.product, query.availabilityZone)
 	if err != nil {
-		return nil, c.spotCallError(logger, perRequest, err)
+		return spotQuote{}, c.spotCallError(logger, perRequest, err)
 	}
 	onDemand, hasOnDemand, err := demands.OnDemandHourly(ctx, query.region, query.instanceType, query.priceListOS)
 	if err != nil {
-		return nil, c.spotCallError(logger, perRequest, err)
+		return spotQuote{}, c.spotCallError(logger, perRequest, err)
 	}
 	risk, err := risks.Interruption(ctx, query.region, query.advisorOS, query.instanceType)
 	if err != nil {
 		logger.Warn().Msg("spot interruption feed unavailable")
 		risk = spotInterruption{}
 	}
-	hours := pluginsdk.DefaultMonthlyHours(req.GetUsageProfile())
-	resp := buildSpotResponse(query, hourly, hours, onDemand, hasOnDemand, risk, time.Now().UTC())
-	if err := pluginsdk.ValidateGetProjectedCostResponse(resp); err != nil {
-		return nil, status.Error(codes.Internal, "spot quote response is invalid")
-	}
-	if resp.GetSpotInterruptionRiskScore() == 0 {
-		logger.Warn().Str("instance_type", query.instanceType).Msg("spot interruption score unavailable")
-	}
-	return resp, nil
+	return spotQuote{hourly: hourly, onDemand: onDemand, hasOnDemand: hasOnDemand, risk: risk}, nil
 }
 
 func (c *Calculator) spotCallError(logger zerolog.Logger, perRequest bool, err error) error {
@@ -179,7 +194,8 @@ func parseSpotQuery(resource *pbc.ResourceDescriptor) (spotQuery, error) {
 	}, nil
 }
 
-func buildSpotResponse(query spotQuery, hourly, hours, onDemand float64, hasOnDemand bool, risk spotInterruption, now time.Time) *pbc.GetProjectedCostResponse {
+func buildSpotResponse(query spotQuery, quote spotQuote, hours float64, now time.Time) *pbc.GetProjectedCostResponse {
+	hourly, onDemand, hasOnDemand, risk := quote.hourly, quote.onDemand, quote.hasOnDemand, quote.risk
 	monthly := hourly * hours
 	detail := fmt.Sprintf("Spot %s %s in %s at %s USD per hour for %s hours", query.product, query.instanceType, query.availabilityZone, strconv.FormatFloat(hourly, 'f', -1, 64), strconv.FormatFloat(hours, 'f', -1, 64))
 	opts := []pluginsdk.GetProjectedCostResponseOption{
