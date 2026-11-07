@@ -12,7 +12,7 @@ For credential sources and host-supplied credentials, see
 | Account and service actual costs | `ce:GetCostAndUsage`, `ce:GetDimensionValues` | Cost Explorer enabled |
 | EC2 and other resource actual costs | `ce:GetCostAndUsageWithResources`, `ce:GetDimensionValues` | [Resource-level data opt-in](#account-settings) |
 | Account and service projected costs | `ce:GetCostForecast`, `ce:GetCostAndUsage` | Cost Explorer enabled |
-| EC2 Spot comparison (opt-in) | `ec2:DescribeSpotPriceHistory`, `pricing:GetProducts` | Outbound HTTPS to `spot-bid-advisor.s3.amazonaws.com` |
+| EC2 Spot comparison and move-to-Spot recommendations (opt-in) | `ec2:DescribeSpotPriceHistory`, `pricing:GetProducts` | Outbound HTTPS to `spot-bid-advisor.s3.amazonaws.com`. Used by `GetProjectedCost` and by `GetRecommendations` for target resources |
 | Budgets | `budgets:ViewBudget` | Process credentials only. See [Budgets](#budgets) |
 | Anomalies | `ce:GetAnomalies` | Anomaly monitors in the account |
 | EC2 rightsizing recommendations | `ce:GetRightsizingRecommendation` | [Rightsizing enabled](#account-settings) |
@@ -167,12 +167,13 @@ legacy, so confirm the labels in your console.
 | Cost Explorer endpoint | All cost, forecast, anomaly, and recommendation calls | Global service. Region doesn't select a dataset |
 | `budgets.amazonaws.com` | Budgets | `us-east-1` |
 | STS endpoint | Role assumption, budget account lookup | |
-| Price List endpoint in `us-east-1` | Spot comparison | On-demand hourly rate |
-| EC2 endpoint in the instance's region | Spot comparison | Spot price history |
-| `spot-bid-advisor.s3.amazonaws.com` | Spot comparison | Public JSON feed for the interruption score. Needs no credentials |
+| Price List endpoint in `us-east-1` | Spot comparison and Spot recommendations | On-demand hourly rate |
+| EC2 endpoint in the instance's region | Spot comparison and Spot recommendations | Spot price history |
+| `spot-bid-advisor.s3.amazonaws.com` | Spot comparison and Spot recommendations | Public JSON feed for the interruption score. Needs no credentials |
 
 The Spot advisor feed is the only non-AWS-API call. If egress blocks it, the Spot
-comparison can't return an interruption score.
+comparison and the Spot recommendations can't report an interruption score. A
+Spot recommendation is still returned with the score at 0.0, which means unknown.
 
 ## Permission errors
 

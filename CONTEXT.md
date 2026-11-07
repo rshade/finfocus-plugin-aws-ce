@@ -53,7 +53,7 @@ To prevent scope creep and architectural drift, this project adheres to the foll
 | `GetActualCost` | ✅ Offline protocol/contract verified | `GetCostAndUsage`, `GetCostAndUsageWithResources` |
 | `GetProjectedCost` | ✅ Proxies AWS values | Month-to-date `GetCostAndUsage` plus `GetCostForecast` to the end of the Coordinated Universal Time month, for `aws:account` and `aws:service` only |
 
-### SDK compliance for v0.7.9
+### SDK compliance for v0.7.11
 
 The plugin uses standardized SDK helpers:
 
@@ -73,10 +73,16 @@ The plugin uses standardized SDK helpers:
 
 ### Future work and current limits
 
-The v0.7.9 SDK already provides budgets and recommendations interfaces and
+The v0.7.11 SDK already provides budgets and recommendations interfaces and
 FOCUS commitment fields. Those features need plugin implementations and
 verification. Their presence isn't evidence of a protocol gap. Anomaly
 mapping requires separate design work outside this release.
+
+`GetRecommendations` proxies AWS Cost Explorer output, with one computed
+exception. With `FINFOCUS_AWS_CE_SPOT_COMPARISON=true`, it adds a move-to-Spot
+recommendation for each EC2 target resource, built from live Spot and on-demand
+prices. Its source is `aws-spot-pricing`, its `pricing_category` is `DYNAMIC`, and
+a risk score of 0.0 means unknown. See [Spot recommendations](docs/recommendations.md#spot-recommendations).
 
 The caller must supply `billing_account_id` for FOCUS output. Without it,
 the plugin returns actual costs with no FOCUS record. Credential keys are plugin

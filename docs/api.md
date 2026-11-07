@@ -2,7 +2,7 @@
 
 The AWS Cost Explorer plugin serves the `finfocus.v1.CostSourceService` gRPC
 interface on a local TCP port. It identifies itself as `aws-ce`, reports spec
-version `v0.7.9`, and advertises actual costs, forecasts, budgets, recommendations, and batch costs. This
+version `v0.7.11`, and advertises actual costs, forecasts, budgets, recommendations, and batch costs. This
 reference describes the current source checkout. See [deployment](deployment.md) to install and run it,
 and [configuration](configuration.md) for settings and credentials.
 
@@ -27,7 +27,7 @@ request and returns discovery metadata without contacting AWS.
 | --- | --- | --- |
 | `name` | string | `aws-ce` |
 | `version` | string | Build version. Release builds inject the release version |
-| `spec_version` | string | `v0.7.9` |
+| `spec_version` | string | `v0.7.11` |
 | `providers` | repeated string | `aws` |
 | `capabilities` | repeated `PluginCapability` | Actual costs, projected costs, budgets, recommendations, and batch costs |
 | `metadata` | map of strings | `supported_rpcs` lists `GetActualCost,GetProjectedCost,GetBudgets,GetRecommendations,Supports,GetPluginInfo,BatchCost` |
@@ -420,7 +420,8 @@ for `GetProjectedCost`. Batch requests don't retrieve budgets.
 anomalies by default. Category `COST` selects rightsizing and Savings Plans.
 Category `ANOMALY` or action `INVESTIGATE` selects anomalies. The shared source
 `aws-cost-explorer` includes both. Target-scoped requests query optimization
-opportunities only. See [recommendations](recommendations.md) for sources, filters, and parameters,
+opportunities only, and with `FINFOCUS_AWS_CE_SPOT_COMPARISON=true` they also return
+a Spot recommendation for each eligible EC2 target. See [recommendations](recommendations.md) for sources, filters, and parameters,
 and [AWS permissions](permissions.md) for the IAM actions each source needs.
 
 Anomaly requests call Cost Explorer `GetAnomalies` for the last 90 days.
@@ -433,6 +434,27 @@ anomalies alone return `InvalidArgument` because the call is account scoped. The
 because that figure records unexpected spend, not a savings estimate. The
 plugin sets a confidence score only when the AWS current score is already
 between 0 and 1.
+
+### Spot recommendations
+
+With `FINFOCUS_AWS_CE_SPOT_COMPARISON=true`, each EC2 target resource with an
+instance type and an availability zone gets one computed recommendation. Its
+source is `aws-spot-pricing`, not `aws-cost-explorer`. The fields below are new in
+spec v0.7.11.
+
+| Field | Spot recommendation | Every other recommendation |
+| --- | --- | --- |
+| `pricing_category` | `FOCUS_PRICING_CATEGORY_DYNAMIC` | `FOCUS_PRICING_CATEGORY_UNSPECIFIED` |
+| `spot_interruption_risk_score` | 0.05, 0.10, 0.15, or 0.20 for a mapped advisor bucket. 0.0 means unknown | 0.0 |
+| `action_type` | `MIGRATE` | The action AWS reports |
+| `impact.current_cost` | On-demand monthly cost | Not set, except anomalies, which carry actual spend |
+| `impact.projected_cost` | Spot monthly cost | Not set, except anomalies, which carry expected spend |
+| `impact.savings_percentage` | 0 to 100 scale | Not set |
+
+The score never appears without the `DYNAMIC` category, and the plugin never sends
+0.0 to mean safe. A lookup failure for one target skips that target and doesn't
+fail the call. Prices, risk, impact math, ID stability, and limits are in
+[Spot recommendations](recommendations.md#spot-recommendations).
 
 ## Errors and unsupported operations
 

@@ -108,7 +108,7 @@ fixtures, with a companion recommendation remote procedure call check.
 make test-integration
 ```
 
-## Spec v0.7.9 features
+## Spec v0.7.11 features
 
 - `GetPluginInfo` advertises plugin settings from `internal/pricing/settings.go`. Add an entry there when the plugin reads a new
   environment variable. A test checks the list with `ValidatePluginSettings`.
@@ -123,6 +123,10 @@ make test-integration
   Advisor `r` maps to `0.05`, `0.10`, `0.15`, and `0.20`. The `>20%` bucket leaves the score at 0 and keeps the label in metadata.
   Don't derive the on-demand price from advisor field `s`, and don't pick the cheapest zone.
   Spot and on-demand rates cache for five minutes. The advisor document caches for one hour.
+- The same opt-in makes `GetRecommendations` emit one move-to-Spot recommendation per EC2 target resource that has an instance type and a zone (`internal/pricing/spot_recommendations.go`). Source `aws-spot-pricing`, action `MIGRATE`, `pricing_category` `DYNAMIC`.
+  `spot_interruption_risk_score` is set only for a mapped advisor bucket. Zero means unknown, and the `>20%` label stays in metadata. Only that builder sets either field.
+  The row skips a target with no on-demand price or a Spot price that isn't below it, and a failed lookup skips that target instead of failing the call. The id hashes source, resource, region, zone, type, OS and action, never prices.
+  Both `GetProjectedCost` and the builder call `spotQuoteFor` in `spot.go`.
 
 ## Documentation map
 
@@ -236,7 +240,8 @@ savings from AWS. See `docs/recommendations.md` and `docs/permissions.md`
 for defaults, filters, permissions, and limitations. Keep SDK validation,
 selection, pagination, summary helpers, and `zerolog` operation logging. Preserve
 request-scoped credentials, retry budgets, the 100-page AWS cap, and all-source
-failure semantics. Never generate recommendations, purchase plans, or mutate
+failure semantics. Never generate recommendations (the opt-in Spot builder in
+`spot_recommendations.go` is the one exception), purchase plans, or mutate
 resources. Ordinary tests use offline fixtures. The `awslive` recommendation
 test also requires `FINFOCUS_AWS_LIVE=true`. Don't run it without an explicit
 request for real AWS verification. A blank plan type with no details is an empty

@@ -110,8 +110,10 @@ For a read-only costs installation, this is the minimum:
 ```
 
 Add the budgets, recommendation, and Spot comparison actions only for the features
-you turn on. Querying individual resources also needs the Cost Explorer
-resource-level data opt-in.
+you turn on. The Spot comparison actions also cover the move-to-Spot
+recommendations that `GetRecommendations` returns when the opt-in is on.
+Querying individual resources also needs the Cost Explorer resource-level data
+opt-in.
 
 ## Configure authentication and startup
 
