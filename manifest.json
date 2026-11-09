@@ -1,7 +1,7 @@
 {
   "metadata": {
     "name": "aws-ce",
-    "version": "0.1.0",
+    "version": "0.1.2",
     "description": "FinFocus plugin that reads actual costs, forecasts, budgets, and optimization recommendations from AWS Cost Explorer",
     "author": "rshade",
     "homepage": "https://github.com/rshade/finfocus-plugin-aws-ce",

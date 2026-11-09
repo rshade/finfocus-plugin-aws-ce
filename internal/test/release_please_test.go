@@ -61,13 +61,25 @@ func TestReleaseManifestAllowsFutureVersions(t *testing.T) {
 func TestPluginManifests(t *testing.T) {
 	raw, err := os.ReadFile("../../release-please-config.json")
 	require.NoError(t, err)
+	type extraFile struct {
+		Type     string `json:"type"`
+		Path     string `json:"path"`
+		JSONPath string `json:"jsonpath"`
+	}
 	var config struct {
 		Packages map[string]struct {
-			ExtraFiles []string `json:"extra-files"`
+			ExtraFiles []extraFile `json:"extra-files"`
 		} `json:"packages"`
 	}
 	require.NoError(t, json.Unmarshal(raw, &config))
-	require.ElementsMatch(t, []string{"manifest.json", "manifest.yaml"}, config.Packages["."].ExtraFiles)
+	require.ElementsMatch(t, []extraFile{
+		{Type: "json", Path: "manifest.json", JSONPath: "$.metadata.version"},
+		{Type: "yaml", Path: "manifest.yaml", JSONPath: "$.metadata.version"},
+	}, config.Packages["."].ExtraFiles)
+	raw, err = os.ReadFile("../../.release-please-manifest.json")
+	require.NoError(t, err)
+	var releaseVersions map[string]string
+	require.NoError(t, json.Unmarshal(raw, &releaseVersions))
 	for _, name := range []string{"manifest.json", "manifest.yaml"} {
 		raw, err = os.ReadFile("../../" + name)
 		require.NoError(t, err)
@@ -81,6 +93,7 @@ func TestPluginManifests(t *testing.T) {
 		metadata, ok := manifest["metadata"].(map[string]any)
 		require.True(t, ok)
 		require.Equal(t, "aws-ce", metadata["name"])
+		require.Equal(t, releaseVersions["."], metadata["version"], name)
 		spec, ok := manifest["specification"].(map[string]any)
 		require.True(t, ok)
 		require.Equal(t, []any{"actual_costs", "projected_costs", "budgets", "recommendations", "batch_cost"}, spec["capabilities"])

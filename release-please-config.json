@@ -39,8 +39,16 @@
       "include-component-in-tag": false,
       "initial-version": "0.1.0",
       "extra-files": [
-        "manifest.json",
-        "manifest.yaml"
+        {
+          "type": "json",
+          "path": "manifest.json",
+          "jsonpath": "$.metadata.version"
+        },
+        {
+          "type": "yaml",
+          "path": "manifest.yaml",
+          "jsonpath": "$.metadata.version"
+        }
       ]
     }
   }

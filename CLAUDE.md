@@ -13,13 +13,13 @@ directories preserve frozen Spec Kit history; do not add new work there.
 make build      # Build plugin binary to bin/finfocus-plugin-aws-ce
 make test       # Run all tests
 make lint       # Run golangci-lint
-make install    # Build and install to ~/.finfocus/plugins/aws-ce/0.1.0/
+make install    # Build and install to ~/.finfocus/plugins/aws-ce/<manifest version>/
 make fmt        # Format code with go fmt
 make ensure     # Update dependencies (alias for deps)
 make deps       # Update dependencies (go mod tidy && go mod download)
 ```
 
-Installation uses the version in `manifest.json`, whose value is `0.1.0`. Override
+Installation uses the version in `manifest.json`, which Release Please keeps at the released version. Override
 `PLUGIN_VERSION` or `FINFOCUS_HOME` when using another registry directory.
 
 Run a single test:
