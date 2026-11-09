@@ -74,8 +74,9 @@ When `capability` is `PLUGIN_CAPABILITY_PROJECTED_COSTS`, the plugin applies the
 checks `GetProjectedCost` makes before it calls AWS. A resource outside them gets
 `supported: false` and a reason: anything other than `aws:account` or
 `aws:service` with an id, an EC2 instance when
-`FINFOCUS_AWS_CE_SPOT_COMPARISON` is off or the instance has no type, region, or
-zone, and a descriptor without `sku` or `region`. Actual costs, other
+`FINFOCUS_AWS_CE_SPOT_COMPARISON` is off, an EC2 instance whose type, region,
+zone, or operating system the Spot quote can't use, and a descriptor without
+`sku` or `region`. Actual costs, other
 capabilities, an unspecified capability, and unknown values get the answer
 described above. An unspecified capability is what older hosts send.
 

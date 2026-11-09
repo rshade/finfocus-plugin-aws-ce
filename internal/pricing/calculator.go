@@ -227,6 +227,11 @@ func (c *Calculator) projectedSupport(resource *pbc.ResourceDescriptor) (bool, s
 	if err := pluginsdk.ValidateProjectedCostRequest(&pbc.GetProjectedCostRequest{Resource: resource}); err != nil {
 		return false, invalidResourceReason(err.Error())
 	}
+	if spot {
+		if _, err := parseSpotQuery(resource); err != nil {
+			return false, "no Spot comparison for this EC2 instance: " + status.Convert(err).Message()
+		}
+	}
 	return true, ""
 }
 

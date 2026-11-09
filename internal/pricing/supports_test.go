@@ -307,6 +307,21 @@ func TestSupportsProjectedCostCapability(t *testing.T) {
 			name: "EC2 without instance type is declined with spot comparison", resource: ec2TypeOnly,
 			capability: projected, spot: true, reasonHas: "no instance type",
 		},
+		{
+			name: "EC2 with a malformed instance type is declined with spot comparison",
+			resource: &pbc.ResourceDescriptor{
+				Provider: "aws", ResourceType: pulumiEC2InstanceType, Sku: "t3_micro", Region: "us-west-2",
+			},
+			capability: projected, spot: true, reasonHas: "instance type is invalid",
+		},
+		{
+			name: "EC2 with an unsupported operating system is declined with spot comparison",
+			resource: &pbc.ResourceDescriptor{
+				Provider: "aws", ResourceType: pulumiEC2InstanceType, Sku: "t3.micro", Region: "us-west-2",
+				Tags: map[string]string{"os": "freebsd"},
+			},
+			capability: projected, spot: true, reasonHas: "operating system is unsupported",
+		},
 		{name: "account projected", resource: account, capability: projected, supported: true},
 		{name: "service projected", resource: service, capability: projected, supported: true},
 		{
