@@ -2,7 +2,7 @@
 
 `finfocus-plugin-aws-ce` (plugin name `aws-ce`) retrieves **actual AWS costs** from
 AWS Cost Explorer for [FinFocus](https://github.com/rshade/finfocus). It
-implements the `finfocus-spec` v0.7.11 protocol over gRPC.
+implements the `finfocus-spec` v0.7.12 protocol over gRPC.
 
 This plugin integrates [AWS Cost Explorer](https://aws.amazon.com/aws-cost-management/aws-cost-explorer/)
 ([documentation](https://docs.aws.amazon.com/cost-management/latest/userguide/ce-what-is.html))

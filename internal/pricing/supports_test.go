@@ -266,3 +266,99 @@ func TestSupportsEC2InstanceStaysSupportedForActuals(t *testing.T) {
 		t.Fatalf("EC2 instance declined for every capability (%q); that would also remove actual costs", resp.GetReason())
 	}
 }
+
+// TestSupportsProjectedCostCapability checks that a PROJECTED_COSTS request is declined, with a reason, for
+// anything GetProjectedCost rejects before calling AWS, while ACTUAL_COSTS and unspecified answers are unchanged.
+func TestSupportsProjectedCostCapability(t *testing.T) {
+	t.Parallel()
+
+	projected := pbc.PluginCapability_PLUGIN_CAPABILITY_PROJECTED_COSTS
+	actual := pbc.PluginCapability_PLUGIN_CAPABILITY_ACTUAL_COSTS
+	unspecified := pbc.PluginCapability_PLUGIN_CAPABILITY_UNSPECIFIED
+	s3 := &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:s3/bucket:Bucket"}
+	ec2TypeOnly := &pbc.ResourceDescriptor{Provider: "aws", ResourceType: pulumiEC2InstanceType, Region: "us-west-2"}
+	ec2Priced := &pbc.ResourceDescriptor{
+		Provider: "aws", ResourceType: pulumiEC2InstanceType, Sku: "t3.micro", Region: "us-west-2",
+	}
+	account := &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:account", Sku: "account", Region: "us-east-1"}
+	service := &pbc.ResourceDescriptor{
+		Provider: "aws", ResourceType: "aws:service", Id: "Amazon Simple Storage Service", Sku: "service", Region: "us-east-1",
+	}
+
+	tests := []struct {
+		name       string
+		resource   *pbc.ResourceDescriptor
+		capability pbc.PluginCapability
+		spot       bool
+		supported  bool
+		reasonHas  string
+	}{
+		{name: "S3 projected is declined", resource: s3, capability: projected, reasonHas: "cannot forecast"},
+		{name: "S3 actual is unchanged", resource: s3, capability: actual, supported: true, reasonHas: "unverified"},
+		{name: "S3 unspecified is unchanged", resource: s3, capability: unspecified, supported: true, reasonHas: "unverified"},
+		{name: "unknown capability reads as unspecified", resource: s3, capability: 999, supported: true},
+		{
+			name: "EC2 projected without spot comparison is declined", resource: ec2Priced, capability: projected,
+			reasonHas: SpotComparisonEnv,
+		},
+		{name: "EC2 actual without spot comparison is unchanged", resource: ec2TypeOnly, capability: actual, supported: true},
+		{name: "eligible EC2 projected with spot comparison", resource: ec2Priced, capability: projected, spot: true, supported: true},
+		{
+			name: "EC2 without instance type is declined with spot comparison", resource: ec2TypeOnly,
+			capability: projected, spot: true, reasonHas: "no instance type",
+		},
+		{
+			name: "EC2 with a malformed instance type is declined with spot comparison",
+			resource: &pbc.ResourceDescriptor{
+				Provider: "aws", ResourceType: pulumiEC2InstanceType, Sku: "t3_micro", Region: "us-west-2",
+			},
+			capability: projected, spot: true, reasonHas: "instance type is invalid",
+		},
+		{
+			name: "EC2 with an unsupported operating system is declined with spot comparison",
+			resource: &pbc.ResourceDescriptor{
+				Provider: "aws", ResourceType: pulumiEC2InstanceType, Sku: "t3.micro", Region: "us-west-2",
+				Tags: map[string]string{"os": "freebsd"},
+			},
+			capability: projected, spot: true, reasonHas: "operating system is unsupported",
+		},
+		{name: "account projected", resource: account, capability: projected, supported: true},
+		{name: "service projected", resource: service, capability: projected, supported: true},
+		{
+			name:       "service without id is declined",
+			resource:   &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:service", Sku: "service", Region: "us-east-1"},
+			capability: projected, reasonHas: "cannot forecast",
+		},
+		{
+			name:       "account without sku is declined",
+			resource:   &pbc.ResourceDescriptor{Provider: "aws", ResourceType: "aws:account", Region: "us-east-1"},
+			capability: projected, reasonHas: "sku",
+		},
+		{
+			name:       "other provider keeps its reason",
+			resource:   &pbc.ResourceDescriptor{Provider: "gcp", ResourceType: "aws:account"},
+			capability: projected, reasonHas: "provider",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			calc := NewCalculator()
+			calc.spotComparison = tt.spot
+			resp, err := calc.Supports(context.Background(), &pbc.SupportsRequest{Resource: tt.resource, Capability: tt.capability})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resp.GetSupported() != tt.supported {
+				t.Fatalf("supported = %v, want %v (reason %q)", resp.GetSupported(), tt.supported, resp.GetReason())
+			}
+			if !tt.supported && resp.GetReason() == "" {
+				t.Fatal("a decline must carry a reason")
+			}
+			if !strings.Contains(resp.GetReason(), tt.reasonHas) {
+				t.Fatalf("reason %q does not mention %q", resp.GetReason(), tt.reasonHas)
+			}
+		})
+	}
+}

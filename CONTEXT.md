@@ -53,13 +53,14 @@ To prevent scope creep and architectural drift, this project adheres to the foll
 | `GetActualCost` | ✅ Offline protocol/contract verified | `GetCostAndUsage`, `GetCostAndUsageWithResources` |
 | `GetProjectedCost` | ✅ Proxies AWS values | Month-to-date `GetCostAndUsage` plus `GetCostForecast` to the end of the Coordinated Universal Time month, for `aws:account` and `aws:service` only |
 
-### SDK compliance for v0.7.11
+### SDK compliance for v0.7.12
 
 The plugin uses standardized SDK helpers:
 
 * `pluginsdk.NewLogWriter()` / `NewPluginLogger()` - Structured logging
 * `pluginsdk.LogOperation()` - Operation timing
 * `pluginsdk.ValidateActualCostRequest()` - Input validation
+* `pluginsdk.RequestedCapability()` - Reads the capability a `Supports` request asks about
 * `pluginsdk.ParsePortFlag()` / `GetPort()` - Configuration
 * `pluginsdk.Serve()` - gRPC server startup
 * `GetPluginInfoResponse.settings` - Advertises the environment variables the plugin reads in `internal/pricing/settings.go`
@@ -73,7 +74,7 @@ The plugin uses standardized SDK helpers:
 
 ### Future work and current limits
 
-The v0.7.11 SDK already provides budgets and recommendations interfaces and
+The v0.7.12 SDK already provides budgets and recommendations interfaces and
 FOCUS commitment fields. Those features need plugin implementations and
 verification. Their presence isn't evidence of a protocol gap. Anomaly
 mapping requires separate design work outside this release.
