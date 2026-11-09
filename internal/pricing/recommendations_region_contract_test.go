@@ -33,7 +33,7 @@ func TestRecommendationsRegionalAWSContract(t *testing.T) {
 					assert.Equal(t, map[string]any{"Dimensions": map[string]any{"Key": "LINKED_ACCOUNT", "Values": []any{account}}}, body["Filter"])
 				}
 				w.Header().Set("Content-Type", "application/x-amz-json-1.1")
-				_, _ = fmt.Fprint(w, `{"RightsizingRecommendations":[{"AccountId":"123","RightsizingType":"TERMINATE","CurrentInstance":{"ResourceId":"i-east","ResourceDetails":{"EC2ResourceDetails":{"InstanceType":"m5.large","Region":"us-east-1"}}},"TerminateRecommendationDetail":{"EstimatedMonthlySavings":"12.50","CurrencyCode":"USD"}},{"AccountId":"123","RightsizingType":"TERMINATE","CurrentInstance":{"ResourceId":"i-west","ResourceDetails":{"EC2ResourceDetails":{"InstanceType":"m5.large","Region":"us-west-2"}}},"TerminateRecommendationDetail":{"EstimatedMonthlySavings":"30","CurrencyCode":"USD"}}]}`)
+				_, _ = fmt.Fprint(w, `{"RightsizingRecommendations":[{"AccountId":"123","RightsizingType":"Terminate","CurrentInstance":{"ResourceId":"i-east","ResourceDetails":{"EC2ResourceDetails":{"InstanceType":"m5.large","Region":"us-east-1"}}},"TerminateRecommendationDetail":{"EstimatedMonthlySavings":"12.50","CurrencyCode":"USD"}},{"AccountId":"123","RightsizingType":"Terminate","CurrentInstance":{"ResourceId":"i-west","ResourceDetails":{"EC2ResourceDetails":{"InstanceType":"m5.large","Region":"us-west-2"}}},"TerminateRecommendationDetail":{"EstimatedMonthlySavings":"30","CurrencyCode":"USD"}}]}`)
 			}))
 			defer endpoint.Close()
 			ce, err := client.NewClient(context.Background(), client.Config{Region: "us-east-1", BaseEndpoint: endpoint.URL, AccessKeyID: "synthetic-access", SecretAccessKey: "synthetic-secret"})

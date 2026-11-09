@@ -3,6 +3,7 @@ package pricing
 import (
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
 	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
 	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
@@ -123,8 +124,7 @@ func TestSpotRecommendationIDIgnoresPricesAndRisk(t *testing.T) {
 }
 
 func TestNonSpotRecommendationsCarryNoSpotFields(t *testing.T) {
-	recs, err := mapRightsizingRecommendations(rightsizingFixture())
-	require.NoError(t, err)
+	recs := mapRightsizingRecommendations(zerolog.Nop(), rightsizingFixture())
 	require.NotEmpty(t, recs)
 	for _, rec := range recs {
 		require.Equal(t, pbc.FocusPricingCategory_FOCUS_PRICING_CATEGORY_UNSPECIFIED, rec.GetPricingCategory())
@@ -214,8 +214,8 @@ func TestGetRecommendationsSpotOptInLeavesCostExplorerRowsUnchanged(t *testing.T
 func TestGetRecommendationsSkipsSpotCallsWhenFilterExcludesThem(t *testing.T) {
 	for name, filter := range map[string]*pbc.RecommendationFilter{
 		"other category": {Category: pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_PERFORMANCE},
-		"other type":       {ResourceType: "savingsplans:Account"},
-		"other provider":   {Provider: "gcp"},
+		"other type":     {ResourceType: "savingsplans:Account"},
+		"other provider": {Provider: "gcp"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			spots := &fakeSpotHourly{hourly: 0.03}

@@ -102,14 +102,23 @@ func TestRecommendationsCombinedAnomalyPageGuards(t *testing.T) {
 		code            codes.Code
 		calls           int
 	}{
-		{name: "repeat", repeat: true, code: codes.Internal, calls: 2},
+		{name: "repeat", repeat: true, calls: 2},
 		{name: "limit", endless: true, code: codes.ResourceExhausted, calls: 100},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			api := &mixedRecommendationAPI{repeat: tc.repeat, endless: tc.endless}
 			calc := NewCalculatorWithClient(client.NewClientWithAPI(api, "us-east-1"))
-			_, err := calc.GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{})
-			require.Equal(t, tc.code, status.Code(err))
+			resp, err := calc.GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{})
+			if tc.code != codes.OK {
+				require.Nil(t, resp)
+				require.Equal(t, tc.code, status.Code(err))
+			} else {
+				require.NoError(t, err)
+				require.Len(t, resp.GetRecommendations(), 2, "a repeated anomaly token drops anomalies and keeps Savings Plans rows")
+				for _, rec := range resp.GetRecommendations() {
+					require.NotEqual(t, pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_ANOMALY, rec.GetCategory())
+				}
+			}
 			require.Len(t, api.anomalyTokens, tc.calls)
 		})
 	}

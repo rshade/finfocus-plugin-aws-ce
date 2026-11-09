@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
+	"github.com/rs/zerolog"
 	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
 	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
 	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
@@ -21,7 +23,9 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// GetRecommendations reads AWS optimization opportunities and anomalies using call-scoped credentials.
+// GetRecommendations reads AWS optimization opportunities, anomalies, and Spot
+// comparisons using call-scoped credentials. Each selected source fails on its
+// own; see recommendationSourceRun.
 func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecommendationsRequest) (*pbc.GetRecommendationsResponse, error) {
 	logger := c.traceLogger(ctx)
 	done := pluginsdk.LogOperation(logger, "GetRecommendations")
@@ -44,7 +48,8 @@ func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 	}
 	f := req.GetFilter()
 	rights, plans := recommendationSources(f)
-	if targets := req.GetTargetResources(); len(targets) > 0 {
+	targets := req.GetTargetResources()
+	if len(targets) > 0 {
 		var targetRights, targetPlans bool
 		for _, target := range targets {
 			r, p := recommendationSources(&pbc.RecommendationFilter{Provider: target.GetProvider(), ResourceType: target.GetResourceType()})
@@ -53,40 +58,55 @@ func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 		}
 		rights, plans = rights && targetRights, plans && targetPlans
 	}
-	var recs []*pbc.Recommendation
 	reservations := selectedReservationServices(req)
 	needAnomalies := combinedAnomalyRequest(req)
-	var ce *client.Client
-	if rights || plans || len(reservations) > 0 || needAnomalies {
-		var pages int
+	needCostExplorer := rights || plans || len(reservations) > 0 || needAnomalies
+	spotSelected := c.spotComparison && spotFilterAllows(f) && slices.ContainsFunc(targets, wantsSpotComparison)
+	spotNeedsClient := spotSelected && (c.spotQuote == nil || c.onDemandQuote == nil)
+
+	var pages int
+	if needCostExplorer {
 		ctx = c.withCostBudget(ctx, &pages)
+	}
+	var ce *client.Client
+	var clientErr error
+	if needCostExplorer || spotNeedsClient {
 		var err error
 		ce, _, err = c.clientForCall(ctx, logger)
 		if err != nil {
 			if _, ok := status.FromError(err); ok {
 				return nil, err
 			}
-			return nil, status.Error(codes.Internal, "recommendation client initialization failed")
+			clientErr = status.Error(codes.Internal, "recommendation client initialization failed")
 		}
 	}
-	if rights || plans {
-		if rights {
+
+	sources := &recommendationSourceRun{ctx: ctx, logger: logger}
+	ceSource := func(name string, fetch func(api *client.Client) ([]*pbc.Recommendation, error)) error {
+		return sources.run(name, func() ([]*pbc.Recommendation, error) {
+			if ce == nil {
+				return nil, clientErr
+			}
+			return fetch(ce)
+		})
+	}
+	if rights {
+		if err := ceSource("rightsizing", func(api *client.Client) ([]*pbc.Recommendation, error) {
 			in := costexplorer.GetRightsizingRecommendationInput{Service: aws.String("AmazonEC2"), Configuration: &types.RightsizingRecommendationConfiguration{BenefitsConsidered: true, RecommendationTarget: types.RecommendationTargetSameInstanceFamily}, Filter: recommendationAWSFilter(f)}
-			data, err := ce.ListRightsizingRecommendations(ctx, in)
+			data, err := api.ListRightsizingRecommendations(ctx, in)
 			if err != nil {
 				return nil, recommendationFailure(err)
 			}
-			mapped, err := mapRightsizingRecommendations(data)
-			if err != nil {
-				logger.Error().Err(err).Msg("invalid AWS rightsizing recommendation data")
-				return nil, status.Error(codes.DataLoss, "invalid AWS recommendation data: rightsizing")
-			}
-			recs = append(recs, mapped...)
+			return mapRightsizingRecommendations(logger, data), nil
+		}); err != nil {
+			return nil, err
 		}
-		if plans {
-			for _, kind := range []types.SupportedSavingsPlansType{types.SupportedSavingsPlansTypeComputeSp, types.SupportedSavingsPlansTypeEc2InstanceSp} {
+	}
+	if plans {
+		for _, kind := range []types.SupportedSavingsPlansType{types.SupportedSavingsPlansTypeComputeSp, types.SupportedSavingsPlansTypeEc2InstanceSp} {
+			if err := ceSource("savings plans "+string(kind), func(api *client.Client) ([]*pbc.Recommendation, error) {
 				in := costexplorer.GetSavingsPlansPurchaseRecommendationInput{SavingsPlansType: kind, LookbackPeriodInDays: types.LookbackPeriodInDaysThirtyDays, TermInYears: types.TermInYearsOneYear, PaymentOption: types.PaymentOptionNoUpfront, AccountScope: types.AccountScopePayer, Filter: recommendationAWSFilter(f)}
-				data, err := ce.ListSavingsPlansRecommendations(ctx, in)
+				data, err := api.ListSavingsPlansRecommendations(ctx, in)
 				if err != nil {
 					return nil, recommendationFailure(err)
 				}
@@ -95,44 +115,63 @@ func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 					logger.Error().Err(err).Str("plan_type", string(kind)).Msg("invalid AWS Savings Plans recommendation data")
 					return nil, status.Error(codes.DataLoss, "invalid AWS recommendation data: Savings Plans")
 				}
-				recs = append(recs, mapped...)
+				return mapped, nil
+			}); err != nil {
+				return nil, err
 			}
 		}
 	}
 	for _, service := range reservations {
-		in := costexplorer.GetReservationPurchaseRecommendationInput{
-			Service: aws.String(service.name), AccountScope: types.AccountScopePayer,
-			LookbackPeriodInDays: types.LookbackPeriodInDaysThirtyDays,
-			TermInYears:          types.TermInYearsOneYear, PaymentOption: types.PaymentOptionNoUpfront,
+		if err := ceSource("reservations "+service.code, func(api *client.Client) ([]*pbc.Recommendation, error) {
+			in := costexplorer.GetReservationPurchaseRecommendationInput{
+				Service: aws.String(service.name), AccountScope: types.AccountScopePayer,
+				LookbackPeriodInDays: types.LookbackPeriodInDaysThirtyDays,
+				TermInYears:          types.TermInYearsOneYear, PaymentOption: types.PaymentOptionNoUpfront,
+			}
+			// This API accepts an AccountId directly; do not reuse the positive
+			// dimension filters supported by rightsizing and Savings Plans.
+			if account := f.GetAccountId(); account != "" {
+				in.AccountId = aws.String(account)
+			}
+			reservationPages, err := api.ListReservationRecommendations(ctx, in)
+			if err != nil {
+				return nil, recommendationFailure(err)
+			}
+			mapped, err := mapReservationRecommendations(service.code, reservationPages)
+			if err != nil {
+				logger.Error().Err(err).Str("service", service.code).Msg("invalid AWS reservation recommendation data")
+				return nil, status.Error(codes.DataLoss, "invalid AWS recommendation data: reservations")
+			}
+			return mapped, nil
+		}); err != nil {
+			return nil, err
 		}
-		// This API accepts an AccountId directly; do not reuse the positive
-		// dimension filters supported by rightsizing and Savings Plans.
-		if account := f.GetAccountId(); account != "" {
-			in.AccountId = aws.String(account)
-		}
-		pages, err := ce.ListReservationRecommendations(ctx, in)
-		if err != nil {
-			return nil, recommendationFailure(err)
-		}
-		mapped, err := mapReservationRecommendations(service.code, pages)
-		if err != nil {
-			logger.Error().Err(err).Str("service", service.code).Msg("invalid AWS reservation recommendation data")
-			return nil, status.Error(codes.DataLoss, "invalid AWS recommendation data: reservations")
-		}
-		recs = append(recs, mapped...)
 	}
-	if c.spotComparison && spotFilterAllows(f) {
-		recs = append(recs, c.spotRecommendations(ctx, logger, req.GetTargetResources())...)
+	if spotSelected {
+		if err := sources.run("spot", func() ([]*pbc.Recommendation, error) {
+			if spotNeedsClient && ce == nil {
+				return nil, clientErr
+			}
+			return c.spotRecommendations(ctx, logger, targets), nil
+		}); err != nil {
+			return nil, err
+		}
 	}
+	recs := sources.recs
 	if err := projectRecommendationSavings(recs, period); err != nil {
 		return nil, status.Error(codes.DataLoss, "invalid AWS recommendation projection")
 	}
+	// Anomalies carry no monthly savings, so they join after projection.
 	if needAnomalies {
-		anomalies, err := collectAnomalyRecommendations(ctx, ce)
-		if err != nil {
+		if err := ceSource("anomalies", func(api *client.Client) ([]*pbc.Recommendation, error) {
+			return collectAnomalyRecommendations(ctx, api)
+		}); err != nil {
 			return nil, err
 		}
-		recs = append(recs, anomalies...)
+		recs = sources.recs
+	}
+	if err := sources.result(); err != nil {
+		return nil, err
 	}
 	selected := make([]*pbc.Recommendation, 0, len(recs))
 	for _, r := range recs {
@@ -172,6 +211,51 @@ func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 		return nil, status.Error(codes.InvalidArgument, "invalid recommendation page token")
 	}
 	return &pbc.GetRecommendationsResponse{Recommendations: page, NextPageToken: next, Summary: pluginsdk.CalculateRecommendationSummary(page, period)}, nil
+}
+
+// recommendationSourceRun collects the sources of one GetRecommendations call.
+// A failed source is logged and its rows are dropped, unless the failure is hard
+// (cancellation, deadline, or an exhausted request budget), which ends the call.
+// When every source fails, the first failure is returned so callers see an error
+// rather than an empty success.
+type recommendationSourceRun struct {
+	ctx       context.Context
+	logger    zerolog.Logger
+	recs      []*pbc.Recommendation
+	succeeded int
+	firstErr  error
+}
+
+func (s *recommendationSourceRun) run(name string, fetch func() ([]*pbc.Recommendation, error)) error {
+	got, err := fetch()
+	if err == nil {
+		s.recs = append(s.recs, got...)
+		s.succeeded++
+		return nil
+	}
+	if s.ctx.Err() != nil || recommendationHardFailure(err) {
+		return err
+	}
+	s.logger.Warn().Str("source", name).Str("code", status.Code(err).String()).Msg("recommendation source failed; returning other sources")
+	if s.firstErr == nil {
+		s.firstErr = err
+	}
+	return nil
+}
+
+func (s *recommendationSourceRun) result() error {
+	if s.succeeded == 0 {
+		return s.firstErr
+	}
+	return nil
+}
+
+func recommendationHardFailure(err error) bool {
+	switch status.Code(err) {
+	case codes.Canceled, codes.DeadlineExceeded, codes.ResourceExhausted:
+		return true
+	}
+	return false
 }
 
 var recommendationResourceTypePattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_\-:/]*$`)

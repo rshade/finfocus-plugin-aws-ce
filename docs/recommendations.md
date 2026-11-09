@@ -25,8 +25,12 @@ request and response fields, see the [API reference](api.md#getrecommendations).
 
 The Cost Explorer sources share the source name `aws-cost-explorer`. The Spot
 source uses `aws-spot-pricing`. An unfiltered request queries every Cost Explorer
-source. If any selected Cost Explorer source fails, the whole call fails with no
-partial result. The Spot source behaves differently: it fails soft for each target.
+source. Each selected source fails on its own. The call returns the results of the
+sources that succeeded and logs each failed source, so one denied or unavailable
+dataset doesn't hide the others. The call fails only when every selected source
+fails, and then it returns that first failure's status. Throttling, cancellation,
+and deadline failures still stop the whole call. The Spot source fails soft for each
+target.
 
 You must enable Cost Explorer, and the account must already have eligible usage and
 recommendation datasets. Enable rightsizing in AWS and allow time for AWS to
@@ -279,8 +283,9 @@ operating system produces a new ID. Duplicate targets produce one recommendation
 Spot recommendations fail soft. If a lookup fails for a target, such as a throttled
 `DescribeSpotPriceHistory` or a missing price, the plugin logs a warning, and skips
 that target. The call still returns the other targets and the Cost Explorer
-recommendations. This differs from the Cost Explorer sources, where one failure
-fails the whole call.
+recommendations. The Spot source also keeps working when the Cost Explorer client
+can't be built or a Cost Explorer source fails. A Spot-only request, such as
+`filter.source` set to `aws-spot-pricing`, makes no Cost Explorer call.
 
 A target is also skipped when:
 
@@ -373,7 +378,10 @@ selected source.
 | Permission, throttling, cancellation, or deadline failure | The standard AWS error mapping |
 | Unavailable dataset | An availability or precondition error |
 | Malformed financial data or mixed currencies | `DataLoss` |
-| Any selected Cost Explorer source fails | The whole call fails |
+| A rightsizing item that can't be mapped, such as an unknown `RightsizingType` | The item is skipped and logged, and the rest returns |
+| One selected source fails, such as Savings Plans or a reservation service | The source is logged and skipped, and the rest returns |
+| Every selected source fails | The first failure's status (`PermissionDenied`, `FailedPrecondition`, `Internal`, and so on) |
+| Throttling, budget exhaustion, cancellation, or deadline | The whole call fails (`ResourceExhausted`, `Canceled`, or `DeadlineExceeded`) |
 | The Spot lookup fails for a target | The target is skipped and the rest returns |
 
 ## Example requests
