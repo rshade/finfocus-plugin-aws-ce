@@ -21,6 +21,7 @@ import (
 
 type spotHourly interface {
 	LatestSpotPrice(ctx context.Context, region, instanceType, product, availabilityZone string) (float64, error)
+	LatestRegionalSpotPrice(ctx context.Context, region, instanceType, product string) (client.RegionalSpotPrice, error)
 }
 
 type onDemandHourly interface {
@@ -52,6 +53,18 @@ type spotQuery struct {
 	priceListOS      string
 }
 
+// regional reports whether the target names no zone, so the quote is the region-level median.
+func (q spotQuery) regional() bool {
+	return q.availabilityZone == ""
+}
+
+const (
+	spotRegionalRule     = "region-median"
+	spotBasisRegion      = "region"
+	spotRegionalIDKey    = "region"
+	spotRegionalNotFound = "no spot price for the instance type in the region"
+)
+
 var (
 	instanceTypePattern = regexp.MustCompile(`^[a-z0-9-]+\.[a-z0-9.]+$`)
 	awsNamePattern      = regexp.MustCompile(`^[a-z0-9-]+$`)
@@ -62,7 +75,33 @@ func spotComparisonFromEnv() bool {
 }
 
 func wantsSpotComparison(resource *pbc.ResourceDescriptor) bool {
-	return isEC2Instance(resource.GetResourceType()) && instanceTypeOf(resource) != "" && availabilityZoneOf(resource) != ""
+	return spotIneligibleReason(resource) == ""
+}
+
+// spotIneligibleReason names why a resource gets no Spot quote, or returns "" when it does.
+// A zone or a region is enough to attempt the quote.
+func spotIneligibleReason(resource *pbc.ResourceDescriptor) string {
+	if !isEC2Instance(resource.GetResourceType()) {
+		return "not an EC2 instance"
+	}
+	if instanceTypeOf(resource) == "" {
+		return "no instance type"
+	}
+	if strings.TrimSpace(resource.GetRegion()) == "" && availabilityZoneOf(resource) == "" {
+		return "no region or availability zone"
+	}
+	return ""
+}
+
+func logSpotSkip(logger zerolog.Logger, resource *pbc.ResourceDescriptor) {
+	if !isEC2Instance(resource.GetResourceType()) {
+		return
+	}
+	reason := spotIneligibleReason(resource)
+	if reason == "" {
+		return
+	}
+	logger.Debug().Str("resource_id", resource.GetId()).Str("reason", reason).Msg("spot comparison skipped")
 }
 
 func isEC2Instance(resourceType string) bool {
@@ -77,6 +116,7 @@ func isEC2Instance(resourceType string) bool {
 
 type spotQuote struct {
 	hourly      float64
+	zones       int
 	onDemand    float64
 	hasOnDemand bool
 	risk        spotInterruption
@@ -130,26 +170,40 @@ func (c *Calculator) spotQuoteFor(ctx context.Context, logger zerolog.Logger, qu
 			risks = defaultSpotAdvisor
 		}
 	}
-	logger.Debug().Str("instance_type", query.instanceType).Str("region", query.region).Str("availability_zone", query.availabilityZone).Str("product", query.product).Msg("spot quote")
+	logger.Debug().Str("instance_type", query.instanceType).Str("region", query.region).Str("availability_zone", query.availabilityZone).Str("product", query.product).Bool("region_level", query.regional()).Msg("spot quote")
 
-	hourly, err := spots.LatestSpotPrice(ctx, query.region, query.instanceType, query.product, query.availabilityZone)
-	if err != nil {
-		return spotQuote{}, c.spotCallError(logger, perRequest, err)
+	var hourly float64
+	var zones int
+	if query.regional() {
+		regional, err := spots.LatestRegionalSpotPrice(ctx, query.region, query.instanceType, query.product)
+		if err != nil {
+			return spotQuote{}, c.spotCallError(logger, perRequest, true, err)
+		}
+		hourly, zones = regional.Hourly, regional.Zones
+	} else {
+		price, err := spots.LatestSpotPrice(ctx, query.region, query.instanceType, query.product, query.availabilityZone)
+		if err != nil {
+			return spotQuote{}, c.spotCallError(logger, perRequest, false, err)
+		}
+		hourly = price
 	}
 	onDemand, hasOnDemand, err := demands.OnDemandHourly(ctx, query.region, query.instanceType, query.priceListOS)
 	if err != nil {
-		return spotQuote{}, c.spotCallError(logger, perRequest, err)
+		return spotQuote{}, c.spotCallError(logger, perRequest, query.regional(), err)
 	}
 	risk, err := risks.Interruption(ctx, query.region, query.advisorOS, query.instanceType)
 	if err != nil {
 		logger.Warn().Msg("spot interruption feed unavailable")
 		risk = spotInterruption{}
 	}
-	return spotQuote{hourly: hourly, onDemand: onDemand, hasOnDemand: hasOnDemand, risk: risk}, nil
+	return spotQuote{hourly: hourly, zones: zones, onDemand: onDemand, hasOnDemand: hasOnDemand, risk: risk}, nil
 }
 
-func (c *Calculator) spotCallError(logger zerolog.Logger, perRequest bool, err error) error {
+func (c *Calculator) spotCallError(logger zerolog.Logger, perRequest, regional bool, err error) error {
 	if errors.Is(err, client.ErrNoSpotPrice) {
+		if regional {
+			return status.Error(codes.NotFound, spotRegionalNotFound)
+		}
 		return status.Error(codes.NotFound, "no spot price for the instance type and availability zone")
 	}
 	if errors.Is(err, client.ErrSpotClientUnconfigured) {
@@ -173,7 +227,7 @@ func parseSpotQuery(resource *pbc.ResourceDescriptor) (spotQuery, error) {
 		return spotQuery{}, status.Error(codes.InvalidArgument, "spot quote instance type is invalid")
 	}
 	zone := availabilityZoneOf(resource)
-	if !awsNamePattern.MatchString(zone) {
+	if zone != "" && !awsNamePattern.MatchString(zone) {
 		return spotQuery{}, status.Error(codes.InvalidArgument, "spot quote availability zone is invalid")
 	}
 	region := strings.TrimSpace(resource.GetRegion())
@@ -197,7 +251,7 @@ func parseSpotQuery(resource *pbc.ResourceDescriptor) (spotQuery, error) {
 func buildSpotResponse(query spotQuery, quote spotQuote, hours float64, now time.Time) *pbc.GetProjectedCostResponse {
 	hourly, onDemand, hasOnDemand, risk := quote.hourly, quote.onDemand, quote.hasOnDemand, quote.risk
 	monthly := hourly * hours
-	detail := fmt.Sprintf("Spot %s %s in %s at %s USD per hour for %s hours", query.product, query.instanceType, query.availabilityZone, strconv.FormatFloat(hourly, 'f', -1, 64), strconv.FormatFloat(hours, 'f', -1, 64))
+	detail := fmt.Sprintf("Spot %s %s in %s at %s USD per hour for %s hours", query.product, query.instanceType, spotLocation(query, quote), strconv.FormatFloat(hourly, 'f', -1, 64), strconv.FormatFloat(hours, 'f', -1, 64))
 	opts := []pluginsdk.GetProjectedCostResponseOption{
 		pluginsdk.WithProjectedCostDetails(hourly, "USD", monthly, detail),
 		pluginsdk.WithProjectedCostPricingCategory(pbc.FocusPricingCategory_FOCUS_PRICING_CATEGORY_DYNAMIC),
@@ -221,13 +275,34 @@ func buildSpotResponse(query spotQuery, quote spotQuote, hours float64, now time
 	}
 	resp := pluginsdk.NewGetProjectedCostResponse(opts...)
 	resp.Metadata = map[string]string{
-		"spot_availability_zone":   query.availabilityZone,
 		"spot_product_description": query.product,
 	}
+	spotBasisMetadata(resp.Metadata, query, quote)
 	if risk.Label != "" {
 		resp.Metadata["spot_interruption_label"] = risk.Label
 	}
 	return resp
+}
+
+// spotLocation names where the Spot price applies: the zone, or the region with the number
+// of zones in the median.
+func spotLocation(query spotQuery, quote spotQuote) string {
+	if !query.regional() {
+		return query.availabilityZone
+	}
+	return fmt.Sprintf("%s (median of %d zones)", query.region, quote.zones)
+}
+
+// spotBasisMetadata records whether the Spot price came from an explicit zone or the regional
+// median. Explicit-zone responses keep their original keys, so a missing spot_az_basis means zone.
+func spotBasisMetadata(meta map[string]string, query spotQuery, quote spotQuote) {
+	if !query.regional() {
+		meta["spot_availability_zone"] = query.availabilityZone
+		return
+	}
+	meta["spot_availability_zone"] = spotRegionalRule
+	meta["spot_az_basis"] = spotBasisRegion
+	meta["spot_zone_count"] = strconv.Itoa(quote.zones)
 }
 
 func savingsFraction(primary, option float64) float64 {

@@ -30,6 +30,7 @@ func (c *Calculator) spotRecommendations(ctx context.Context, logger zerolog.Log
 	var recs []*pbc.Recommendation
 	for _, target := range targets {
 		if !wantsSpotComparison(target) {
+			logSpotSkip(logger, target)
 			continue
 		}
 		if ctx.Err() != nil {
@@ -38,7 +39,7 @@ func (c *Calculator) spotRecommendations(ctx context.Context, logger zerolog.Log
 		}
 		query, err := parseSpotQuery(target)
 		if err != nil {
-			logger.Warn().Err(err).Str("resource_id", target.GetId()).Msg("spot recommendation skipped: invalid target")
+			logger.Debug().Err(err).Str("resource_id", target.GetId()).Msg("spot recommendation skipped: invalid target")
 			continue
 		}
 		quote, err := c.spotQuoteFor(ctx, logger, query)
@@ -114,7 +115,7 @@ func buildSpotRecommendation(target *pbc.ResourceDescriptor, query spotQuery, qu
 			ProjectedCost:     projected,
 			SavingsPercentage: percentage,
 		},
-		Description: fmt.Sprintf("Move %s (%s) from on-demand to Spot capacity in %s", resourceID, query.instanceType, query.availabilityZone),
+		Description: fmt.Sprintf("Move %s (%s) from on-demand to Spot capacity in %s", resourceID, query.instanceType, spotLocation(query, quote)),
 		Reasoning: []string{
 			fmt.Sprintf("Spot %s costs %s USD per hour against %s USD per hour on demand, over %s hours.",
 				query.product, formatRate(quote.hourly), formatRate(quote.onDemand), formatRate(hours)),
@@ -124,12 +125,15 @@ func buildSpotRecommendation(target *pbc.ResourceDescriptor, query spotQuery, qu
 		Metadata: map[string]string{
 			"monthly_savings":          monthlySavings,
 			"projection_convention":    "daily=monthly/30;monthly=monthly;annual=monthly*12",
-			"spot_availability_zone":   query.availabilityZone,
 			"spot_product_description": query.product,
 			"spot_hourly_price":        formatRate(quote.hourly),
 			"on_demand_hourly_price":   formatRate(quote.onDemand),
 		},
 	}
+	if query.regional() {
+		rec.Reasoning = append(rec.Reasoning, fmt.Sprintf("No availability zone is set, so the Spot price is the median of the latest prices in %d zones of %s.", quote.zones, query.region))
+	}
+	spotBasisMetadata(rec.Metadata, query, quote)
 	if account != "" {
 		rec.Metadata["account_id"] = account
 	}
@@ -146,10 +150,16 @@ func buildSpotRecommendation(target *pbc.ResourceDescriptor, query spotQuery, qu
 }
 
 // spotRecommendationID hashes inputs that do not change with price or risk, so
-// a dismissal survives market moves.
+// a dismissal survives market moves. A region-level target hashes the fixed
+// spotRegionalIDKey instead of a zone, so the zone count and the median can move
+// without changing the id. An explicit zone hashes exactly as it did before.
 func spotRecommendationID(resourceID string, query spotQuery) string {
+	location := query.availabilityZone
+	if query.regional() {
+		location = spotRegionalIDKey
+	}
 	b, _ := json.Marshal([]string{
-		spotRecommendationSource, resourceID, query.region, query.availabilityZone,
+		spotRecommendationSource, resourceID, query.region, location,
 		query.instanceType, query.product, pbc.RecommendationActionType_RECOMMENDATION_ACTION_TYPE_MIGRATE.String(),
 	})
 	return fmt.Sprintf("%s:%x", spotRecommendationSource, sha256.Sum256(b))

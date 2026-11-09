@@ -121,17 +121,37 @@ process credentials. See [AWS credentials](docs/CREDENTIALS.md).
 ## Spot comparison
 
 The Spot comparison is off by default. With `FINFOCUS_AWS_CE_SPOT_COMPARISON=true`,
-`GetProjectedCost` for an EC2 instance with an instance type and an availability zone
-returns the current Spot price, with the on-demand rate and an interruption score.
+`GetProjectedCost` for an EC2 instance with an instance type and either an availability
+zone or a region returns the current Spot price, with the on-demand rate and an interruption
+score. A target with a zone is priced in that zone. A target with only a region is priced at
+the median of the latest Spot price in each zone of the region, and its response says so.
 With it off, the same request returns `InvalidArgument`, and FinFocus core falls back
 to the next plugin, such as `aws-public`, which prices the instance at its on-demand
 rate.
 
 The same switch makes `GetRecommendations` return a move-to-Spot recommendation for
-each EC2 target resource that has an instance type and an availability zone. It is
+each EC2 target resource that has an instance type and an availability zone or a region. It is
 a computed recommendation, labeled with the source `aws-spot-pricing`, with savings,
 `pricing_category` `DYNAMIC`, and an interruption risk score. See
 [Spot recommendations](docs/recommendations.md#spot-recommendations).
+
+### Spot eligibility
+
+An EC2 target is eligible for the Spot comparison and for the move-to-Spot recommendation
+when all of these hold:
+
+- `FINFOCUS_AWS_CE_SPOT_COMPARISON` is `true`.
+- The resource type is `ec2`, `aws:ec2`, or contains `ec2/instance`.
+- It has an instance type, read from `attributes.instanceType`, then `sku`, then the
+  `instanceType` tag.
+- It has a region, or an availability zone. The region is the resource's `region`. The zone is
+  read from `attributes.availabilityZone` or `attributes.availability_zone`, then the matching tag.
+- The operating system is Linux (the default), Windows, RHEL, or SUSE.
+
+A target with a zone uses that zone. A target with only a region uses the region-level median,
+described in [Spot recommendations](docs/recommendations.md#region-level-quotes). Most Pulumi
+programs place instances through `subnetId` and never set the zone, so the region-level
+quote covers them. Each skipped EC2 target logs its reason at debug level.
 
 Leave it off when another plugin prices your instances. FinFocus core uses the first
 plugin that answers a projected-cost request, and at equal priority it asks `aws-ce`

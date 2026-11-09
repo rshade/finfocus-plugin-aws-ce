@@ -261,9 +261,10 @@ func (c *Calculator) initClient(ctx context.Context, logger zerolog.Logger) erro
 }
 
 // GetProjectedCost proxies AWS Cost Explorer GetCostForecast for an account or
-// a service. An EC2 instance with an instance type and an availability zone is
-// a Spot comparison instead: DescribeSpotPriceHistory for that zone, and the
-// Price List on-demand rate on the same monthly basis. Cost Explorer cannot
+// a service. An EC2 instance with an instance type and a zone or region is
+// a Spot comparison instead: DescribeSpotPriceHistory for that zone, or the
+// region-level median when only a region is set, and the Price List on-demand
+// rate on the same monthly basis. Cost Explorer cannot
 // forecast any other single resource, so it is declined rather than priced at a
 // service or account total.
 // CostPerMonth is the projected total for the current UTC calendar month: the
@@ -287,6 +288,9 @@ func (c *Calculator) GetProjectedCost(ctx context.Context, req *pbc.GetProjected
 	}
 	if c.spotComparison && wantsSpotComparison(resource) {
 		return c.quoteSpot(ctx, logger, req)
+	}
+	if c.spotComparison {
+		logSpotSkip(logger, resource)
 	}
 	if !forecastScopeSupported(resource) {
 		return nil, statusWithDetail(
