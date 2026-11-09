@@ -15,7 +15,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sustainability v1.10.4
 	github.com/aws/smithy-go v1.28.8
 	github.com/rs/zerolog v1.35.1
-	github.com/rshade/finfocus-spec v0.7.11
+	github.com/rshade/finfocus-spec v0.7.12
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12

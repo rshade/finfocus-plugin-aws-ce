@@ -108,10 +108,11 @@ fixtures, with a companion recommendation remote procedure call check.
 make test-integration
 ```
 
-## Spec v0.7.11 features
+## Spec v0.7.12 features
 
 - `GetPluginInfo` advertises plugin settings from `internal/pricing/settings.go`. Add an entry there when the plugin reads a new
   environment variable. A test checks the list with `ValidatePluginSettings`.
+- `Supports` reads `pluginsdk.RequestedCapability(req)`. For `PROJECTED_COSTS` it returns `projectedSupport`, the checks `GetProjectedCost` makes before any AWS call; keep the two in step. The type-only answer must stay `true` for actual costs, so never decline in `supportsByResourceType`.
 - Never add `Parse`, the cost-parsing remote procedure call, to this plugin. `aws-public` owns `Parse` for the `aws` provider.
 - The plugin also doesn't adopt `GetRecommendationHistory` or the `ParsedResource` action hint. They serve projected-cost and recommendation plugins, not an actual-cost plugin.
 - With `FINFOCUS_AWS_CE_SPOT_COMPARISON=true`, an EC2 `GetProjectedCost` with an instance type and an availability zone or a region is a Spot comparison. A region-only target uses `LatestRegionalSpotPrice`: the median of the newest price per zone in the last hour, no zone filter, labeled `spot_az_basis: region`, `spot_availability_zone: region-median`, `spot_zone_count`. The rule is documented in `docs/recommendations.md#region-level-quotes`. It is off by default so a Spot quote never replaces an on-demand price.

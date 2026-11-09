@@ -76,7 +76,7 @@ var (
 const (
 	pluginName = "aws-ce"
 	// specVersion must keep the leading v. pluginsdk.ValidateSpecVersion rejects "0.7.0".
-	specVersion   = "v0.7.11"
+	specVersion   = "v0.7.12"
 	supportedRPCs = "GetActualCost,GetProjectedCost,GetBudgets,GetRecommendations,Supports,GetPluginInfo,BatchCost"
 )
 
@@ -202,7 +202,32 @@ func (c *Calculator) Supports(ctx context.Context, req *pbc.SupportsRequest) (*p
 			}
 		}
 	}
+	// The type-only answer must stay true for actual costs. A host that names
+	// PROJECTED_COSTS gets the GetProjectedCost answer instead.
+	if response.Supported && pluginsdk.RequestedCapability(req) == pbc.PluginCapability_PLUGIN_CAPABILITY_PROJECTED_COSTS {
+		response.Supported, response.Reason = c.projectedSupport(resource)
+	}
 	return response, nil
+}
+
+// projectedSupport reports whether GetProjectedCost can price resource. It applies
+// the same checks GetProjectedCost makes before any AWS call, so a decline here is
+// a request that would otherwise fail with InvalidArgument.
+func (c *Calculator) projectedSupport(resource *pbc.ResourceDescriptor) (bool, string) {
+	spot := c.spotComparison && wantsSpotComparison(resource)
+	if !spot && !forecastScopeSupported(resource) {
+		if !isEC2Instance(resource.GetResourceType()) {
+			return false, "projected cost is available for aws:service and aws:account only; Cost Explorer cannot forecast a single resource"
+		}
+		if !c.spotComparison {
+			return false, "projected cost for an EC2 instance is a Spot comparison, which needs " + SpotComparisonEnv + "=true"
+		}
+		return false, "no Spot comparison for this EC2 instance: " + spotIneligibleReason(resource)
+	}
+	if err := pluginsdk.ValidateProjectedCostRequest(&pbc.GetProjectedCostRequest{Resource: resource}); err != nil {
+		return false, invalidResourceReason(err.Error())
+	}
+	return true, ""
 }
 
 const pulumiEC2InstanceType = "aws:ec2/instance:Instance"

@@ -2,7 +2,7 @@
 
 The AWS Cost Explorer plugin serves the `finfocus.v1.CostSourceService` gRPC
 interface on a local TCP port. It identifies itself as `aws-ce`, reports spec
-version `v0.7.11`, and advertises actual costs, forecasts, budgets, recommendations, and batch costs. This
+version `v0.7.12`, and advertises actual costs, forecasts, budgets, recommendations, and batch costs. This
 reference describes the current source checkout. See [deployment](deployment.md) to install and run it,
 and [configuration](configuration.md) for settings and credentials.
 
@@ -27,7 +27,7 @@ request and returns discovery metadata without contacting AWS.
 | --- | --- | --- |
 | `name` | string | `aws-ce` |
 | `version` | string | Build version. Release builds inject the release version |
-| `spec_version` | string | `v0.7.11` |
+| `spec_version` | string | `v0.7.12` |
 | `providers` | repeated string | `aws` |
 | `capabilities` | repeated `PluginCapability` | Actual costs, projected costs, budgets, recommendations, and batch costs |
 | `metadata` | map of strings | `supported_rpcs` lists `GetActualCost,GetProjectedCost,GetBudgets,GetRecommendations,Supports,GetPluginInfo,BatchCost` |
@@ -44,7 +44,8 @@ The `carbon_enabled` BOOL setting is always advertised, with environment name
 ### Supports
 
 `Supports(SupportsRequest) → SupportsResponse` checks whether the plugin can
-query a resource. The request contains one `resource` descriptor.
+query a resource. The request contains one `resource` descriptor and an optional
+`capability`.
 
 | Descriptor field | Type | Behavior |
 | --- | --- | --- |
@@ -68,6 +69,15 @@ types when requesting costs.
 | `capabilities_enum` | repeated `PluginCapability` | Actual costs, forecasts, budgets, and recommendations |
 | `capabilities` | map of `bool` values | Legacy field. Use `capabilities_enum` |
 | `supported_metrics` | repeated `MetricKind` | Empty. Historical inventory uses its own report RPC |
+
+When `capability` is `PLUGIN_CAPABILITY_PROJECTED_COSTS`, the plugin applies the
+checks `GetProjectedCost` makes before it calls AWS. A resource outside them gets
+`supported: false` and a reason: anything other than `aws:account` or
+`aws:service` with an id, an EC2 instance when
+`FINFOCUS_AWS_CE_SPOT_COMPARISON` is off or the instance has no type, region, or
+zone, and a descriptor without `sku` or `region`. Actual costs, other
+capabilities, an unspecified capability, and unknown values get the answer
+described above. An unspecified capability is what older hosts send.
 
 Unsupported resources return `supported: false`, not a failed remote procedure
 call. This check doesn't contact AWS or confirm permissions, resource existence,
