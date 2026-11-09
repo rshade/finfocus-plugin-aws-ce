@@ -229,3 +229,57 @@ func TestGetRecommendationsSkipsSpotCallsWhenFilterExcludesThem(t *testing.T) {
 		})
 	}
 }
+
+func TestSpotDisplayName(t *testing.T) {
+	tests := []struct {
+		name       string
+		resourceID string
+		want       string
+	}{
+		{"pulumi urn", "urn:pulumi:dev::spotcheck::aws:ec2/instance:Instance::web-preview", "web-preview"},
+		{"pulumi urn with parent", "urn:pulumi:dev::app::aws:ec2/vpc:Vpc$aws:ec2/instance:Instance::web", "web"},
+		{"pulumi urn without name", "urn:pulumi:dev::app::aws:ec2/instance:Instance::", "urn:pulumi:dev::app::aws:ec2/instance:Instance::"},
+		{"malformed pulumi urn", "urn:pulumi:dev", "urn:pulumi:dev"},
+		{"instance arn", "arn:aws:ec2:us-east-1:123456789012:instance/i-0abc", "i-0abc"},
+		{"plain instance id", "i-0abc", "i-0abc"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, spotDisplayName(tt.resourceID))
+		})
+	}
+}
+
+func TestSpotRecommendationDescribesURNByLogicalName(t *testing.T) {
+	const urn = "urn:pulumi:dev::spotcheck::aws:ec2/instance:Instance::web-preview"
+	target := spotRecommendationTarget(t, "us-east-1a")
+	target.Id = urn
+	query, err := parseSpotQuery(target)
+	require.NoError(t, err)
+	rec, err := buildSpotRecommendation(target, query, spotQuote{hourly: 0.03, onDemand: 0.10, hasOnDemand: true}, pluginsdk.HoursProd)
+	require.NoError(t, err)
+	require.NoError(t, pluginsdk.ValidateRecommendation(rec))
+	require.Equal(t, "Move web-preview (m5.large) from on-demand to Spot capacity in us-east-1a", rec.GetDescription())
+	require.Equal(t, "web-preview", rec.GetResource().GetName())
+	require.Equal(t, urn, rec.GetResource().GetId())
+	require.Equal(t, spotRecommendationID(urn, query), rec.GetId())
+}
+
+func TestSpotRecommendationRegionalURNDescription(t *testing.T) {
+	const urn = "urn:pulumi:dev::spotcheck::aws:ec2/instance:Instance::web-preview"
+	target := regionalSpotTarget(t)
+	target.Id = urn
+	query, err := parseSpotQuery(target)
+	require.NoError(t, err)
+	rec, err := buildSpotRecommendation(target, query, spotQuote{hourly: 0.03, zones: 4, onDemand: 0.10, hasOnDemand: true}, pluginsdk.HoursProd)
+	require.NoError(t, err)
+	require.Equal(t, "Move web-preview (m5.large) from on-demand to Spot capacity in us-east-1 (median of 4 zones)", rec.GetDescription())
+	require.Equal(t, "web-preview", rec.GetResource().GetName())
+}
+
+func TestSpotRecommendationNameForPlainIDMatchesID(t *testing.T) {
+	rec, err := buildTestSpotRecommendation(t, spotQuote{hourly: 0.03, onDemand: 0.10, hasOnDemand: true})
+	require.NoError(t, err)
+	require.Equal(t, "i-0abc", rec.GetResource().GetName())
+	require.Equal(t, "i-0abc", rec.GetResource().GetId())
+}

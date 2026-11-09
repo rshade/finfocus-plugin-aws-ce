@@ -125,6 +125,7 @@ func TestSpotRecommendationExplicitZoneKeepsReasoningAndID(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rec.GetReasoning(), 2)
 	require.Equal(t, "Move i-0abc (m5.large) from on-demand to Spot capacity in us-east-1a", rec.GetDescription())
+	require.Equal(t, "i-0abc", rec.GetResource().GetName())
 	require.NotContains(t, rec.GetMetadata(), "spot_az_basis")
 	require.Equal(t, explicitZoneSpotRecommendationID, rec.GetId())
 }
