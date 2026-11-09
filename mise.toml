@@ -32,7 +32,7 @@ vale = "3.26.0"
 # Commitlint dependencies are locked in package-lock.json; install with npm ci.
 
 # Code review automation via aqua registry.
-"aqua:reviewdog/reviewdog" = "0.21.2"
+"aqua:reviewdog/reviewdog" = "0.21.3"
 
 [tasks.test]
 description = "Run all tests"
