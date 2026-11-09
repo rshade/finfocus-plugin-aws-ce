@@ -117,7 +117,8 @@ for defaults, filters, permissions, and limitations. Keep SDK validation,
 selection, pagination, summary helpers, and `zerolog` operation logging. Preserve
 request-scoped credentials, retry budgets, the 100-page AWS cap, and per-source
 isolation: a failed source is logged and skipped, cancellation and budget exhaustion fail the
-call, and only a call where every selected source fails returns an error. Never generate recommendations, purchase plans, or mutate
+call, and only a call where every selected source fails returns an error. A partial result
+is never paginated: with a page token or a second page, a failed source fails the call. Never generate recommendations, purchase plans, or mutate
 resources. Ordinary tests use offline fixtures. The `awslive` recommendation
 test also requires `FINFOCUS_AWS_LIVE=true`. Don't run it without an explicit
 request for real AWS verification. A blank plan type with no details is an empty

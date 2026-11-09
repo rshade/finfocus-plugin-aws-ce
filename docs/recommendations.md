@@ -403,6 +403,13 @@ otherwise identical request. Sorting has an ID tie-breaker. Offset pagination
 queries AWS again and gives no snapshot consistency when AWS regenerates data.
 Summaries describe the returned page only.
 
+Partial results never cross pages. Page tokens are offsets into the full result,
+and the response has no field that names a failed source. A source that failed for
+one page and answered for the next would shift that list and silently skip or
+repeat rows. When any source fails, the plugin returns the remaining rows only if
+they fit on one page and the request has no page token. Otherwise it returns the
+first failure.
+
 Each AWS query follows up to 100 AWS result pages and rejects repeated tokens.
 Retries consume the configured request budget. The plugin doesn't cache results
 across requests, and per-request credentials and assume-role settings apply to every
@@ -414,13 +421,14 @@ selected source.
 | --- | --- |
 | Empty dataset | Successful empty response |
 | Invalid filter, projection, target, or token | `InvalidArgument`, before any AWS access |
-| Permission, throttling, cancellation, or deadline failure | The standard AWS error mapping |
-| Unavailable dataset | An availability or precondition error |
-| Malformed financial data or mixed currencies | `DataLoss` |
+| A permission failure or an unavailable dataset in one source | That source is skipped, as for any failed source below. Its status (`PermissionDenied`, `FailedPrecondition`) is returned only when every selected source fails |
+| Malformed Savings Plans or reservation data | That source is skipped. `DataLoss` is returned only when every selected source fails |
+| Mixed currencies, savings overflow, or a projection failure across the collected rows | `DataLoss` for the whole call |
 | A rightsizing item that can't be mapped, such as an unknown `RightsizingType` | The item is skipped and logged, and the rest returns |
 | One selected source fails, such as Savings Plans or a reservation service | The source is logged and skipped, and the rest returns |
 | Every selected source fails | The first failure's status (`PermissionDenied`, `FailedPrecondition`, `Internal`, and so on) |
 | Throttling, budget exhaustion, cancellation, or deadline | The whole call fails (`ResourceExhausted`, `Canceled`, or `DeadlineExceeded`) |
+| A source fails on a paginated call: the request has a page token, or the result is longer than one page | The first failure's status, as before source isolation. See [Pagination](#pagination) |
 | The Spot lookup fails for a target | The target is skipped and the rest returns |
 
 ## Example requests

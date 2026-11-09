@@ -210,6 +210,9 @@ func (c *Calculator) GetRecommendations(ctx context.Context, req *pbc.GetRecomme
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid recommendation page token")
 	}
+	if err := sources.paginationResult(req.GetPageToken() != "" || next != ""); err != nil {
+		return nil, err
+	}
 	return &pbc.GetRecommendationsResponse{Recommendations: page, NextPageToken: next, Summary: pluginsdk.CalculateRecommendationSummary(page, period)}, nil
 }
 
@@ -226,6 +229,9 @@ type recommendationSourceRun struct {
 	firstErr  error
 }
 
+// run collects one source's rows. It returns an error only for a hard failure;
+// any other failure is logged, its rows are dropped, and the first one is kept
+// for result and paginationResult.
 func (s *recommendationSourceRun) run(name string, fetch func() ([]*pbc.Recommendation, error)) error {
 	got, err := fetch()
 	if err == nil {
@@ -243,6 +249,8 @@ func (s *recommendationSourceRun) run(name string, fetch func() ([]*pbc.Recommen
 	return nil
 }
 
+// result returns the first failure when no source succeeded, so a full outage
+// is an error rather than an empty success.
 func (s *recommendationSourceRun) result() error {
 	if s.succeeded == 0 {
 		return s.firstErr
@@ -250,6 +258,21 @@ func (s *recommendationSourceRun) result() error {
 	return nil
 }
 
+// paginationResult keeps partial results off paginated calls. Page tokens are
+// SDK offsets into the full list, and the response has no field for a failed
+// source, so a source that fails on one page and answers on another would shift
+// the list and silently skip or repeat rows. A partial result is returned only
+// when it is complete on one page; otherwise the first failure is returned.
+func (s *recommendationSourceRun) paginationResult(paginated bool) error {
+	if paginated && s.firstErr != nil {
+		s.logger.Warn().Str("code", status.Code(s.firstErr).String()).Msg("recommendation source failed on a paginated call; returning the failure")
+		return s.firstErr
+	}
+	return nil
+}
+
+// recommendationHardFailure reports failures that end the whole call instead of
+// one source: cancellation, deadline, and an exhausted request budget.
 func recommendationHardFailure(err error) bool {
 	switch status.Code(err) {
 	case codes.Canceled, codes.DeadlineExceeded, codes.ResourceExhausted:
