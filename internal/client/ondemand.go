@@ -27,8 +27,8 @@ var ErrPriceListTruncated = errors.New("price list exceeded 5 pages")
 // A price and a confirmed miss are cached for five minutes.
 func (c *Client) OnDemandHourly(ctx context.Context, region, instanceType, operatingSystem string) (float64, bool, error) {
 	key := region + "\x00" + instanceType + "\x00" + operatingSystem
-	if hourly, ok, hit := c.cached(&c.priceCache, key); hit {
-		return hourly, ok, nil
+	if entry, hit := c.cached(&c.priceCache, key); hit {
+		return entry.hourly, entry.ok, nil
 	}
 	api, err := c.pricingAPIFor()
 	if err != nil {
@@ -39,7 +39,7 @@ func (c *Client) OnDemandHourly(ctx context.Context, region, instanceType, opera
 		return 0, false, err
 	}
 	hourly, ok := onDemandHourlyFromPriceList(items, instanceType)
-	c.store(&c.priceCache, key, hourly, ok)
+	c.store(&c.priceCache, key, cachedHourly{hourly: hourly, ok: ok})
 	return hourly, ok, nil
 }
 

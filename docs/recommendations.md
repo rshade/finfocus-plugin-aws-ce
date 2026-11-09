@@ -130,10 +130,11 @@ All of these must hold:
   and can't discover instances. For a request with no targets, Cost Explorer
   rightsizing is the source.
 - The target is an EC2 instance (`ec2`, `aws:ec2/instance:Instance`, or
-  `ec2:Instance`) with an instance type and an availability zone. The plugin reads
-  `attributes` first, then `sku`, then tags, the same order as `GetProjectedCost`.
+  `ec2:Instance`) with an instance type and an availability zone or a region. The plugin
+  reads `attributes` first, then `sku`, then tags, the same order as `GetProjectedCost`.
 - The region is set, and the operating system is Linux, Windows, RHEL, or SUSE.
-  Linux is the default.
+  Linux is the default. A target with a region and no zone is priced at the region-level median
+  (see [Region-level quotes](#region-level-quotes)).
 - The Price List API has an on-demand row, and the Spot price is below it.
 
 A target that fails any condition produces no recommendation and doesn't fail the
@@ -270,13 +271,51 @@ suppresses the recommendation.
 The plugin doesn't rank recommendations by risk. FinFocus core never reorders
 them either. Read the score and the label, then decide.
 
+### Region-level quotes
+
+A target with an instance type and a region, but no availability zone, is quoted at the
+median of the latest Spot price in each zone of the region. The plugin makes one
+`DescribeSpotPriceHistory` call for the instance type and operating system over the last hour,
+with no zone filter. It keeps the newest price for each zone that reported one, sorts those
+prices, and takes:
+
+- the middle price when the count is odd;
+- the mean of the two middle prices when the count is even.
+
+Zones with no price in the hour are not counted. The response and the recommendation say so:
+
+| Field | Value for a region-level quote |
+| --- | --- |
+| `metadata.spot_az_basis` | `region` |
+| `metadata.spot_availability_zone` | `region-median` |
+| `metadata.spot_zone_count` | The number of zones in the median |
+| `reasoning` | A third line naming the region and the zone count |
+| `description` | Says `median of N zones` in place of the zone |
+
+An explicit-zone quote keeps its existing metadata and has no `spot_az_basis`, so a missing key
+means the zone was given.
+
+The plugin doesn't pick the cheapest zone. The instance lands in the zone its subnet is in,
+which the plugin can't see, so the cheapest zone is the most optimistic guess. The median is
+neutral, and one unusually cheap or dear zone can't dominate it. A region with more than
+500 price rows in the hour fails with the page-limit error rather than quote a median over partial
+data.
+
 ### Stable IDs
 
 The ID is `aws-spot-pricing:` followed by a SHA-256 hash of the source, resource
-ID, region, availability zone, instance type, operating system, and action type.
-Prices and risk are not inputs. A dismissal therefore survives a price change, and
-the same suggestion keeps its ID across calls. A different zone, instance type, or
-operating system produces a new ID. Duplicate targets produce one recommendation.
+ID, region, location, instance type, operating system, and action type. The location
+is the availability zone for an explicit-zone target and the literal `region` for a
+region-level target. Prices, risk, and zone count are not inputs. A dismissal therefore
+survives a price change, and the same suggestion keeps its ID across calls. A different
+zone, instance type, or operating system produces a new ID. Duplicate targets produce one
+recommendation.
+
+A region-level dismissal survives price, risk, and zone-count changes. It does not survive
+the instance later reporting a real availability zone. The zone-specific suggestion has a
+different ID and appears as a new row, because its price is for one zone and not the
+region median. The reverse holds too: a zone-level dismissal does not hide the region-level
+row. The explicit-zone ID is unchanged from the earlier release.
 
 ### Failure behavior
 
@@ -307,8 +346,8 @@ ask again before acting on them.
 
 - Targets only. The plugin doesn't find instances for you.
 - EC2 only. It doesn't recommend Spot for RDS, containers, or other services.
-- One zone per target. It prices the zone you give and never picks the cheapest
-  zone.
+- One price per target. An explicit zone is priced in that zone. A region-only target
+  is priced at the region median, and never at the cheapest zone.
 - Shared tenancy on-demand prices only. It doesn't derive the on-demand price from
   advisor data.
 - It recommends the same instance type on Spot. It doesn't suggest a different

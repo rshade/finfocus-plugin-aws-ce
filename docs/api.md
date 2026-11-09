@@ -285,7 +285,7 @@ would show the fee as its own charge and covered usage at the on-demand rate.
 | --- | --- |
 | Type `aws:account` | All costs visible to the credentials |
 | Type `aws:service` with a non-empty id | Exact Cost Explorer service name in `id` |
-| EC2 instance with an instance type and an availability zone | Spot comparison described below when `FINFOCUS_AWS_CE_SPOT_COMPARISON=true`, otherwise declined |
+| EC2 instance with an instance type and a region or an availability zone | Spot comparison described below when `FINFOCUS_AWS_CE_SPOT_COMPARISON=true`, otherwise declined |
 | Any other resource, or `aws:service` without an id | Declined with `InvalidArgument` and `ERROR_CODE_INVALID_RESOURCE` |
 
 Cost Explorer cannot forecast one resource, and resource-level data covers 14
@@ -297,14 +297,17 @@ resources from list prices for single resources.
 ### Spot comparison
 
 The comparison is off by default. With `FINFOCUS_AWS_CE_SPOT_COMPARISON=true`,
-an EC2 instance request that includes an instance type and an availability zone
-returns a Spot quote instead of a forecast. With it off, the request gets
+an EC2 instance request that includes an instance type and a region, with or without an
+availability zone, returns a Spot quote instead of a forecast. With it off, the request gets
 `InvalidArgument` like any other single resource. The instance type comes from
 `attributes.instanceType` or `attributes.instance_type`, then `sku`, then tags.
 The zone comes from `attributes.availabilityZone` or `attributes.availability_zone`,
 then tags. `attributes` win when the same input is also on a tag. The SDK still
 requires `sku` on the request. The operating
 system comes from the same sources and defaults to Linux. The request must include `region`.
+Without a zone, the quote is the median of the latest Spot price in each zone of the region
+over the last hour, and the response metadata sets `spot_az_basis` to `region`,
+`spot_availability_zone` to `region-median`, and `spot_zone_count` to the number of zones.
 `dry_run: true` still returns `InvalidArgument`.
 
 The plugin filters `ec2:DescribeSpotPriceHistory` by that instance type, product
@@ -331,7 +334,8 @@ map to `spot_interruption_risk_score` values 0.05, 0.10, 0.15, and 0.20.
 The open bucket `>20%` leaves the score at 0 and sets metadata
 `spot_interruption_label`. A feed failure still returns the prices and leaves
 the score at 0. `FINFOCUS_TEST_MODE=true` skips the feed. Metadata also records `spot_availability_zone` and
-`spot_product_description`. `expires_at` is five minutes ahead. The plugin caches
+`spot_product_description`. For a region-level quote, see the `spot_az_basis` fields above.
+`expires_at` is five minutes ahead. The plugin caches
 Spot prices and on-demand rates for five minutes, and caches the advisor document
 for one hour. Missing Spot history returns `NotFound`.
 
@@ -438,7 +442,9 @@ between 0 and 1.
 ### Spot recommendations
 
 With `FINFOCUS_AWS_CE_SPOT_COMPARISON=true`, each EC2 target resource with an
-instance type and an availability zone gets one computed recommendation. Its
+instance type and an availability zone or a region gets one computed recommendation.
+A region-only target uses the region-level median; its recommendation id hashes the literal
+`region` in place of a zone, so it is stable across price and zone-count changes. Its
 source is `aws-spot-pricing`, not `aws-cost-explorer`. The fields below are new in
 spec v0.7.11.
 

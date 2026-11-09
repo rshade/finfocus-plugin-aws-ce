@@ -17,6 +17,7 @@ import (
 
 type fakeSpotHourly struct {
 	hourly       float64
+	zones        int
 	err          error
 	calls        int
 	instanceType string
@@ -30,6 +31,14 @@ func (f *fakeSpotHourly) LatestSpotPrice(_ context.Context, _, instanceType, pro
 	f.zone = availabilityZone
 	f.product = product
 	return f.hourly, f.err
+}
+
+func (f *fakeSpotHourly) LatestRegionalSpotPrice(_ context.Context, _, instanceType, product string) (client.RegionalSpotPrice, error) {
+	f.calls++
+	f.instanceType = instanceType
+	f.zone = ""
+	f.product = product
+	return client.RegionalSpotPrice{Hourly: f.hourly, Zones: f.zones}, f.err
 }
 
 type fakeOnDemand struct {
@@ -187,8 +196,9 @@ func TestSpotComparisonMissingPrice(t *testing.T) {
 	}
 }
 
-func TestEC2WithoutZoneStaysDeclined(t *testing.T) {
+func TestEC2WithoutZoneDeclinedWhenComparisonOff(t *testing.T) {
 	calc := NewCalculatorWithClient(client.NewClientWithAPI(&mockCostExplorerAPI{}, "us-east-1"))
+	calc.spotComparison = false
 	calc.spotQuote = &fakeSpotHourly{hourly: 1}
 	req := &pbc.GetProjectedCostRequest{Resource: &pbc.ResourceDescriptor{
 		Provider: "aws", ResourceType: "aws:ec2/instance:Instance", Sku: "m5.large", Region: "us-east-1",
@@ -198,7 +208,7 @@ func TestEC2WithoutZoneStaysDeclined(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 	if calc.spotQuote.(*fakeSpotHourly).calls != 0 {
-		t.Fatal("spot price was called without an availability zone")
+		t.Fatal("spot price was called while the comparison is off")
 	}
 }
 

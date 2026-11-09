@@ -32,15 +32,16 @@ type CostExplorerAPI interface {
 
 // Client represents a client for AWS Cost Explorer API.
 type Client struct {
-	ceClient   CostExplorerAPI
-	region     string
-	awsConfig  aws.Config
-	spotAPI    SpotAPI
-	pricingAPI PricingAPI
-	cacheMu    sync.Mutex
-	spotCache  map[string]cachedHourly
-	priceCache map[string]cachedHourly
-	discovery  discoveryCache
+	ceClient          CostExplorerAPI
+	region            string
+	awsConfig         aws.Config
+	spotAPI           SpotAPI
+	pricingAPI        PricingAPI
+	cacheMu           sync.Mutex
+	spotCache         map[string]cachedHourly
+	regionalSpotCache map[string]cachedHourly
+	priceCache        map[string]cachedHourly
+	discovery         discoveryCache
 }
 
 // Config holds configuration for the AWS Cost Explorer client.

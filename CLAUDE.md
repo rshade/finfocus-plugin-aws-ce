@@ -38,7 +38,7 @@ Explorer. It implements the `finfocus-spec` plugin SDK interface.
 - `cmd/plugin/main.go` sets up the gRPC server at the plugin entry point
 - `internal/pricing/calculator.go` contains the core `Calculator` struct
   - `GetProjectedCost()` serves `aws:account` and `aws:service` only and declines other resources with `InvalidArgument`. It returns month-to-date `AmortizedCost` (`ce:GetCostAndUsage`) plus the `ce:GetCostForecast` to the first of next month, and shifts the AWS interval bounds by the month-to-date amount
-    An EC2 instance with an instance type and zone takes the Spot comparison path in `spot.go`, which also calls EC2,
+    An EC2 instance with an instance type and a zone or region takes the Spot comparison path in `spot.go`, which also calls EC2,
     the Price List API, and the Spot Instance Advisor feed
   - `GetActualCost()` retrieves historical costs from the Cost Explorer API
   - `GetServiceActualCost()` and `GetAccountActualCost()` handle service and account queries
@@ -114,18 +114,18 @@ make test-integration
   environment variable. A test checks the list with `ValidatePluginSettings`.
 - Never add `Parse`, the cost-parsing remote procedure call, to this plugin. `aws-public` owns `Parse` for the `aws` provider.
 - The plugin also doesn't adopt `GetRecommendationHistory` or the `ParsedResource` action hint. They serve projected-cost and recommendation plugins, not an actual-cost plugin.
-- With `FINFOCUS_AWS_CE_SPOT_COMPARISON=true`, an EC2 `GetProjectedCost` with an instance type and an availability zone is a Spot comparison. It is off by default so a Spot quote never replaces an on-demand price.
+- With `FINFOCUS_AWS_CE_SPOT_COMPARISON=true`, an EC2 `GetProjectedCost` with an instance type and an availability zone or a region is a Spot comparison. A region-only target uses `LatestRegionalSpotPrice`: the median of the newest price per zone in the last hour, no zone filter, labeled `spot_az_basis: region`, `spot_availability_zone: region-median`, `spot_zone_count`. The rule is documented in `docs/recommendations.md#region-level-quotes`. It is off by default so a Spot quote never replaces an on-demand price.
   Account and service requests stay on `ce:GetCostForecast`. Any other single resource returns `InvalidArgument`.
-  Read `attributes` before `sku` and tags. `DescribeSpotPriceHistory` filters instance type, product description, and zone.
+  Read `attributes` before `sku` and tags. `DescribeSpotPriceHistory` filters instance type, product description, and zone; a region-level lookup omits the zone filter.
   Linux uses `Linux/UNIX`. `pricing:GetProducts` in `us-east-1` supplies the shared-tenancy on-demand hourly rate.
   `on_demand_equivalent_monthly_cost` and the `STANDARD` `On-Demand` price option use the same hour count as `cost_per_month`.
   `savings_fraction` is `(spot unit price - on-demand unit price) / spot unit price`. Leave the on-demand fields unset when the price list has no row.
   Advisor `r` maps to `0.05`, `0.10`, `0.15`, and `0.20`. The `>20%` bucket leaves the score at 0 and keeps the label in metadata.
-  Don't derive the on-demand price from advisor field `s`, and don't pick the cheapest zone.
+  Don't derive the on-demand price from advisor field `s`, and don't pick the cheapest zone. A region-level quote uses the median zone price, not the cheapest zone.
   Spot and on-demand rates cache for five minutes. The advisor document caches for one hour.
-- The same opt-in makes `GetRecommendations` emit one move-to-Spot recommendation per EC2 target resource that has an instance type and a zone (`internal/pricing/spot_recommendations.go`). Source `aws-spot-pricing`, action `MIGRATE`, `pricing_category` `DYNAMIC`.
+- The same opt-in makes `GetRecommendations` emit one move-to-Spot recommendation per EC2 target resource that has an instance type and a zone or a region (`internal/pricing/spot_recommendations.go`). Source `aws-spot-pricing`, action `MIGRATE`, `pricing_category` `DYNAMIC`.
   `spot_interruption_risk_score` is set only for a mapped advisor bucket. Zero means unknown, and the `>20%` label stays in metadata. Only that builder sets either field.
-  The row skips a target with no on-demand price or a Spot price that isn't below it, and a failed lookup skips that target instead of failing the call. The id hashes source, resource, region, zone, type, OS and action, never prices.
+  The row skips a target with no on-demand price or a Spot price that isn't below it, and a failed lookup skips that target instead of failing the call. The id hashes source, resource, region, location (the zone, or the literal `region` for a region-level quote), type, OS and action, never prices or zone count. The explicit-zone id is pinned by a test and must not change.
   Both `GetProjectedCost` and the builder call `spotQuoteFor` in `spot.go`.
 
 ## Documentation map
