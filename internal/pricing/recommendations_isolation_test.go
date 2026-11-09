@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
 	"github.com/aws/smithy-go"
 	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
+	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
 	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -149,4 +150,44 @@ func TestRecommendationsRequestCredentialFailureStaysHard(t *testing.T) {
 	resp, err := calc.GetRecommendations(ctx, &pbc.GetRecommendationsRequest{TargetResources: []*pbc.ResourceDescriptor{spotRecommendationTarget(t, "us-east-1a")}})
 	require.Nil(t, resp)
 	require.Equal(t, codes.FailedPrecondition, status.Code(err))
+}
+
+func TestRecommendationsPartialFailureIsNotPaginated(t *testing.T) {
+	denied := &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "secret"}
+	targets := []*pbc.ResourceDescriptor{
+		spotRecommendationTarget(t, "us-east-1a"),
+		spotRecommendationTarget(t, "us-east-1b"),
+	}
+	for _, tc := range []struct {
+		name string
+		req  *pbc.GetRecommendationsRequest
+	}{
+		{"result spans more than one page", &pbc.GetRecommendationsRequest{PageSize: 1, TargetResources: targets}},
+		{"request continues a page", &pbc.GetRecommendationsRequest{PageToken: pluginsdk.EncodePageToken(1), TargetResources: targets}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calc := spotIsolationCalculator(&recommendationAPI{rightFail: denied})
+			resp, err := calc.GetRecommendations(t.Context(), tc.req)
+			require.Nil(t, resp)
+			require.Equal(t, codes.PermissionDenied, status.Code(err))
+		})
+	}
+
+	t.Run("complete result on one page keeps partial rows", func(t *testing.T) {
+		calc := spotIsolationCalculator(&recommendationAPI{rightFail: denied})
+		resp, err := calc.GetRecommendations(t.Context(), &pbc.GetRecommendationsRequest{TargetResources: targets})
+		require.NoError(t, err)
+		require.Len(t, spotRows(resp.GetRecommendations()), 2)
+		require.Empty(t, resp.GetNextPageToken())
+	})
+
+	t.Run("pagination without a failed source is unchanged", func(t *testing.T) {
+		calc := spotIsolationCalculator(&recommendationAPI{rights: rightsizingFixture()})
+		first, err := calc.GetRecommendations(t.Context(), &pbc.GetRecommendationsRequest{PageSize: 1, TargetResources: targets})
+		require.NoError(t, err)
+		require.NotEmpty(t, first.GetNextPageToken())
+		second, err := calc.GetRecommendations(t.Context(), &pbc.GetRecommendationsRequest{PageSize: 1, PageToken: first.GetNextPageToken(), TargetResources: targets})
+		require.NoError(t, err)
+		require.Len(t, second.GetRecommendations(), 1)
+	})
 }
