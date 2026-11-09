@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.3](https://github.com/rshade/finfocus-plugin-aws-ce/compare/v0.1.2...v0.1.3) (2026-11-09)
+
+
+### Features
+
+* **spot:** quote spot for EC2 targets without an availability zone ([#103](https://github.com/rshade/finfocus-plugin-aws-ce/issues/103)) ([2241ac4](https://github.com/rshade/finfocus-plugin-aws-ce/commit/2241ac431e67c5c4b54e998ba09328d75b0c63f9))
+
+
+### Bug Fixes
+
+* **recommendations:** match title-case rightsizing types and isolate sources ([d155ece](https://github.com/rshade/finfocus-plugin-aws-ce/commit/d155ecedd89a73c4f80cd2e1783a9e19da3566e9)), closes [#100](https://github.com/rshade/finfocus-plugin-aws-ce/issues/100)
+* **recommendations:** never paginate a partial result ([#105](https://github.com/rshade/finfocus-plugin-aws-ce/issues/105)) ([18bc3fe](https://github.com/rshade/finfocus-plugin-aws-ce/commit/18bc3fe1873c2dc6d468186e037f3f66bd58869c))
+* **release:** keep manifest.json and manifest.yaml versions in release-please ([#107](https://github.com/rshade/finfocus-plugin-aws-ce/issues/107)) ([baffef3](https://github.com/rshade/finfocus-plugin-aws-ce/commit/baffef38cd312ce9873e47e52b86eb35d1f1cef7))
+* **spot:** describe Spot targets by their short name ([#109](https://github.com/rshade/finfocus-plugin-aws-ce/issues/109)) ([e65c27f](https://github.com/rshade/finfocus-plugin-aws-ce/commit/e65c27f57c2fe6475117ef15ed65779d77244465))
+* **supports:** decline projected cost for resources GetProjectedCost ([a3cf768](https://github.com/rshade/finfocus-plugin-aws-ce/commit/a3cf768941fd427808ed4d093ba4dff96ad4a4fc))
+* **supports:** decline projected cost for resources GetProjectedCost cannot price ([#110](https://github.com/rshade/finfocus-plugin-aws-ce/issues/110)) ([a3cf768](https://github.com/rshade/finfocus-plugin-aws-ce/commit/a3cf768941fd427808ed4d093ba4dff96ad4a4fc))
+
 ## [0.1.2](https://github.com/rshade/finfocus-plugin-aws-ce/compare/v0.1.1...v0.1.2) (2026-11-09)
 
 
