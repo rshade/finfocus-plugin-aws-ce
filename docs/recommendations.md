@@ -118,6 +118,11 @@ is computed, not copied from AWS. The plugin quotes the current Spot price, the
 on-demand price, and the Spot Instance Advisor interruption bucket, then reports
 the difference.
 
+The description names the target by a short name. For a Pulumi URN that is the
+logical name after the last `::`, and for an instance ARN it is the instance id.
+`resource.name` carries the same name. `resource.id` keeps the value the caller sent,
+and the recommendation id does not change.
+
 ### When the plugin emits one
 
 All of these must hold:

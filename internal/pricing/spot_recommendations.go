@@ -15,7 +15,10 @@ import (
 	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
 )
 
-const spotRecommendationSource = "aws-spot-pricing"
+const (
+	spotRecommendationSource = "aws-spot-pricing"
+	pulumiURNPrefix          = "urn:pulumi:"
+)
 
 var (
 	errSpotNoOnDemandPrice = errors.New("no on-demand price for the instance type")
@@ -87,6 +90,7 @@ func buildSpotRecommendation(target *pbc.ResourceDescriptor, query spotQuery, qu
 	if resourceID == "" {
 		return nil, errSpotNoResourceID
 	}
+	displayName := spotDisplayName(resourceID)
 	current := roundMoney(quote.onDemand * hours)
 	projected := roundMoney(quote.hourly * hours)
 	savings := roundMoney(current - projected)
@@ -101,6 +105,7 @@ func buildSpotRecommendation(target *pbc.ResourceDescriptor, query spotQuery, qu
 		Source:     spotRecommendationSource,
 		Resource: &pbc.ResourceRecommendationInfo{
 			Id:           resourceID,
+			Name:         displayName,
 			Provider:     "aws",
 			ResourceType: "ec2:Instance",
 			Sku:          query.instanceType,
@@ -115,7 +120,7 @@ func buildSpotRecommendation(target *pbc.ResourceDescriptor, query spotQuery, qu
 			ProjectedCost:     projected,
 			SavingsPercentage: percentage,
 		},
-		Description: fmt.Sprintf("Move %s (%s) from on-demand to Spot capacity in %s", resourceID, query.instanceType, spotLocation(query, quote)),
+		Description: fmt.Sprintf("Move %s (%s) from on-demand to Spot capacity in %s", displayName, query.instanceType, spotLocation(query, quote)),
 		Reasoning: []string{
 			fmt.Sprintf("Spot %s costs %s USD per hour against %s USD per hour on demand, over %s hours.",
 				query.product, formatRate(quote.hourly), formatRate(quote.onDemand), formatRate(hours)),
@@ -174,6 +179,23 @@ func spotTargetIdentity(target *pbc.ResourceDescriptor) (resourceID, account str
 		}
 	}
 	return resourceID, account
+}
+
+// spotDisplayName shortens a Pulumi URN to its logical name and an instance ARN
+// to its instance id, so a description stays readable. The id itself is unchanged.
+func spotDisplayName(resourceID string) string {
+	if strings.HasPrefix(resourceID, pulumiURNPrefix) {
+		if i := strings.LastIndex(resourceID, "::"); i >= 0 && i+2 < len(resourceID) {
+			return resourceID[i+2:]
+		}
+		return resourceID
+	}
+	if strings.HasPrefix(resourceID, "arn:") {
+		if id, _ := spotTargetIdentity(&pbc.ResourceDescriptor{Arn: resourceID}); id != "" {
+			return id
+		}
+	}
+	return resourceID
 }
 
 func roundMoney(v float64) float64 {
