@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
 	"github.com/aws/smithy-go"
+	"github.com/rs/zerolog"
 	"github.com/rshade/finfocus-plugin-aws-ce/internal/client"
 	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
 	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
@@ -33,7 +34,17 @@ type recommendationAPI struct {
 }
 
 func (m *recommendationAPI) GetReservationPurchaseRecommendation(context.Context, *costexplorer.GetReservationPurchaseRecommendationInput, ...func(*costexplorer.Options)) (*costexplorer.GetReservationPurchaseRecommendationOutput, error) {
+	if m.fail != nil {
+		return nil, m.fail
+	}
 	return &costexplorer.GetReservationPurchaseRecommendationOutput{}, nil
+}
+
+func (m *recommendationAPI) GetAnomalies(context.Context, *costexplorer.GetAnomaliesInput, ...func(*costexplorer.Options)) (*costexplorer.GetAnomaliesOutput, error) {
+	if m.fail != nil {
+		return nil, m.fail
+	}
+	return &costexplorer.GetAnomaliesOutput{}, nil
 }
 
 func (m *recommendationAPI) GetRightsizingRecommendation(_ context.Context, in *costexplorer.GetRightsizingRecommendationInput, _ ...func(*costexplorer.Options)) (*costexplorer.GetRightsizingRecommendationOutput, error) {
@@ -188,8 +199,7 @@ func TestRecommendationsLargePages(t *testing.T) {
 	require.Len(t, max.Recommendations, 1000)
 }
 func TestRecommendationsStrictMetadata(t *testing.T) {
-	r, err := mapRightsizingRecommendations(rightsizingFixture())
-	require.NoError(t, err)
+	r := mapRightsizingRecommendations(zerolog.Nop(), rightsizingFixture())
 	r[0].CreatedAt = timestamppb.New(time.Now().Add(-48 * time.Hour))
 	r[0].ConfidenceScore = aws.Float64(.8)
 	require.True(t, recommendationStrictMatch(r[0], &pbc.RecommendationFilter{MaxAgeDays: 3, MinConfidenceScore: .5}, nil))
@@ -198,19 +208,23 @@ func TestRecommendationsStrictMetadata(t *testing.T) {
 	targets := []*pbc.ResourceDescriptor{{Provider: "aws", ResourceType: "ec2", Tags: map[string]string{"missing": ""}}}
 	require.False(t, recommendationStrictMatch(r[0], nil, targets))
 }
-func TestRecommendationsNoPartialResponse(t *testing.T) {
+func TestRecommendationsPartialSourceFailure(t *testing.T) {
 	m := &recommendationAPI{rights: rightsizingFixture(), planFail: errors.New("secret")}
 	r, err := recommendationCalculator(m).GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{})
-	require.Nil(t, r)
-	require.Equal(t, codes.Internal, status.Code(err))
-	require.Len(t, m.calls, 2)
+	require.NoError(t, err)
+	require.Len(t, r.GetRecommendations(), 1)
+	require.Equal(t, "ec2:Instance", r.GetRecommendations()[0].GetResource().GetResourceType())
+	require.Len(t, m.calls, 3)
 }
-func TestRecommendationsInvalidPayload(t *testing.T) {
+func TestRecommendationsSkipsUnmappableRightsizingItem(t *testing.T) {
 	m := &recommendationAPI{rights: rightsizingFixture()}
 	m.rights[0].RightsizingRecommendations[0].CurrentInstance.CurrencyCode = nil
 	r, err := recommendationCalculator(m).GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{})
-	require.Nil(t, r)
-	require.Equal(t, codes.DataLoss, status.Code(err))
+	require.NoError(t, err)
+	require.Len(t, r.GetRecommendations(), 2)
+	for _, rec := range r.GetRecommendations() {
+		require.Equal(t, "savingsplans:Account", rec.GetResource().GetResourceType())
+	}
 }
 func TestRecommendationsBudget(t *testing.T) {
 	m := &recommendationAPI{rights: rightsizingFixture()}

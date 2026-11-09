@@ -109,7 +109,7 @@ func TestOfficialStandardConformance(t *testing.T) {
 			_, _ = w.Write([]byte(`{"Budgets":[{"BudgetName":"offline","BudgetType":"COST","TimeUnit":"MONTHLY","BudgetLimit":{"Amount":"100","Unit":"USD"},"CalculatedSpend":{"ActualSpend":{"Amount":"10","Unit":"USD"},"ForecastedSpend":{"Amount":"30","Unit":"USD"}}}]}`))
 		case "AWSInsightsIndexService.GetRightsizingRecommendation":
 			recommendations.Add(1)
-			_, _ = w.Write([]byte(`{"RightsizingRecommendations":[{"AccountId":"123456789012","RightsizingType":"TERMINATE","CurrentInstance":{"ResourceId":"i-0123456789abcdef0"},"TerminateRecommendationDetail":{"EstimatedMonthlySavings":"12.50","CurrencyCode":"USD"}}]}`))
+			_, _ = w.Write([]byte(`{"RightsizingRecommendations":[{"AccountId":"123456789012","RightsizingType":"Terminate","CurrentInstance":{"ResourceId":"i-0123456789abcdef0"},"TerminateRecommendationDetail":{"EstimatedMonthlySavings":"12.50","CurrencyCode":"USD"}}]}`))
 		case "AWSInsightsIndexService.GetSavingsPlansPurchaseRecommendation", "AWSInsightsIndexService.GetReservationPurchaseRecommendation":
 			recommendations.Add(1)
 			_, _ = w.Write([]byte(`{}`))

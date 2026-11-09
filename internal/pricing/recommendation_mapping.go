@@ -7,11 +7,13 @@ import (
 	"math"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
+	"github.com/rs/zerolog"
 	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
 	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -76,86 +78,100 @@ func ec2Details(d *types.ResourceDetails) *types.EC2ResourceDetails {
 	return d.EC2ResourceDetails
 }
 
-// mapRightsizingRecommendations selects the first AWS default target, or the first alternative when none is flagged.
-func mapRightsizingRecommendations(pages []costexplorer.GetRightsizingRecommendationOutput) ([]*pbc.Recommendation, error) {
+// mapRightsizingRecommendations maps every Cost Explorer rightsizing item on the
+// pages. An item that cannot be mapped is logged and skipped, so one unfamiliar
+// item cannot erase the rest of the page.
+func mapRightsizingRecommendations(logger zerolog.Logger, pages []costexplorer.GetRightsizingRecommendationOutput) []*pbc.Recommendation {
 	var result []*pbc.Recommendation
 	for _, page := range pages {
 		for _, item := range page.RightsizingRecommendations {
-			c := item.CurrentInstance
-			if c == nil || aws.ToString(c.ResourceId) == "" || aws.ToString(item.AccountId) == "" {
-				return nil, fmt.Errorf("missing rightsizing identity")
-			}
-			var monthly, currency, target string
-			currency = aws.ToString(c.CurrencyCode)
-			switch item.RightsizingType {
-			case types.RightsizingTypeTerminate:
-				if item.TerminateRecommendationDetail == nil {
-					return nil, fmt.Errorf("missing terminate detail")
-				}
-				monthly = aws.ToString(item.TerminateRecommendationDetail.EstimatedMonthlySavings)
-				if s := aws.ToString(item.TerminateRecommendationDetail.CurrencyCode); s != "" {
-					currency = s
-				}
-			case types.RightsizingTypeModify:
-				if item.ModifyRecommendationDetail == nil || len(item.ModifyRecommendationDetail.TargetInstances) == 0 {
-					return nil, fmt.Errorf("missing modify target")
-				}
-				t := item.ModifyRecommendationDetail.TargetInstances[0]
-				for _, candidate := range item.ModifyRecommendationDetail.TargetInstances {
-					if candidate.DefaultTargetInstance {
-						t = candidate
-						break
-					}
-				}
-				monthly = aws.ToString(t.EstimatedMonthlySavings)
-				if s := aws.ToString(t.CurrencyCode); s != "" {
-					currency = s
-				}
-				if d := ec2Details(t.ResourceDetails); d != nil {
-					target = aws.ToString(d.InstanceType)
-				}
-				if target == "" {
-					return nil, fmt.Errorf("missing target instance type")
-				}
-			default:
-				return nil, fmt.Errorf("unknown rightsizing action")
-			}
-			r, e := newAWSRecommendation(aws.ToString(item.AccountId), aws.ToString(c.ResourceId), "ec2:Instance", monthly, currency)
-			if e != nil {
-				return nil, e
-			}
-			r.Resource.Name = aws.ToString(c.InstanceName)
-			if d := ec2Details(c.ResourceDetails); d != nil {
-				r.Resource.Sku = aws.ToString(d.InstanceType)
-				r.Resource.Region = aws.ToString(d.Region)
-			}
-			r.Resource.Tags = map[string]string{}
-			for _, tag := range c.Tags {
-				if len(tag.Values) == 1 {
-					r.Resource.Tags[aws.ToString(tag.Key)] = tag.Values[0]
-				}
-			}
-			if item.RightsizingType == types.RightsizingTypeTerminate {
-				r.ActionType = pbc.RecommendationActionType_RECOMMENDATION_ACTION_TYPE_TERMINATE
-				r.ActionDetail = &pbc.Recommendation_Terminate{Terminate: &pbc.TerminateAction{}}
-			} else {
-				r.ActionType = pbc.RecommendationActionType_RECOMMENDATION_ACTION_TYPE_RIGHTSIZE
-				r.ActionDetail = &pbc.Recommendation_Rightsize{Rightsize: &pbc.RightsizeAction{CurrentSku: r.Resource.Sku, CurrentInstanceType: r.Resource.Sku, RecommendedSku: target, RecommendedInstanceType: target}}
-			}
-			r.Id = recommendationID(aws.ToString(item.AccountId), recommendationSource, r.Resource.Id, r.Resource.Region, r.ActionType.String(), target)
-			if page.Metadata != nil {
-				if e = setRecommendationTime(r, aws.ToString(page.Metadata.GenerationTimestamp)); e != nil {
-					return nil, e
-				}
-				r.Metadata["aws_recommendation_set_id"] = aws.ToString(page.Metadata.RecommendationId)
-			}
-			if e = pluginsdk.ValidateRecommendation(r); e != nil {
-				return nil, fmt.Errorf("invalid rightsizing recommendation: %w", e)
+			r, err := mapRightsizingItem(page.Metadata, item)
+			if err != nil {
+				logger.Warn().Err(err).Str("rightsizing_type", string(item.RightsizingType)).Msg("skipping rightsizing recommendation that cannot be mapped")
+				continue
 			}
 			result = append(result, r)
 		}
 	}
-	return result, nil
+	return result
+}
+
+// mapRightsizingItem maps one rightsizing item. Cost Explorer returns RightsizingType
+// in title case ("Modify", "Terminate"), while the SDK constants are upper case.
+func mapRightsizingItem(metadata *types.RightsizingRecommendationMetadata, item types.RightsizingRecommendation) (*pbc.Recommendation, error) {
+	c := item.CurrentInstance
+	if c == nil || aws.ToString(c.ResourceId) == "" || aws.ToString(item.AccountId) == "" {
+		return nil, fmt.Errorf("missing rightsizing identity")
+	}
+	kind := types.RightsizingType(strings.ToUpper(string(item.RightsizingType)))
+	var monthly, currency, target string
+	currency = aws.ToString(c.CurrencyCode)
+	switch kind {
+	case types.RightsizingTypeTerminate:
+		if item.TerminateRecommendationDetail == nil {
+			return nil, fmt.Errorf("missing terminate detail")
+		}
+		monthly = aws.ToString(item.TerminateRecommendationDetail.EstimatedMonthlySavings)
+		if s := aws.ToString(item.TerminateRecommendationDetail.CurrencyCode); s != "" {
+			currency = s
+		}
+	case types.RightsizingTypeModify:
+		if item.ModifyRecommendationDetail == nil || len(item.ModifyRecommendationDetail.TargetInstances) == 0 {
+			return nil, fmt.Errorf("missing modify target")
+		}
+		t := item.ModifyRecommendationDetail.TargetInstances[0]
+		for _, candidate := range item.ModifyRecommendationDetail.TargetInstances {
+			if candidate.DefaultTargetInstance {
+				t = candidate
+				break
+			}
+		}
+		monthly = aws.ToString(t.EstimatedMonthlySavings)
+		if s := aws.ToString(t.CurrencyCode); s != "" {
+			currency = s
+		}
+		if d := ec2Details(t.ResourceDetails); d != nil {
+			target = aws.ToString(d.InstanceType)
+		}
+		if target == "" {
+			return nil, fmt.Errorf("missing target instance type")
+		}
+	default:
+		return nil, fmt.Errorf("unknown rightsizing action")
+	}
+	r, e := newAWSRecommendation(aws.ToString(item.AccountId), aws.ToString(c.ResourceId), "ec2:Instance", monthly, currency)
+	if e != nil {
+		return nil, e
+	}
+	r.Resource.Name = aws.ToString(c.InstanceName)
+	if d := ec2Details(c.ResourceDetails); d != nil {
+		r.Resource.Sku = aws.ToString(d.InstanceType)
+		r.Resource.Region = aws.ToString(d.Region)
+	}
+	r.Resource.Tags = map[string]string{}
+	for _, tag := range c.Tags {
+		if len(tag.Values) == 1 {
+			r.Resource.Tags[aws.ToString(tag.Key)] = tag.Values[0]
+		}
+	}
+	if kind == types.RightsizingTypeTerminate {
+		r.ActionType = pbc.RecommendationActionType_RECOMMENDATION_ACTION_TYPE_TERMINATE
+		r.ActionDetail = &pbc.Recommendation_Terminate{Terminate: &pbc.TerminateAction{}}
+	} else {
+		r.ActionType = pbc.RecommendationActionType_RECOMMENDATION_ACTION_TYPE_RIGHTSIZE
+		r.ActionDetail = &pbc.Recommendation_Rightsize{Rightsize: &pbc.RightsizeAction{CurrentSku: r.Resource.Sku, CurrentInstanceType: r.Resource.Sku, RecommendedSku: target, RecommendedInstanceType: target}}
+	}
+	r.Id = recommendationID(aws.ToString(item.AccountId), recommendationSource, r.Resource.Id, r.Resource.Region, r.ActionType.String(), target)
+	if metadata != nil {
+		if e = setRecommendationTime(r, aws.ToString(metadata.GenerationTimestamp)); e != nil {
+			return nil, e
+		}
+		r.Metadata["aws_recommendation_set_id"] = aws.ToString(metadata.RecommendationId)
+	}
+	if e = pluginsdk.ValidateRecommendation(r); e != nil {
+		return nil, fmt.Errorf("invalid rightsizing recommendation: %w", e)
+	}
+	return r, nil
 }
 
 // mapSavingsPlansRecommendations describes account purchase opportunities, not existing instances.

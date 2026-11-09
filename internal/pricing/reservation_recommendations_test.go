@@ -116,18 +116,19 @@ func TestReservationSDKResponse(t *testing.T) {
 	require.Empty(t, resp.GetNextPageToken())
 }
 
-func TestReservationFailuresAreAtomic(t *testing.T) {
+func TestReservationFailuresAreIsolated(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		err  error
+		hard bool
 		code codes.Code
 	}{
-		{"permission", &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "secret"}, codes.PermissionDenied},
-		{"missing dataset", &smithy.GenericAPIError{Code: "DataUnavailableException"}, codes.FailedPrecondition},
-		{"budget", client.ErrRateLimited, codes.ResourceExhausted},
-		{"cancellation", context.Canceled, codes.Canceled},
-		{"invalid payload", nil, codes.DataLoss},
-		{"internal", errors.New("secret"), codes.Internal},
+		{"permission", &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "secret"}, false, codes.PermissionDenied},
+		{"missing dataset", &smithy.GenericAPIError{Code: "DataUnavailableException"}, false, codes.FailedPrecondition},
+		{"budget", client.ErrRateLimited, true, codes.ResourceExhausted},
+		{"cancellation", context.Canceled, true, codes.Canceled},
+		{"invalid payload", nil, false, codes.DataLoss},
+		{"internal", errors.New("secret"), false, codes.Internal},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			api := &reservationTestAPI{recommendationAPI: recommendationAPI{rights: rightsizingFixture()}, fetch: func(*costexplorer.GetReservationPurchaseRecommendationInput) (*costexplorer.GetReservationPurchaseRecommendationOutput, error) {
@@ -137,9 +138,17 @@ func TestReservationFailuresAreAtomic(t *testing.T) {
 			}}
 			calc := NewCalculatorWithClient(client.NewClientWithAPI(api, "us-east-1"))
 			resp, err := calc.GetRecommendations(context.Background(), &pbc.GetRecommendationsRequest{Filter: &pbc.RecommendationFilter{Category: pbc.RecommendationCategory_RECOMMENDATION_CATEGORY_COST}})
-			require.Equal(t, tc.code, status.Code(err))
-			require.Nil(t, resp, "failure must not expose earlier rightsizing or Savings Plans results")
-			require.NotContains(t, err.Error(), "secret")
+			if tc.hard {
+				require.Nil(t, resp)
+				require.Equal(t, tc.code, status.Code(err))
+				require.NotContains(t, err.Error(), "secret")
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, resp.GetRecommendations(), 3, "a failed reservation source keeps the rightsizing and Savings Plans rows")
+			for _, rec := range resp.GetRecommendations() {
+				require.NotEqual(t, "rds:Account", rec.GetResource().GetResourceType())
+			}
 		})
 	}
 }

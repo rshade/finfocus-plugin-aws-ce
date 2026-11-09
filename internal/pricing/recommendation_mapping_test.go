@@ -1,20 +1,24 @@
 package pricing
 
 import (
+	"bytes"
+	"strings"
+	"testing"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
+	"github.com/rs/zerolog"
 	"github.com/rshade/finfocus-spec/sdk/go/pluginsdk"
 	pbc "github.com/rshade/finfocus-spec/sdk/go/proto/finfocus/v1"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func rightsizingFixture() []costexplorer.GetRightsizingRecommendationOutput {
 	return []costexplorer.GetRightsizingRecommendationOutput{{
 		RightsizingRecommendations: []types.RightsizingRecommendation{{
 			AccountId:       aws.String("123"),
-			RightsizingType: types.RightsizingTypeModify,
+			RightsizingType: types.RightsizingType("Modify"),
 			CurrentInstance: &types.CurrentInstance{
 				ResourceId: aws.String("i-123"), CurrencyCode: aws.String("USD"),
 				ResourceDetails: &types.ResourceDetails{EC2ResourceDetails: &types.EC2ResourceDetails{
@@ -30,8 +34,7 @@ func rightsizingFixture() []costexplorer.GetRightsizingRecommendationOutput {
 }
 func TestMapRightsizingRecommendations(t *testing.T) {
 	pages := rightsizingFixture()
-	recs, err := mapRightsizingRecommendations(pages)
-	require.NoError(t, err)
+	recs := mapRightsizingRecommendations(zerolog.Nop(), pages)
 	require.Len(t, recs, 1)
 	require.Equal(t, 12.5, recs[0].GetImpact().GetEstimatedSavings())
 	require.Equal(t, "i-123", recs[0].Resource.Id)
@@ -44,17 +47,14 @@ func TestMapRightsizingRecommendations(t *testing.T) {
 	require.Equal(t, "m5.medium", recs[0].GetRightsize().GetRecommendedInstanceType())
 	require.Nil(t, recs[0].ConfidenceScore)
 	require.Nil(t, recs[0].CreatedAt)
-	again, err := mapRightsizingRecommendations(pages)
-	require.NoError(t, err)
+	again := mapRightsizingRecommendations(zerolog.Nop(), pages)
 	require.Equal(t, recs[0].Id, again[0].Id)
 	pages[0].RightsizingRecommendations[0].AccountId = aws.String("456")
-	other, err := mapRightsizingRecommendations(pages)
-	require.NoError(t, err)
+	other := mapRightsizingRecommendations(zerolog.Nop(), pages)
 	require.NotEqual(t, recs[0].Id, other[0].Id)
-	pages[0].RightsizingRecommendations[0].RightsizingType = types.RightsizingTypeTerminate
+	pages[0].RightsizingRecommendations[0].RightsizingType = types.RightsizingType("Terminate")
 	pages[0].RightsizingRecommendations[0].TerminateRecommendationDetail = &types.TerminateRecommendationDetail{EstimatedMonthlySavings: aws.String("300"), CurrencyCode: aws.String("USD")}
-	recs, err = mapRightsizingRecommendations(pages)
-	require.NoError(t, err)
+	recs = mapRightsizingRecommendations(zerolog.Nop(), pages)
 	require.NotNil(t, recs[0].GetTerminate())
 }
 func TestMapSavingsPlansRecommendations(t *testing.T) {
@@ -109,14 +109,54 @@ func TestRecommendationMoney(t *testing.T) {
 		t.Run(value, func(t *testing.T) {
 			p := rightsizingFixture()
 			p[0].RightsizingRecommendations[0].ModifyRecommendationDetail.TargetInstances[0].EstimatedMonthlySavings = aws.String(value)
-			_, err := mapRightsizingRecommendations(p)
-			require.Error(t, err)
+			require.Empty(t, mapRightsizingRecommendations(zerolog.Nop(), p))
 		})
 	}
 	p := rightsizingFixture()
 	p[0].RightsizingRecommendations[0].CurrentInstance.CurrencyCode = nil
-	_, err := mapRightsizingRecommendations(p)
-	require.Error(t, err)
+	require.Empty(t, mapRightsizingRecommendations(zerolog.Nop(), p))
+}
+
+func TestMapRightsizingRecommendationsCaseInsensitiveType(t *testing.T) {
+	for _, tc := range []struct {
+		kind   string
+		action pbc.RecommendationActionType
+	}{
+		{"Modify", pbc.RecommendationActionType_RECOMMENDATION_ACTION_TYPE_RIGHTSIZE},
+		{"MODIFY", pbc.RecommendationActionType_RECOMMENDATION_ACTION_TYPE_RIGHTSIZE},
+		{"Terminate", pbc.RecommendationActionType_RECOMMENDATION_ACTION_TYPE_TERMINATE},
+		{"TERMINATE", pbc.RecommendationActionType_RECOMMENDATION_ACTION_TYPE_TERMINATE},
+	} {
+		t.Run(tc.kind, func(t *testing.T) {
+			pages := rightsizingFixture()
+			item := &pages[0].RightsizingRecommendations[0]
+			item.RightsizingType = types.RightsizingType(tc.kind)
+			if tc.action == pbc.RecommendationActionType_RECOMMENDATION_ACTION_TYPE_TERMINATE {
+				item.TerminateRecommendationDetail = &types.TerminateRecommendationDetail{EstimatedMonthlySavings: aws.String("300"), CurrencyCode: aws.String("USD")}
+			}
+			recs := mapRightsizingRecommendations(zerolog.Nop(), pages)
+			require.Len(t, recs, 1)
+			require.Equal(t, tc.action, recs[0].GetActionType())
+			require.NoError(t, pluginsdk.ValidateRecommendation(recs[0]))
+		})
+	}
+}
+
+func TestMapRightsizingRecommendationsSkipsUnmappableItems(t *testing.T) {
+	pages := rightsizingFixture()
+	valid := pages[0].RightsizingRecommendations[0]
+	unknown := valid
+	unknown.RightsizingType = types.RightsizingType("Resize")
+	unknown.CurrentInstance = &types.CurrentInstance{ResourceId: aws.String("i-unknown"), CurrencyCode: aws.String("USD")}
+	pages[0].RightsizingRecommendations = []types.RightsizingRecommendation{unknown, valid}
+	var logs bytes.Buffer
+	recs := mapRightsizingRecommendations(zerolog.New(&logs), pages)
+	require.Len(t, recs, 1)
+	require.Equal(t, "i-123", recs[0].GetResource().GetId())
+	require.Contains(t, logs.String(), `"level":"warn"`)
+	require.Contains(t, logs.String(), "skipping rightsizing recommendation that cannot be mapped")
+	require.Contains(t, logs.String(), `"rightsizing_type":"Resize"`)
+	require.False(t, strings.Contains(logs.String(), "i-unknown"), "unmappable item identity should stay out of logs")
 }
 func TestRecommendationProjection(t *testing.T) {
 	for _, tc := range []struct {
@@ -136,16 +176,14 @@ func TestMapRightsizingRecommendationsMetadata(t *testing.T) {
 	pages := rightsizingFixture()
 	pages[0].Metadata = &types.RightsizingRecommendationMetadata{GenerationTimestamp: aws.String("2026-10-19T10:00:00-05:00"), RecommendationId: aws.String("set-1")}
 	pages[0].RightsizingRecommendations[0].CurrentInstance.Tags = []types.TagValues{{Key: aws.String("team"), Values: []string{"finops"}}}
-	recs, err := mapRightsizingRecommendations(pages)
-	require.NoError(t, err)
+	recs := mapRightsizingRecommendations(zerolog.Nop(), pages)
 	require.Equal(t, "finops", recs[0].Resource.Tags["team"])
 	require.Equal(t, "2026-10-19T15:00:00Z", recs[0].CreatedAt.AsTime().Format("2006-01-02T15:04:05Z07:00"))
 	require.Nil(t, recs[0].Resource.Utilization)
 	require.Nil(t, recs[0].GetRightsize().ProjectedUtilization)
 	require.Nil(t, recs[0].Impact.ImplementationCost)
 	pages[0].Metadata.RecommendationId = aws.String("regenerated-set")
-	again, err := mapRightsizingRecommendations(pages)
-	require.NoError(t, err)
+	again := mapRightsizingRecommendations(zerolog.Nop(), pages)
 	require.Equal(t, recs[0].Id, again[0].Id)
 }
 func TestMapSavingsPlansRecommendationsMetadata(t *testing.T) {
@@ -199,14 +237,12 @@ func TestMapRightsizingDefaultTarget(t *testing.T) {
 	pages := rightsizingFixture()
 	targets := pages[0].RightsizingRecommendations[0].ModifyRecommendationDetail.TargetInstances
 	targets[1] = types.TargetInstance{DefaultTargetInstance: true, EstimatedMonthlySavings: aws.String("5"), ResourceDetails: &types.ResourceDetails{EC2ResourceDetails: &types.EC2ResourceDetails{InstanceType: aws.String("m5.xlarge")}}}
-	recs, err := mapRightsizingRecommendations(pages)
-	require.NoError(t, err)
+	recs := mapRightsizingRecommendations(zerolog.Nop(), pages)
 	require.Len(t, recs, 1)
 	require.Equal(t, "m5.xlarge", recs[0].GetRightsize().GetRecommendedInstanceType())
 	require.Equal(t, 5.0, recs[0].GetImpact().GetEstimatedSavings())
 	targets[0].DefaultTargetInstance = true
-	recs, err = mapRightsizingRecommendations(pages)
-	require.NoError(t, err)
+	recs = mapRightsizingRecommendations(zerolog.Nop(), pages)
 	require.Len(t, recs, 1)
 	require.Equal(t, "m5.medium", recs[0].GetRightsize().GetRecommendedInstanceType())
 }

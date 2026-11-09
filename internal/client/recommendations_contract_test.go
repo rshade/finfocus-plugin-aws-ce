@@ -67,7 +67,7 @@ func TestRecommendationsAWSContract(t *testing.T) {
 						http.Error(w, "unexpected AWS request", http.StatusBadRequest)
 						return
 					}
-					_, _ = fmt.Fprintf(w, `{"RightsizingRecommendations":[{"AccountId":"123456789012","RightsizingType":"TERMINATE","CurrentInstance":{"ResourceId":"i-offline","ResourceDetails":{"EC2ResourceDetails":{"InstanceType":"m5.large","Region":"us-east-1"}}},"TerminateRecommendationDetail":{"EstimatedMonthlySavings":"12.50","CurrencyCode":"USD"}}]%s}`, token)
+					_, _ = fmt.Fprintf(w, `{"RightsizingRecommendations":[{"AccountId":"123456789012","RightsizingType":"Terminate","CurrentInstance":{"ResourceId":"i-offline","ResourceDetails":{"EC2ResourceDetails":{"InstanceType":"m5.large","Region":"us-east-1"}}},"TerminateRecommendationDetail":{"EstimatedMonthlySavings":"12.50","CurrencyCode":"USD"}}]%s}`, token)
 				} else {
 					if !assert.Equal(t, "AWSInsightsIndexService.GetSavingsPlansPurchaseRecommendation", r.Header.Get("X-Amz-Target")) {
 						http.Error(w, "unexpected AWS request", http.StatusBadRequest)
