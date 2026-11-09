@@ -1,31 +1,33 @@
 metadata:
-    name: aws-ce
-    version: 0.1.2
-    description: FinFocus plugin that reads actual costs, forecasts, budgets, and optimization recommendations from AWS Cost Explorer
-    author: rshade
-    homepage: https://github.com/rshade/finfocus-plugin-aws-ce
-    repository: https://github.com/rshade/finfocus-plugin-aws-ce
-    license: Apache-2.0
-    keywords:
-        - finfocus
-        - cost
-        - plugin
-        - aws
-    createdat: null
-    updatedat: null
+  name: aws-ce
+  version: 0.1.3
+  description: >-
+    FinFocus plugin that reads actual costs, forecasts, budgets, and
+    optimization recommendations from AWS Cost Explorer
+  author: rshade
+  homepage: https://github.com/rshade/finfocus-plugin-aws-ce
+  repository: https://github.com/rshade/finfocus-plugin-aws-ce
+  license: Apache-2.0
+  keywords:
+    - finfocus
+    - cost
+    - plugin
+    - aws
+  createdat: null
+  updatedat: null
 specification:
-    specversion: "v0.7.12"
-    supportedproviders:
-        - aws
-    supportedresources: {}
-    capabilities:
-        - actual_costs
-        - projected_costs
-        - budgets
-        - recommendations
-        - batch_cost
-    servicedefinition: null
-    observabilitysupport: null
+  specversion: v0.7.12
+  supportedproviders:
+    - aws
+  supportedresources: {}
+  capabilities:
+    - actual_costs
+    - projected_costs
+    - budgets
+    - recommendations
+    - batch_cost
+  servicedefinition: null
+  observabilitysupport: null
 security: null
 installation: null
 configuration: null
