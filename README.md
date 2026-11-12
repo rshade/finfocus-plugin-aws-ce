@@ -7,7 +7,7 @@ implements the `finfocus-spec` v0.7.12 protocol over gRPC.
 This plugin integrates [AWS Cost Explorer](https://aws.amazon.com/aws-cost-management/aws-cost-explorer/)
 ([documentation](https://docs.aws.amazon.com/cost-management/latest/userguide/ce-what-is.html))
 and is a plugin for [FinFocus](https://github.com/rshade/finfocus), the Pulumi
-cost CLI. See the [FinFocus docs](https://rshade.github.io/finfocus/).
+cost CLI. See the [FinFocus docs](https://finfocus.dev/docs/).
 
 ## What it does
 
