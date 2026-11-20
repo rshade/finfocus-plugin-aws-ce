@@ -73,8 +73,10 @@ var (
 	_ pluginsdk.BudgetsProvider              = (*Calculator)(nil)
 )
 
+// PluginName is the plugin's install name. Use it wherever the plugin states its name.
+const PluginName = "aws-ce"
+
 const (
-	pluginName = "aws-ce"
 	// specVersion must keep the leading v. pluginsdk.ValidateSpecVersion rejects "0.7.0".
 	specVersion   = "v0.7.12"
 	supportedRPCs = "GetActualCost,GetProjectedCost,GetBudgets,GetRecommendations,Supports,GetPluginInfo,BatchCost"
@@ -91,7 +93,7 @@ func WithCarbonEnabled(enabled bool) CalculatorOption {
 
 // NewCalculator creates a new AWS Cost Explorer cost calculator plugin.
 func NewCalculator(options ...CalculatorOption) *Calculator {
-	base := pluginsdk.NewBasePlugin(pluginName)
+	base := pluginsdk.NewBasePlugin(PluginName)
 
 	// Configure supported providers
 	providers := []string{"aws"}
@@ -138,7 +140,7 @@ func (c *Calculator) GetPluginInfo(ctx context.Context, _ *pbc.GetPluginInfoRequ
 	defer done()
 
 	response := &pbc.GetPluginInfoResponse{
-		Name:        pluginName,
+		Name:        PluginName,
 		Version:     version.Version,
 		SpecVersion: specVersion,
 		Providers:   []string{"aws"},
@@ -709,7 +711,7 @@ func (c *Calculator) buildResponse(costs []CostEntry, expires time.Time, billing
 			Cost:        cost.Amount,
 			UsageAmount: usage,
 			UsageUnit:   unit,
-			Source:      "aws-ce",
+			Source:      PluginName,
 			FocusRecord: focus,
 			ExpiresAt:   expiresAt,
 		})
