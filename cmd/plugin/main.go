@@ -22,7 +22,7 @@ func main() {
 	// Initialize logger using SDK helpers
 	logWriter := pluginsdk.NewLogWriter()
 	level := parseLogLevel(pluginsdk.GetLogLevel())
-	logger := pluginsdk.NewPluginLogger("aws-ce", version.Version, level, logWriter)
+	logger := pluginsdk.NewPluginLogger(pricing.PluginName, version.Version, level, logWriter)
 
 	// Determine port: CLI flag takes precedence over environment variable
 	port := pluginsdk.ParsePortFlag()
